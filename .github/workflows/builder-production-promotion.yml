@@ -120,7 +120,7 @@ jobs:
             # the automatic run, so consider both event types after this board publish.
             builder_run_id=""
             builder_head_sha=""
-            candidates="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/odds_builder.yml/runs?branch=main&per_page=100" --jq ".workflow_runs[] | select((.event == \"workflow_dispatch\" or .event == \"workflow_run\") and .head_branch == \"main\" and .created_at >= \"$BOARD_PUBLISHED_AT\") | [.id, .head_sha] | @tsv")"
+            candidates="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/odds_builder.yml/runs?branch=main&per_page=100" --jq ".workflow_runs[] | select(.event == \"workflow_dispatch\" and .head_branch == \"main\" and .created_at >= \"$BOARD_PUBLISHED_AT\" or .event == \"workflow_run\" and .head_branch == \"main\" and .created_at >= \"$BOARD_PUBLISHED_AT\") | [.id, .head_sha] | @tsv")"
             while IFS=$'\t' read -r candidate_id candidate_sha; do
               [ -n "$candidate_id" ] || continue
               builder_status="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$candidate_id" --jq '.status')"
@@ -233,7 +233,7 @@ jobs:
             # If one run is superseded, re-scan rather than failing the promotion.
             builder_run_id=""
             builder_head_sha=""
-            candidates="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/odds_builder.yml/runs?branch=main&per_page=100" --jq ".workflow_runs[] | select((.event == \"workflow_dispatch\" or .event == \"workflow_run\") and .head_branch == \"main\" and .created_at >= \"$BOARD_PUBLISHED_AT\") | [.id, .head_sha] | @tsv")"
+            candidates="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/odds_builder.yml/runs?branch=main&per_page=100" --jq ".workflow_runs[] | select(.event == \"workflow_dispatch\" and .head_branch == \"main\" and .created_at >= \"$BOARD_PUBLISHED_AT\" or .event == \"workflow_run\" and .head_branch == \"main\" and .created_at >= \"$BOARD_PUBLISHED_AT\") | [.id, .head_sha] | @tsv")"
             while IFS=$'\t' read -r candidate_id candidate_sha; do
               [ -n "$candidate_id" ] || continue
               builder_status="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$candidate_id" --jq '.status')"
