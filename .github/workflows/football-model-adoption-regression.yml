@@ -21,6 +21,7 @@ on:
       - 'scripts/test_football_prequential_ensemble.py'
       - 'scripts/test_model_upgrade_football_ensemble.py'
       - '.github/workflows/autopilot-refresh.yml'
+      - '.github/workflows/tennis_pipeline.yml'
       - '.github/workflows/football-model-adoption-regression.yml'
 
 permissions:
@@ -55,7 +56,7 @@ jobs:
       - name: Test validated forecast application and protected ticket gates
         run: python scripts/test_model_upgrade_football_ensemble.py
 
-      - name: Verify the scheduled publisher applies and publishes model outputs
+      - name: Verify the canonical pipeline owns model application and forecast publication
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -74,6 +75,7 @@ jobs:
           assert 'data/football_forward_readiness.json' in publish
           assert 'cancel-in-progress: false' in workflow
           assert 'git rebase origin/main' in workflow
+          assert 'git stash push --include-untracked' in publish
           assert 'Readiness/source artifacts changed concurrently; rebuild on latest main.' in publish
           print('Canonical prediction pipeline is sole owner of model application/feed; Autopilot only publishes readiness and status.')
           PY
