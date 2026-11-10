@@ -1159,7 +1159,17 @@ def _settle_result(record: dict[str, Any], settled_by_event: dict[tuple[str, str
     final_score = source.get("final_score")
     actual = str(source.get("actual") or source.get("result") or "").lower()
     result = None
-    if record.get("sport") == "basketball":
+    if market == "set_winner":
+        set_number = int(_num(record.get("set_number")) or 0)
+        set_rows = actual_markets.get("set_winners") if isinstance(actual_markets.get("set_winners"), list) else []
+        actual_set = next((
+            item for item in set_rows
+            if isinstance(item, dict) and int(_num(item.get("set_number")) or 0) == set_number
+        ), None)
+        winner = str((actual_set or {}).get("winner") or "").lower()
+        if set_number in {1, 2} and winner in {"p1", "p2"} and side in {"p1", "p2"}:
+            result = "yes" if winner == side else "no"
+    elif record.get("sport") == "basketball":
         total = _num(source.get("final_total"))
         if total is None and isinstance(final_score, list) and len(final_score) >= 2:
             a, b = _num(final_score[0]), _num(final_score[1])
@@ -1463,7 +1473,8 @@ def _evidence_summary(records: list[dict[str, Any]]) -> dict[str, Any]:
             continue
         line = _num(row.get("line"))
         line_key = "none" if line is None else f"{line:g}"
-        key = f"{row.get('sport')}:{row.get('market')}:{line_key}:{row.get('pick')}"
+        set_key = f":set{row.get('set_number')}" if row.get("market") == "set_winner" else ""
+        key = f"{row.get('sport')}:{row.get('market')}{set_key}:{line_key}:{row.get('pick')}"
         groups.setdefault(key, []).append(row)
     summary = {}
     for key, rows in groups.items():
