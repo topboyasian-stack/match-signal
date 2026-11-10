@@ -12,6 +12,8 @@ assert.ok(ui.includes("https://raw.githubusercontent.com/topboyasian-stack/match
 assert.ok(sharedBooking.includes("https://raw.githubusercontent.com/topboyasian-stack/match-signal/main/") && sharedBooking.includes("loadNbaReleaseContext"), "NBA ticket release checks must read the current main evidence and remain fail-closed when evidence cannot be loaded");
 assert.ok(html.includes("core-workspaces-design.css?v=20261014-full-v1"), "Basketball must use the shared Match Signal design layer");
 assert.ok(html.includes("basketball-live.js?v=20261104-nba-probability-cohort1"), "Basketball must load the shared-ticket totals renderer");
+assert.ok(html.includes("winner-feed-fix=20261110"), "Basketball must force a cache-busted request for the repaired winner-prediction renderer");
+assert.ok(html.includes("qualification of the separate totals market does not control whether winner estimates are displayed"), "Basketball winner estimates must remain visible independently of the totals ticket-release gate");
 assert.ok(html.includes("basketball-design.css?v=20261024-builder-dark-v3"), "Basketball must load its latest contrast-corrected scoped design layer");
 assert.ok(workflow.includes("MS-BASKETBALL-DESK-2026.10.24-V11") && workflow.includes("basketball-design.css?v=20261024-builder-dark-v3"), "Pages production smoke markers must match the current Basketball page and CSS versions");
 assert.ok(workflow.includes("basketball-live.js?v=20261104-nba-probability-cohort1"), "Pages smoke tests must track the shared-ticket NBA renderer");
