@@ -36,7 +36,7 @@ function marketKind(market) {
 
 function isTicketSelectable(sport, product, market, pick, line, marketId, setNumber, specifier) {
   if (market === "set_winner") {
-    const match = String(specifier || "").match(/(?:^|[|,;\\s])setnr\\s*=\\s*([12])(?=$|[|,;\\s])/i);
+    const match = String(specifier || "").match(/(?:^|[|,;\s])setnr\s*=\s*([12])(?=$|[|,;\s])/i);
     return sport === "tennis" && marketId === "202" &&
       ["p1", "p2"].includes(pick) && [1, 2].includes(Number(setNumber)) &&
       Boolean(match) && Number(match[1]) === Number(setNumber);
