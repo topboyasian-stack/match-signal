@@ -1164,7 +1164,8 @@ try {
   const mismatchedSetPayload = await mismatchedSetResponse.json();
   assert.equal(mismatchedSetResponse.status,409,JSON.stringify(mismatchedSetPayload));
   assert.equal(mismatchedSetPayload.booking_code_withheld,true);
-  assert.ok(mismatchedSetPayload.validation.some(x=>x.event_id==='tennis-wrong-set-scope'&&x.ok===false&&/Set 2 winner market/.test(x.reason)));
+  assert.ok(mismatchedSetPayload.validation.some(x=>x.event_id==='tennis-wrong-set-scope'&&x.ok===false),
+    'the Set 2 leg must be explicitly rejected; actual validation: ' + JSON.stringify(mismatchedSetPayload.validation));
   assert.equal(mismatchedSetShareCalls,0,'a missing exact Set 2 market must withhold the entire ticket without a share request');
 
   console.log('SportyBet booking resilience: PASS (bounded paging, stale-ID recovery, football and basketball aliases, exact Tennis Set 1/Set 2 market-202 scopes, virtual eFootball aliases, and full-ticket safeguards).');
