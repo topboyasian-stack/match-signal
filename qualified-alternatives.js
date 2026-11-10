@@ -48,8 +48,9 @@ function optionMarkup(x){
    ? (x.quote_status==='FRESH_EXACT'?'SportyBet '+odds.toFixed(2):'Last-seen '+odds.toFixed(2))
    : 'SportyBet price unavailable';
  const probabilityText=Number.isFinite(probability)?Math.round(probability*100)+'% model probability':'Model probability unavailable';
+ const scopeNote=x.market==='set_winner'?'<span>Shared per-set estimate · not adjusted for the previous set outcome</span>':'';
  const control=x.ticket_selectable===true?ticketButton(x):'<span class="ms-alt-research-note">Research display only · ticket mapping not enabled</span>';
- return '<div class="ms-alt-option"><div class="ms-alt-copy"><b>'+escapeHtml(displayPick(x))+'</b><span>'+escapeHtml(x.market_label||x.market||'Market')+' · '+escapeHtml(probabilityText)+' · '+escapeHtml(price)+'</span><span>'+escapeHtml(quoteLabel(x))+'</span><span>'+escapeHtml(comparisonLabel(x))+'</span><span>'+escapeHtml(qualificationLabel(x))+'</span></div>'+control+'</div>';
+ return '<div class="ms-alt-option"><div class="ms-alt-copy"><b>'+escapeHtml(displayPick(x))+'</b><span>'+escapeHtml(x.market_label||x.market||'Market')+' · '+escapeHtml(probabilityText)+' · '+escapeHtml(price)+'</span><span>'+escapeHtml(quoteLabel(x))+'</span><span>'+escapeHtml(comparisonLabel(x))+'</span>'+scopeNote+'<span>'+escapeHtml(qualificationLabel(x))+'</span></div>'+control+'</div>';
 }
 function attach(){
  const cards=document.querySelectorAll('[data-ms-fixture-id]');
