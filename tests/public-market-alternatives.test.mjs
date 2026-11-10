@@ -276,3 +276,48 @@ test("eFootball alternatives keep exact product and fallback event identity", as
   assert.equal(payload.alternatives[0].product, "efootball_gt");
   assert.equal(payload.alternatives[0].sportybet_event_id, "fixture-1");
 });
+
+test("tennis Set 1 and Set 2 winners remain visible across match-probability comparisons", async () => {
+  const rows = [
+    candidate({
+      sport: "tennis", market: "set_winner", line: null, set_number: 1, pick: "p1",
+      model_probability: 0.5772, bookmaker_odds: 1.82, sportybet_event_id: "sr:match:tennis-set-scope",
+      sportybet_market_id: "202", sportybet_specifier: "setnr=1",
+      original_primary_pick: "p1", original_primary_market: "winner", original_primary_probability: 0.65
+    }),
+    candidate({
+      sport: "tennis", market: "set_winner", line: null, set_number: 2, pick: "p1",
+      model_probability: 0.5772, bookmaker_odds: 1.86, sportybet_event_id: "sr:match:tennis-set-scope",
+      sportybet_market_id: "202", sportybet_specifier: "setnr=2",
+      original_primary_pick: "p1", original_primary_market: "winner", original_primary_probability: 0.65
+    }),
+    candidate({
+      sport: "tennis", market: "set_winner", line: null, set_number: 1, pick: "p2",
+      model_probability: 0.4228, bookmaker_odds: 2.02, sportybet_event_id: "sr:match:tennis-set-scope",
+      sportybet_market_id: "202", sportybet_specifier: "setnr=1",
+      original_primary_pick: "p1", original_primary_market: "winner", original_primary_probability: 0.65
+    })
+  ];
+  const payload = await (await call(rows)).json();
+  const setRows = payload.alternatives.filter(row => row.market === "set_winner");
+  assert.equal(setRows.length, 2, "both sets must remain independently visible");
+  assert.deepEqual(setRows.map(row => row.set_number).sort(), [1, 2]);
+  assert.ok(setRows.every(row => row.pick === "p1"), "show the most likely player per set rather than both sides");
+  assert.ok(setRows.every(row => row.ticket_selectable === true));
+  assert.ok(setRows.every(row => row.primary_comparison_status === "MARKET_SCOPE_NOT_COMPARABLE"));
+  assert.deepEqual(setRows.map(row => row.market_label).sort(), ["Set 1 winner", "Set 2 winner"]);
+  assert.equal(payload.diagnostics.rejected_by_reason.not_more_likely_than_primary || 0, 0);
+});
+
+test("tennis set-winner research stays visible but mismatched set specifiers are not ticket selectable", async () => {
+  const payload = await (await call([candidate({
+    sport: "tennis", market: "set_winner", line: null, set_number: 2, pick: "p1",
+    model_probability: 0.57, bookmaker_odds: null, sportybet_event_id: "sr:match:wrong-scope",
+    sportybet_market_id: "202", sportybet_specifier: "setnr=1",
+    fresh_exact_quote: false, passed_builder_gates: false
+  })])).json();
+  assert.equal(payload.alternatives.length, 1);
+  assert.equal(payload.alternatives[0].set_number, 2);
+  assert.equal(payload.alternatives[0].ticket_selectable, false);
+  assert.equal(payload.alternatives[0].builder_qualified, false);
+});
