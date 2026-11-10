@@ -59,6 +59,7 @@ export async function onRequestGet(context){
           // SportyBet's tournamentId filter truncates the NBA result to five rows.
           // Pull the paged basketball feed unfiltered, then keep exact NBA IDs below.
           Object.entries(params).forEach(([k,v])=>url.searchParams.set(k,v));
+          // Cloudflare Workers reject RequestInit.cache; timestamped URLs plus no-cache headers preserve fresh SportyBet quotes.
           const r=await fetch(url.toString(),{
             headers:{'Accept':'application/json, text/plain, */*','Current-Country':'NG','Cache-Control':'no-cache','Pragma':'no-cache'},
             signal:AbortSignal.timeout(12000)
