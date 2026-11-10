@@ -356,6 +356,44 @@ class FuturePrematchFilterTests(unittest.TestCase):
 
 
 
+class TennisSetWinnerMarketSpecifierTests(unittest.TestCase):
+    def test_tennis_snapshot_preserves_distinct_set_winner_specifiers(self):
+        event = {
+            "event_id": "sr:match:tennis-set-specifier",
+            "tournament": "ATP Stockholm, Sweden Men Singles",
+            "category": "ATP",
+            "start_time_ms": KICKOFF_MS,
+            "markets": [
+                {
+                    "id": "202", "desc": "1st set - winner", "specifier": "setnr=1",
+                    "outcomes": [
+                        {"id": "4", "desc": "Home", "odds": "1.81", "isActive": 1},
+                        {"id": "5", "desc": "Away", "odds": "2.00", "isActive": 1},
+                    ],
+                },
+                {
+                    "id": "202", "desc": "2nd set - winner", "specifier": "setnr=2",
+                    "outcomes": [
+                        {"id": "4", "desc": "Home", "odds": "1.82", "isActive": 1},
+                        {"id": "5", "desc": "Away", "odds": "2.00", "isActive": 1},
+                    ],
+                },
+            ],
+        }
+        snapshot = predict_today._sportybet_market_snapshot(event, "tennis")
+        set_markets = [
+            row for row in snapshot["markets"]
+            if str(row.get("id")) == "202"
+        ]
+        self.assertEqual(len(set_markets), 2)
+        self.assertEqual([row.get("specifier") for row in set_markets], ["setnr=1", "setnr=2"])
+        self.assertEqual([row["name"] for row in set_markets], ["1st set - winner", "2nd set - winner"])
+        self.assertEqual(
+            [[outcome["id"] for outcome in row["outcomes"]] for row in set_markets],
+            [["4", "5"], ["4", "5"]],
+        )
+
+
 class CurrentSportyBetQuoteTimestampTests(unittest.TestCase):
     def test_matched_live_snapshot_sets_builder_freshness_fields(self):
         prediction_row = prediction()
