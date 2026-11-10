@@ -1056,5 +1056,117 @@ try {
   assert.ok(ageGroupPayload.validation.some(row=>row.event_id==='prediction-man-utd-u21'&&row.ok===false));
   assert.equal(ageGroupDoesNotMatch.length,0,'a first-team alias must never satisfy an U21 ticket leg');
 
-  console.log('SportyBet booking resilience: PASS (bounded paging, stale-ID recovery, football and basketball aliases, virtual slot-aware eFootball aliases, exact live markets, and full-ticket safeguards).');
+  // Tennis Set 1 and Set 2 must resolve to distinct market-202 setnr
+  // specifiers and exact player outcome IDs on the current provider event.
+  const tennisSetStart = Date.now() + 5 * 60 * 60 * 1000;
+  const tennisSetFixtures = [
+    {
+      event_id: 'tennis-source-set-one',
+      sportybet_event_id: 'sr:match:tennis-set-one',
+      sport: 'tennis', market: 'set_winner', set_number: 1, market_id: '202', pick: 'p1',
+      player_1: 'Alice Alpha', player_2: 'Bruno Beta',
+      match: 'Alice Alpha vs Bruno Beta', start_time: new Date(tennisSetStart).toISOString()
+    },
+    {
+      event_id: 'tennis-source-set-two',
+      sportybet_event_id: 'sr:match:tennis-set-two',
+      sport: 'tennis', market: 'set_winner', set_number: 2, market_id: '202', pick: 'p2',
+      player_1: 'Carla Gamma', player_2: 'Diego Delta',
+      match: 'Carla Gamma vs Diego Delta', start_time: new Date(tennisSetStart + 60 * 60 * 1000).toISOString()
+    }
+  ];
+  const tennisCurrentEvents = new Map([
+    ['sr:match:tennis-set-one', {
+      eventId: 'sr:match:tennis-set-one', homeTeamName: 'Alice Alpha', awayTeamName: 'Bruno Beta',
+      estimateStartTime: tennisSetStart, matchStatus: 'Not start',
+      markets: [{id:'202',desc:'1st Set Winner',specifier:'setnr=1',status:'0',outcomes:[
+        {id:'tennis-s1-alice',desc:'Alice Alpha',odds:1.82,isActive:1},
+        {id:'tennis-s1-bruno',desc:'Bruno Beta',odds:2.02,isActive:1}
+      ]}]
+    }],
+    ['sr:match:tennis-set-two', {
+      eventId: 'sr:match:tennis-set-two', homeTeamName: 'Carla Gamma', awayTeamName: 'Diego Delta',
+      estimateStartTime: tennisSetStart + 60 * 60 * 1000, matchStatus: 'Not start',
+      markets: [{id:'202',desc:'2nd Set Winner',specifier:'setnr=2',status:'0',outcomes:[
+        {id:'tennis-s2-carla',desc:'Carla Gamma',odds:1.86,isActive:1},
+        {id:'tennis-s2-diego',desc:'Diego Delta',odds:1.98,isActive:1}
+      ]}]
+    }]
+  ]);
+  const tennisShareRequests = [];
+  globalThis.fetch = async (input, options = {}) => {
+    const url = new URL(typeof input === 'string' ? input : input.url);
+    if (url.pathname === '/api/ng/orders/share') {
+      tennisShareRequests.push(JSON.parse(String(options.body || '{}')));
+      return jsonResponse({bizCode:10000,data:{shareCode:'TENNIS-SET-SCOPES-EXACT',outcomes:[{odds:1.82},{odds:1.98}]}});
+    }
+    if (url.pathname === '/api/ng/factsCenter/event') {
+      const eventId = String(url.searchParams.get('eventId') || '');
+      const event = tennisCurrentEvents.get(eventId);
+      assert.ok(event, 'Only the two known current tennis events should be requested');
+      return jsonResponse({bizCode:10000,data:{event}});
+    }
+    throw new Error('Unexpected tennis set-winner booking request: ' + url.toString());
+  };
+  const tennisSetResponse = await onRequest({request:new Request('https://match-signal.pages.dev/api/sportybet-booking',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({mode:'manual',manual_selections:tennisSetFixtures})
+  })});
+  const tennisSetPayload = await tennisSetResponse.json();
+  assert.equal(tennisSetResponse.status,200,JSON.stringify(tennisSetPayload));
+  assert.equal(tennisSetPayload.ok,true,JSON.stringify(tennisSetPayload));
+  assert.equal(tennisSetPayload.booking_code,'TENNIS-SET-SCOPES-EXACT');
+  assert.equal(tennisSetPayload.selection_count,2);
+  assert.equal(tennisShareRequests.length,1,'both tennis set winners must be shared in one all-or-nothing ticket');
+  assert.deepEqual(tennisShareRequests[0].selections.map(x=>({
+    eventId:x.eventId,marketId:x.marketId,specifier:x.specifier,outcomeId:x.outcomeId
+  })),[
+    {eventId:'sr:match:tennis-set-one',marketId:'202',specifier:'setnr=1',outcomeId:'tennis-s1-alice'},
+    {eventId:'sr:match:tennis-set-two',marketId:'202',specifier:'setnr=2',outcomeId:'tennis-s2-diego'}
+  ]);
+
+  // A Set 2 request must not fall back to an otherwise open Set 1 market.
+  const mismatchedSetStart = Date.now() + 4 * 60 * 60 * 1000;
+  let mismatchedSetShareCalls = 0;
+  globalThis.fetch = async input => {
+    const url = new URL(typeof input === 'string' ? input : input.url);
+    if (url.pathname === '/api/ng/orders/share') {
+      mismatchedSetShareCalls++;
+      return jsonResponse({bizCode:10000,data:{shareCode:'MUST-NOT-BE-CREATED'}});
+    }
+    if (url.pathname === '/api/ng/factsCenter/event') {
+      const eventId = String(url.searchParams.get('eventId') || '');
+      const second = eventId === 'sr:match:tennis-other-fixture';
+      return jsonResponse({bizCode:10000,data:{event:{
+        eventId,
+        homeTeamName:second?'George Golf':'Eva Echo',
+        awayTeamName:second?'Helen Hotel':'Finn Foxtrot',
+        estimateStartTime:mismatchedSetStart + (second ? 3600000 : 0),matchStatus:'Not start',
+        markets:[{id:'202',desc:'1st Set Winner',specifier:'setnr=1',status:'0',outcomes:[
+          {id:second?'other-s1-george':'only-s1-eva',desc:second?'George Golf':'Eva Echo',odds:1.9,isActive:1},
+          {id:second?'other-s1-helen':'only-s1-finn',desc:second?'Helen Hotel':'Finn Foxtrot',odds:1.9,isActive:1}
+        ]}]
+      }}});
+    }
+    throw new Error('Unexpected mismatched tennis set request: ' + url.toString());
+  };
+  const mismatchedSetResponse = await onRequest({request:new Request('https://match-signal.pages.dev/api/sportybet-booking',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({mode:'manual',manual_selections:[
+      {event_id:'tennis-wrong-set-scope',sportybet_event_id:'sr:match:tennis-only-set-one',sport:'tennis',
+       market:'set_winner',set_number:2,market_id:'202',pick:'p1',player_1:'Eva Echo',player_2:'Finn Foxtrot',
+       match:'Eva Echo vs Finn Foxtrot',start_time:new Date(mismatchedSetStart).toISOString()},
+      {event_id:'tennis-other-fixture',sportybet_event_id:'sr:match:tennis-other-fixture',sport:'tennis',
+       market:'set_winner',set_number:1,pick:'p1',market_id:'202',player_1:'George Golf',player_2:'Helen Hotel',
+       match:'George Golf vs Helen Hotel',start_time:new Date(mismatchedSetStart + 3600000).toISOString()}
+    ]})
+  })});
+  const mismatchedSetPayload = await mismatchedSetResponse.json();
+  assert.equal(mismatchedSetResponse.status,409,JSON.stringify(mismatchedSetPayload));
+  assert.equal(mismatchedSetPayload.booking_code_withheld,true);
+  assert.equal(mismatchedSetPayload.validation.some(x=>x.event_id==='tennis-wrong-set-scope'&&x.ok===true),false,
+    'the Set 2 leg must not validate against a Set 1-only catalogue; actual validation: ' + JSON.stringify(mismatchedSetPayload.validation));
+  assert.equal(mismatchedSetShareCalls,0,'a missing exact Set 2 market must withhold the entire ticket without a share request');
+
+  console.log('SportyBet booking resilience: PASS (bounded paging, stale-ID recovery, football and basketball aliases, exact Tennis Set 1/Set 2 market-202 scopes, virtual eFootball aliases, and full-ticket safeguards).');
 } finally { globalThis.fetch=originalFetch; }
