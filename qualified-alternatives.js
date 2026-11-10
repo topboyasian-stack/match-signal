@@ -8,6 +8,7 @@ function displayPick(x){
  if(x.market==='total')return pick.toUpperCase()+' '+(x.line==null?'':x.line);
  if(x.market==='btts')return 'BTTS '+pick.toUpperCase();
  if(x.market==='double_chance')return 'DOUBLE CHANCE '+pick.toUpperCase();
+ if(x.market==='set_winner')return 'SET '+String(x.set_number||'')+' WINNER · '+(pick==='p1'?(x.player_1||'Player 1'):(x.player_2||'Player 2'));
  if(pick==='p1')return x.player_1||'Participant 1';
  if(pick==='p2')return x.player_2||'Participant 2';
  if(pick==='draw')return 'Draw';
@@ -33,11 +34,12 @@ function qualificationLabel(x){
 }
 function comparisonLabel(x){
  if(x.primary_comparison_status==='MORE_LIKELY_THAN_PRIMARY')return 'Higher model probability than primary pick';
+ if(x.primary_comparison_status==='MARKET_SCOPE_NOT_COMPARABLE')return 'Set probability is assessed separately from match-winner probability';
  return 'Primary probability unavailable for direct comparison';
 }
 function ticketButton(x){
  const pick=String(x.pick||'').toLowerCase(),line=x.line;
- return '<button type="button" data-ms-ticket-add data-ticket-sport="'+escapeHtml(x.sport)+'" data-ticket-event="'+escapeHtml(x.event_id)+'" data-ticket-sportybet-event="'+escapeHtml(x.sportybet_event_id)+'" '+(x.sport==='efootball'?'data-ticket-product="'+escapeHtml(x.product)+'" ':'')+'data-ticket-model-qualified="'+String(x.builder_qualified===true)+'" data-ticket-market="'+escapeHtml(x.market)+'" data-ticket-pick="'+escapeHtml(pick)+'" data-ticket-line="'+(line==null?'':escapeHtml(line))+'" data-ticket-market-id="'+escapeHtml(x.market_id)+'" data-ticket-odds="'+(x.odds==null?'':escapeHtml(x.odds))+'" data-ticket-start="'+escapeHtml(x.start_time)+'" data-ticket-player1="'+escapeHtml(x.player_1)+'" data-ticket-player2="'+escapeHtml(x.player_2)+'" data-ticket-match="'+escapeHtml(x.match||((x.player_1||'')+' vs '+(x.player_2||'')))+'">Add to ticket</button>';
+ return '<button type="button" data-ms-ticket-add data-ticket-sport="'+escapeHtml(x.sport)+'" data-ticket-event="'+escapeHtml(x.event_id)+'" data-ticket-sportybet-event="'+escapeHtml(x.sportybet_event_id)+'" '+(x.sport==='efootball'?'data-ticket-product="'+escapeHtml(x.product)+'" ':'')+'data-ticket-model-qualified="'+String(x.builder_qualified===true)+'" data-ticket-market="'+escapeHtml(x.market)+'" data-ticket-pick="'+escapeHtml(pick)+'" data-ticket-line="'+(line==null?'':escapeHtml(line))+'" data-ticket-set-number="'+(x.set_number==null?'':escapeHtml(x.set_number))+'" data-ticket-market-id="'+escapeHtml(x.market_id)+'" data-ticket-odds="'+(x.odds==null?'':escapeHtml(x.odds))+'" data-ticket-start="'+escapeHtml(x.start_time)+'" data-ticket-player1="'+escapeHtml(x.player_1)+'" data-ticket-player2="'+escapeHtml(x.player_2)+'" data-ticket-match="'+escapeHtml(x.match||((x.player_1||'')+' vs '+(x.player_2||'')))+'">Add to ticket</button>';
 }
 function optionMarkup(x){
  const probability=Number(x.probability);
@@ -54,9 +56,10 @@ function attach(){
  cards.forEach(card=>{
   const event=card.getAttribute('data-ms-fixture-id'),sport=card.getAttribute('data-ms-fixture-sport');
   let host=card.querySelector('.ms-qualified-alternatives');
-  const found=rows.filter(x=>x.event_id===event&&x.sport===sport).slice(0,2);
+  const matching=rows.filter(x=>x.event_id===event&&x.sport===sport);
+  const found=matching.slice(0,(sport==='tennis'&&matching.some(x=>x.market==='set_winner'))?4:2);
   if(!found.length){if(host)host.remove();return;}
-  const signature=JSON.stringify(found.map(x=>[x.market,x.pick,x.line,x.probability,x.odds,x.quote_status,x.builder_qualified,x.ticket_selectable,x.qualification_status,x.below_research_baseline,x.primary_comparison_status]));
+  const signature=JSON.stringify(found.map(x=>[x.market,x.set_number,x.pick,x.line,x.probability,x.odds,x.quote_status,x.builder_qualified,x.ticket_selectable,x.qualification_status,x.below_research_baseline,x.primary_comparison_status]));
   if(host&&host.dataset.signature===signature)return;
   if(!host){host=document.createElement('section');host.className='ms-qualified-alternatives';card.appendChild(host);}
   host.dataset.signature=signature;
