@@ -30,6 +30,14 @@ SELECTION_GATE=DATA/"selection_gate.json"
 RISK_GATE=DATA/"risk_gate.json"
 ACTIVE_PREDICTION_ROWS=None  # Set by main() when a fresh Unified Upcoming fallback is used.
 
+
+def _evaluation_time_after_market_refresh(started_at):
+    """Use a clock taken after network capture when evaluating captured quote freshness."""
+    current = datetime.now(timezone.utc)
+    if getattr(started_at, "tzinfo", None) is None:
+        started_at = started_at.replace(tzinfo=timezone.utc)
+    return max(started_at, current)
+
 MIN_PROB=0.60
 MIN_EDGE=0.025
 MAX_ODDS_AGE_SECONDS=900
@@ -5581,6 +5589,12 @@ def main():
         # Fail closed when the current SportyBet layer cannot be refreshed.
         market_refresh={"status":"failed","error":str(exc)[:240]}
 
+    # attach_sportybet_market_layer stamps quotes when each upstream response is
+    # received. The Builder's initial clock predates that network round-trip, so
+    # using it would incorrectly classify every newly captured quote as a future
+    # timestamp. Re-anchor evaluation only after capture; genuinely future stamps
+    # still fail closed in the quote validator.
+    now = _evaluation_time_after_market_refresh(now)
     football=football_candidates(now) if market_refresh.get("status")=="ok" else []
     tennis=tennis_candidates(now) if market_refresh.get("status")=="ok" else []
     virtual,virtual_diag=virtual_candidates(now)
