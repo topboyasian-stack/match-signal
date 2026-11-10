@@ -299,10 +299,11 @@ export function buildPublicAlternatives(document, nowMs = Date.now()) {
     if (hasSetWinners) {
       // Keep Set 1 and Set 2 independently visible; a generic two-row cap
       // previously allowed one set market to hide the other.
-      const setRows = rankedRows.filter(row => row.market === "set_winner")
-        .sort((a, b) => Number(a.set_number) - Number(b.set_number) || b.probability - a.probability);
-      for (const row of setRows) {
-        if (!selected.some(x => x.market === row.market && x.set_number === row.set_number && x.pick === row.pick)) selected.push(row);
+      const setRows = rankedRows.filter(row => row.market === "set_winner");
+      for (const setNumber of [1, 2]) {
+        const bestForSet = setRows.filter(row => Number(row.set_number) === setNumber)
+          .sort((a, b) => b.probability - a.probability)[0];
+        if (bestForSet) selected.push(bestForSet);
       }
     }
     for (const row of rankedRows) {
@@ -334,7 +335,7 @@ export async function onRequestGet({ request, env }) {
   if (request.method !== "GET") return json({ error: "METHOD_NOT_ALLOWED" }, 405);
   try {
     const raw = await env.MATCH_SIGNAL_ANALYST_STORE.get(EVIDENCE_KEY);
-    if (!raw) return json({ status: "EMPTY", publication_policy_version: "research-visible-v2", min_probability: 0, research_display_baseline: RESEARCH_DISPLAY_BASELINE, builder_min_probability: MIN_RECOMMENDED_PROBABILITY, max_per_fixture: 2, alternatives: [] });
+    if (!raw) return json({ status: "EMPTY", publication_policy_version: "research-visible-v2", min_probability: 0, research_display_baseline: RESEARCH_DISPLAY_BASELINE, builder_min_probability: MIN_RECOMMENDED_PROBABILITY, max_per_fixture: 4, default_max_per_fixture: 2, alternatives: [] });
     const document = JSON.parse(raw);
     if (!document || document.record_type !== "cross_sport_market_reassessment" || !Array.isArray(document.records)) {
       return json({ error: "EVIDENCE_UNAVAILABLE" }, 503);
