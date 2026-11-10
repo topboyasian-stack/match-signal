@@ -41,9 +41,9 @@ permissions:
   actions: write
   contents: read
 
-# Fresh concurrency namespace releases runs waiting on the superseded Unified Upcoming publisher queue; preserve the ordered promotion sequence.
+# Fresh v13 promotion namespace releases stale queued runs after the v12 child-board retry fix; preserve the ordered board -> Builder -> Pages sequence.
 concurrency:
-  group: builder-production-promotion-v12
+  group: builder-production-promotion-v13
   cancel-in-progress: false
 
 jobs:
