@@ -13,6 +13,7 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import cross_sport_market_reassessment as reassessment
 import sync_cross_sport_private_evidence as evidence_sync
+import settle_tennis_history as tennis_settlement
 from fixture_primary_prediction_ledger import build_fixture_ledger, merge_primary_ledger, primary_summary
 
 
@@ -424,8 +425,17 @@ class CrossSportReassessmentTests(unittest.TestCase):
         self.assertEqual(by_scope[(2, "p1")]["sportybet_specifier"], "setnr=2")
         self.assertEqual(by_scope[(1, "p1")]["sportybet_outcome_id"], "s1-a")
         self.assertEqual(by_scope[(2, "p2")]["sportybet_outcome_id"], "s2-b")
+        class FakeTennisCore(FakeCore):
+            @staticmethod
+            def market_rows(candidate):
+                return candidate.get("reassessment_market_rows", [])
+
+            @staticmethod
+            def make_leg(candidate):
+                return {"builder_eligible": True, "status": "VALUE_RESEARCH_CANDIDATE"}
+
         for item in set_rows:
-            record = reassessment._make_audit_record(FakeCore(), item, self.now)
+            record = reassessment._make_audit_record(FakeTennisCore(), item, self.now)
             self.assertFalse(record["bookable"])
             self.assertFalse(record["qualification_allowed"])
             self.assertFalse(record["passed_builder_gates"])
@@ -448,6 +458,48 @@ class CrossSportReassessmentTests(unittest.TestCase):
         exact = [item for item in audit if item.get("builder_market") == "set_winner" and item.get("sportybet_outcome_id")]
         self.assertEqual({item["set_number"] for item in exact}, {1})
         self.assertFalse(any(item["set_number"] == 2 for item in exact))
+
+    def test_tennis_set_winner_settlement_uses_player_identity_not_competitor_order(self):
+        row = {
+            "player_1": "Player Two",
+            "player_2": "Player One",
+            "analytics": {"total_games": {"line": 22.5}, "pick": "over"},
+        }
+        competition = {
+            "status": {"type": {"completed": True}},
+            "competitors": [
+                {"athlete": {"displayName": "Player One"}, "winner": True,
+                 "linescores": [{"value": 6}, {"value": 4}]},
+                {"athlete": {"displayName": "Player Two"},
+                 "linescores": [{"value": 3}, {"value": 6}]},
+            ],
+        }
+        self.assertTrue(tennis_settlement.settle_row(row, competition))
+        self.assertEqual(row["actual_markets"]["set_winners"], [
+            {"set_number": 1, "winner": "p2"},
+            {"set_number": 2, "winner": "p1"},
+        ])
+
+    def test_set_winner_audit_settles_only_its_selected_set(self):
+        source = {
+            "actual_markets": {
+                "set_winners": [
+                    {"set_number": 1, "winner": "p1"},
+                    {"set_number": 2, "winner": "p2"},
+                ]
+            },
+            "settled_at": self.now.isoformat(),
+        }
+        first = reassessment._settle_result({
+            "sport": "tennis", "event_id": "tennis-set", "market": "set_winner",
+            "set_number": 1, "pick": "p1",
+        }, {("tennis", "tennis-set"): source})
+        second = reassessment._settle_result({
+            "sport": "tennis", "event_id": "tennis-set", "market": "set_winner",
+            "set_number": 2, "pick": "p1",
+        }, {("tennis", "tennis-set"): source})
+        self.assertEqual(first["settlement_result"], "yes")
+        self.assertEqual(second["settlement_result"], "no")
 
     def test_future_quote_timestamp_fails_closed(self):
         row = sample_football(self.now, quote_age_seconds=0)
