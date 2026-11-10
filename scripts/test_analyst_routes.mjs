@@ -99,6 +99,54 @@ assert.equal(
   "fixtures within two minutes of kickoff or already started must stay hidden"
 );
 
+// Model-only alternatives are published from a replace-on-refresh list, not the
+// immutable exact-quote history. They must remain visible without becoming bookable.
+const currentResearch = buildPublicAlternatives({
+  record_type: "cross_sport_market_reassessment",
+  updated_at: new Date(alternativesNow).toISOString(),
+  records: [],
+  current_research_candidates: [{
+    sport: "football",
+    event_id: "football-model-only-1",
+    start_time: new Date(alternativesNow + 3 * 60 * 60 * 1000).toISOString(),
+    match: "Research Home FC vs Research Away FC",
+    market: "total_goals",
+    line: 2.5,
+    pick: "over",
+    model_probability: 0.78,
+    original_pick: "p1",
+    original_primary_pick: "p1",
+    original_primary_market: "1X2",
+    original_primary_probability: 0.56,
+    primary_prediction_id: "primary-model-only-1",
+    prediction_role: "ALTERNATIVE",
+    alternative_source: "SYSTEM_RECOMMENDED",
+    candidate_status: "RESEARCH_ONLY_NO_LIVE_QUOTE",
+    research_only: true,
+    bookable: false,
+    qualification_allowed: false,
+    passed_builder_gates: false,
+    fresh_exact_quote: false,
+    bookmaker_odds: null,
+    quote_timestamp: null,
+    market_odds_timestamp: null,
+    odds_timestamp: null,
+    sportybet_event_id: null,
+    sportybet_market_id: null,
+    sportybet_outcome_id: null,
+    sportybet_outcome_name: null,
+    sportybet_specifier: null
+  }]
+}, alternativesNow);
+assert.equal(currentResearch.alternatives.length, 1, "model-only research alternatives must reach public display");
+assert.equal(currentResearch.diagnostics.current_research_candidates_seen, 1);
+assert.equal(currentResearch.alternatives[0].event_id, "football-model-only-1");
+assert.equal(currentResearch.alternatives[0].quote_status, "UNVERIFIED");
+assert.equal(currentResearch.alternatives[0].odds, null);
+assert.equal(currentResearch.alternatives[0].ticket_selectable, false);
+assert.equal(currentResearch.alternatives[0].builder_qualified, false);
+assert.equal(currentResearch.alternatives[0].qualification_status, "RESEARCH_ONLY_MARKET_NOT_TICKET_MAPPED");
+
 const primaryIdLinked = buildPublicAlternatives({
   record_type: "cross_sport_market_reassessment",
   generated_at: new Date(alternativesNow).toISOString(),
