@@ -144,17 +144,17 @@ def main():
             "Shared ticket catalogue scans must stop at the regional proxy's supported fifth page")
     require("export async function requestSportyBetShare" in api and
             "for (const origin of [SPORTYBET_PROXY_ORIGIN, ORIGIN])" in api and
-            "const shareResult = await requestSportyBetShare(selections, { deadlineAt: manualDeadlineAt, timeoutMs: manualMode ? 6500 : 12000 })" in api,
+            "const shareResult = await requestSportyBetShare(selections, { deadlineAt: requestDeadlineAt, timeoutMs: manualMode ? 6500 : 9000 })" in api,
             "Share-code creation must try both SportyBet sources within the manual request deadline and return JSON failures")
     require("async function collectCurrentEventsById(legs, deadlineAt = null, sharedMatchedLegs = null)" in api and
             "upstream('/api/ng/factsCenter/event'" in api and
-            "const directEvents = await collectCurrentEventsById(lookupLegs, manualDeadlineAt, sharedMatchedLegs)" in api and
+            "const directEvents = await collectCurrentEventsById(lookupLegs, catalogueDeadlineAt, sharedMatchedLegs)" in api and
             "const unresolvedLegs = lookupLegs.filter(leg => !sharedMatchedLegs.has(leg))" in api,
             "Manual booking must try SportyBet single-event details by current provider ID first, then catalogue-scan only unresolved aliases")
     require("const lookupLegs = manualMode ? legs.filter" in api and "const basketballLegs = lookupLegs.filter" in api and
             "const unresolvedBasketballLegs = unresolvedLegs.filter" in api and
             "unresolvedBasketballLegs.flatMap(leg => [leg.sportybet_event_id, leg.event_id])" in api and
-            "collectBasketballEvents(context, unresolvedBasketballIds, catalogueTimeline, unresolvedBasketballLegs, manualDeadlineAt)" in api and
+            "collectBasketballEvents(context, unresolvedBasketballIds, catalogueTimeline, unresolvedBasketballLegs, catalogueDeadlineAt)" in api and
             "targetBasketballFixtureMatches" in api and "directProvider = sportybetId ? found.get(sportybetId) : null" in api,
             "Mixed-sport tickets must try direct SportyBet event details first, then resolve only unmatched Basketball fixtures by provider ID or verified participants and kickoff, while excluding started legs")
     require("const unresolvedFootballLegs = unresolvedLegs.filter" in api and
