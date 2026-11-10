@@ -14,11 +14,6 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
-try:
-    from curl_cffi import requests as http
-except ImportError:
-    import requests as http
-
 from settle_same_day import brier
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -27,7 +22,19 @@ HISTORY_PATH = DATA / "prediction_history.json"
 ARCHIVE_PATH = DATA / "tennis_prediction_archive.json"
 ACCURACY_PATH = DATA / "accuracy.json"
 ESPN = "https://site.api.espn.com/apis/site/v2/sports/tennis"
-SESSION = http.Session(impersonate="chrome") if hasattr(http, "Session") else http.Session()
+SESSION = None
+
+
+def _session():
+    """Load the optional HTTP client only when settlement fetches ESPN data."""
+    global SESSION
+    if SESSION is None:
+        try:
+            from curl_cffi import requests as http
+        except ImportError:
+            import requests as http
+        SESSION = http.Session(impersonate="chrome") if hasattr(http, "Session") else http.Session()
+    return SESSION
 
 
 def load(path, default):
@@ -46,7 +53,7 @@ def event_date(row):
 
 
 def get_json(url, params):
-    r = SESSION.get(url, params=params, timeout=30)
+    r = _session().get(url, params=params, timeout=30)
     r.raise_for_status()
     return r.json()
 
