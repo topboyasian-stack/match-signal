@@ -246,3 +246,16 @@ settlement = (ROOT / "scripts" / "settle_expansion.py").read_text(encoding="utf-
 assert "total_ou_final_points" in settlement and "Official final score including overtime" in settlement
 assert 'final_total = float(hg) + float(ag)' in settlement
 print("NBA SportyBet total tests passed: exact fixture/time, market 225 incl. OT, fresh quotes, market-blind model and OT-aware settlement.")
+
+# The production NBA publisher must persist the independent winner-model
+# identity and preserve the separate totals-model label on newly generated rows.
+publisher_source = (ROOT / "scripts" / "live_expansion_pipeline.py").read_text(encoding="utf-8")
+assert '"winner_model_version": p["winner_model"]["version"]' in publisher_source
+assert '"winner_model_features": p["winner_model"]["feature_values"]' in publisher_source
+assert '"totals_model": p["totals_model"]' in publisher_source
+assert 'old.get("winner_model_version") != NBA_WINNER_MODEL_VERSION' in publisher_source
+assert 'row["model"] = NBA_WINNER_MODEL_LABEL' in publisher_source
+assert 'row["model"] = NBA_TOTALS_MODEL_LABEL' not in publisher_source, (
+    "the live publisher must not overwrite the independent winner-model label with the totals-model label"
+)
+
