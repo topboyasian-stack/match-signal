@@ -65,6 +65,7 @@ jobs:
           assert 'data/football_prequential_validation.json' in workflow
           assert workflow.count('python scripts/model_upgrade.py') >= 2, 'the conflict-retry path must reapply the model to the newest forecasts'
           assert 'release_gates_changed' in workflow
+          assert 'cancel-in-progress: false' in workflow
           assert 'git rebase origin/main' in workflow
           publish = workflow.split('      - name: Publish validated football forecasts, readiness and autopilot status', 1)[1]
           assert publish.index('git fetch origin main') < publish.index('git rebase origin/main') < publish.index('git push origin main')
