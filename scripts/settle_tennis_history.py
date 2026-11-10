@@ -14,12 +14,9 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
-try:
-    from curl_cffi import requests as http
-except ImportError:
-    import requests as http
-
-from settle_same_day import brier
+def brier(probs, actual):
+    """Local pure Brier-score helper; importing settlement must not need HTTP clients."""
+    return round(sum((float(probs.get(key, 0)) - (1 if actual == key else 0)) ** 2 for key in probs), 6)
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
@@ -27,7 +24,19 @@ HISTORY_PATH = DATA / "prediction_history.json"
 ARCHIVE_PATH = DATA / "tennis_prediction_archive.json"
 ACCURACY_PATH = DATA / "accuracy.json"
 ESPN = "https://site.api.espn.com/apis/site/v2/sports/tennis"
-SESSION = http.Session(impersonate="chrome") if hasattr(http, "Session") else http.Session()
+SESSION = None
+
+
+def _session():
+    """Load the optional HTTP client only when settlement fetches ESPN data."""
+    global SESSION
+    if SESSION is None:
+        try:
+            from curl_cffi import requests as http
+        except ImportError:
+            import requests as http
+        SESSION = http.Session(impersonate="chrome") if hasattr(http, "Session") else http.Session()
+    return SESSION
 
 
 def load(path, default):
@@ -46,7 +55,7 @@ def event_date(row):
 
 
 def get_json(url, params):
-    r = SESSION.get(url, params=params, timeout=30)
+    r = _session().get(url, params=params, timeout=30)
     r.raise_for_status()
     return r.json()
 
@@ -118,7 +127,25 @@ def settle_row(row, competition):
         line = float(ou.get("line", 22.5))
         total_games = s1 + s2
         actual_ou = "over" if total_games > line else "under" if total_games < line else "push"
-        row["actual_markets"] = {"total_games": total_games, "total_games_line": line, "total_games_result": actual_ou, "total_games_correct": ou.get("pick") in {"over", "under"} and actual_ou == ou.get("pick"), "sets": max(len(lines1), len(lines2)), "sets_won_p1": sum(float(x.get("value", 0)) > float(y.get("value", 0)) for x, y in zip(lines1, lines2)), "sets_won_p2": sum(float(y.get("value", 0)) > float(x.get("value", 0)) for x, y in zip(lines1, lines2))}
+        def normalized_player(value):
+            return "".join(char for char in str(value or "").casefold() if char.isalnum())
+
+        competitor_one = (c1.get("athlete") or {}).get("displayName") or c1.get("displayName") or ""
+        competitor_two = (c2.get("athlete") or {}).get("displayName") or c2.get("displayName") or ""
+        row_p1 = normalized_player(row.get("player_1"))
+        row_p2 = normalized_player(row.get("player_2"))
+        set_winners = []
+        for set_number, (score_one, score_two) in enumerate(zip(lines1, lines2), start=1):
+            games_one = float(score_one.get("value", 0))
+            games_two = float(score_two.get("value", 0))
+            if games_one == games_two:
+                continue
+            winner_name = competitor_one if games_one > games_two else competitor_two
+            normalized_winner = normalized_player(winner_name)
+            winner = "p1" if normalized_winner == row_p1 and row_p1 else "p2" if normalized_winner == row_p2 and row_p2 else None
+            if winner:
+                set_winners.append({"set_number": set_number, "winner": winner})
+        row["actual_markets"] = {"total_games": total_games, "total_games_line": line, "total_games_result": actual_ou, "total_games_correct": ou.get("pick") in {"over", "under"} and actual_ou == ou.get("pick"), "sets": max(len(lines1), len(lines2)), "sets_won_p1": sum(float(x.get("value", 0)) > float(y.get("value", 0)) for x, y in zip(lines1, lines2)), "sets_won_p2": sum(float(y.get("value", 0)) > float(x.get("value", 0)) for x, y in zip(lines1, lines2)), "set_winners": set_winners}
         row["final_score"] = [s1, s2]
         row.update({"settled": True, "settled_at": datetime.now(timezone.utc).isoformat(), "actual": actual, "correct": row.get("pick") == actual, "brier": brier(row.get("probabilities", {}), actual), "settlement_source": "ESPN tennis/all scoreboard"})
         return True
