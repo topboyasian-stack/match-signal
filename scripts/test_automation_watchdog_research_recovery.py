@@ -125,6 +125,20 @@ class EfootballResearchRecoveryTests(unittest.TestCase):
         self.assertIn("cancel_stale_nba_totals_settlement_run", WATCHDOG)
         self.assertIn("'nba_totals_ledger_recovery_status': nba_totals_ledger_recovery_status", WATCHDOG)
 
+    def test_nba_totals_capture_staleness_has_bounded_recovery_and_run_evidence(self):
+        self.assertIn("nba_totals_capture_status = load('data/nba_totals_price_capture_status.json')", WATCHDOG)
+        self.assertIn("NBA_TOTALS_CAPTURE_MAX_AGE_MINUTES = 15", WATCHDOG)
+        self.assertIn("nba_totals_capture_age_minutes = minutes_since(nba_totals_capture_status.get('checked_at'))", WATCHDOG)
+        self.assertIn("recent_runs(\n              'nba-totals-price-capture.yml', 30", WATCHDOG)
+        self.assertIn("recover_stale_nba_totals_capture", WATCHDOG)
+        self.assertIn("nba_totals_capture_recovery_status", WATCHDOG)
+        self.assertIn("'nba_totals_capture_latest_run_id':", WATCHDOG)
+        self.assertIn("nba_totals_capture_active_run_age_minutes", WATCHDOG)
+        self.assertIn("nba_totals_capture_dispatch_age_minutes", WATCHDOG)
+        self.assertIn("['gh', 'workflow', 'run', 'nba-totals-price-capture.yml', '--ref', 'main']", WATCHDOG)
+        self.assertIn("'nba_totals_capture_max_age_minutes': NBA_TOTALS_CAPTURE_MAX_AGE_MINUTES", WATCHDOG)
+        self.assertIn("NBA_TOTALS_CAPTURE_DISPATCH_COOLDOWN_MINUTES = 10", WATCHDOG)
+
     def test_nba_settlement_heartbeat_and_ledger_publication_are_recoverable(self):
         self.assertIn("cron: '5,20,35,50 * * * *'", NBA_SETTLEMENT)
         self.assertIn("for attempt in 1 2 3 4 5; do", NBA_SETTLEMENT)
