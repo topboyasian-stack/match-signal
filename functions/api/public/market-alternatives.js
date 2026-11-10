@@ -116,6 +116,7 @@ export function publicAlternative(row, quote = {}) {
     match, market, market_label: marketLabel,
     pick, line, set_number: setWinner ? setNumber : null, market_id: marketId, odds,
     probability,
+    probability_scope: setWinner ? "stationary_per_set_not_set_specific_conditional" : null,
     builder_qualified: builderQualified,
     ticket_selectable: ticketSelectable,
     quote_status: quoteStatus,
