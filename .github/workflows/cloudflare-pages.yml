@@ -585,6 +585,7 @@ jobs:
             failures.push('Checked-out Odds Builder source is missing its build marker or versioned CSS/engine reference.');
           }
           const SMOKE_REQUEST_TIMEOUT_MS = 15000;
+          const BOOKING_POST_SMOKE_TIMEOUT_MS = 25000;
           const LIVE_RESULTS_TIMEOUT_MS = 45000;
           async function getFrom(origin, path, timeoutMs = SMOKE_REQUEST_TIMEOUT_MS) {
             const r = await fetch(origin + path + (path.includes('?') ? '&' : '?') + 'smoke=' + Date.now(), {
@@ -943,7 +944,7 @@ jobs:
               const {r,body}=await get(path);
               if (!r.ok) failures.push(path+' HTTP '+r.status);
               if (!body.trim()) failures.push(path+' empty response');
-              if (path==='/qualified-alternatives.js' && (!body.includes("querySelectorAll('[data-ms-fixture-id]')") || !body.includes('data-ticket-model-qualified="true"') || !body.includes('data-ticket-sportybet-event'))) failures.push('/qualified-alternatives.js missing exact-fixture mounting or qualified shared-ticket metadata');
+              if (path==='/qualified-alternatives.js' && (!body.includes("querySelectorAll('[data-ms-fixture-id]')") || !body.includes('data-ticket-model-qualified=') || !body.includes('String(x.builder_qualified===true)') || !body.includes('data-ticket-sportybet-event'))) failures.push('/qualified-alternatives.js missing exact-fixture mounting or qualified shared-ticket metadata');
               if (path==='/analyst.js' && (
                 !body.includes('VERIFIED SOURCE FACTS') ||
                 !body.includes('High-line Under exact-line evidence') ||
@@ -1209,7 +1210,7 @@ jobs:
                   headers: {'Content-Type':'application/json','Accept':'application/json'},
                   body: JSON.stringify({batch_id: String(batch.batch_id)}),
                   cache: 'no-store',
-                  signal: AbortSignal.timeout(SMOKE_REQUEST_TIMEOUT_MS)
+                  signal: AbortSignal.timeout(BOOKING_POST_SMOKE_TIMEOUT_MS)
                 });
                 const raw = await rr.text();
                 let payload = null;

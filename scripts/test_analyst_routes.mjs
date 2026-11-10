@@ -78,15 +78,25 @@ const independentAlternatives = buildPublicAlternatives({
 }, alternativesNow);
 
 assert.equal(independentAlternatives.status, "OK");
-assert.equal(independentAlternatives.alternatives.length, 2);
+const fixtureOptions = independentAlternatives.alternatives.filter(row => row.event_id === "fixture-alt-1");
+assert.equal(fixtureOptions.length, 2, "the publisher must limit each fixture to two distinct options");
 assert.deepEqual(
-  independentAlternatives.alternatives.map(row => [row.pick, row.line]),
-  [["under", 3.5], ["over", 2.5]],
-  "model-scored alternatives should appear without passing the accumulator gate, while exact duplicate, stale, started, and low-probability rows stay out"
+  fixtureOptions.map(row => [row.pick, row.line]),
+  [["under", 3.5], ["over", 3.5]],
+  "the two highest-probability distinct options should be selected for the fixture"
 );
-assert.ok(
-  independentAlternatives.alternatives.every(row => row.event_id === "fixture-alt-1"),
-  "only valid upcoming alternatives should be public"
+const staleResearch = independentAlternatives.alternatives.find(row => row.event_id === "stale-fixture");
+assert.ok(staleResearch, "stale quote candidates stay visible as research instead of disappearing");
+assert.equal(staleResearch.quote_status, "STALE");
+assert.equal(staleResearch.builder_qualified, false, "stale quotes cannot be Builder-qualified");
+const belowBaselineResearch = independentAlternatives.alternatives.find(row => row.event_id === "below-research-floor");
+assert.ok(belowBaselineResearch, "lower-probability alternatives stay visible for research");
+assert.equal(belowBaselineResearch.below_research_baseline, true);
+assert.equal(belowBaselineResearch.builder_qualified, false);
+assert.equal(
+  independentAlternatives.alternatives.some(row => row.event_id === "started-fixture"),
+  false,
+  "fixtures within two minutes of kickoff or already started must stay hidden"
 );
 
 const primaryIdLinked = buildPublicAlternatives({

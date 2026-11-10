@@ -49,11 +49,14 @@ const alternativesApi = fs.readFileSync("functions/api/public/market-alternative
 const alternativesUi = fs.readFileSync("qualified-alternatives.js", "utf8");
 const ticketDrawer = fs.readFileSync("ticket-drawer.js", "utf8");
 assert.ok(alternativesApi.includes("const MIN_RECOMMENDED_PROBABILITY = 0.65;"));
-assert.ok(alternativesApi.includes("const MIN_RESEARCH_ALTERNATIVE_PROBABILITY = 0.55;"));
-assert.ok(alternativesApi.includes("const minimumProbability = builderQualified ? MIN_RECOMMENDED_PROBABILITY : MIN_RESEARCH_ALTERNATIVE_PROBABILITY;"));
-assert.ok(alternativesApi.includes('row.passed_builder_gates !== true && !String(row.original_pick || row.primary_prediction_id || "").trim()'));
+assert.ok(alternativesApi.includes("const RESEARCH_DISPLAY_BASELINE = 0.55;"));
+assert.ok(alternativesApi.includes("const belowBaseline = probability < RESEARCH_DISPLAY_BASELINE;"));
+assert.ok(alternativesApi.includes("const builderQualified = row.passed_builder_gates === true && quoteFresh"));
+assert.ok(alternativesApi.includes('if (row.prediction_role !== "ALTERNATIVE" || row.alternative_source !== "SYSTEM_RECOMMENDED")'));
+assert.ok(alternativesApi.includes("diagnostics.primary_link_present++"));
+assert.ok(!alternativesApi.includes('!String(row.original_pick || row.primary_prediction_id || "").trim()'));
 assert.ok(alternativesApi.includes("builder_qualified: builderQualified"));
-assert.ok(alternativesUi.includes("Research only — Builder gate not passed"));
+assert.ok(alternativesUi.includes("Research only · Builder gate not passed"));
 assert.ok(alternativesUi.includes("String(x.builder_qualified===true)"));
 assert.ok(ticketDrawer.includes("model_qualified:raw.model_qualified===true"));
 assert.ok(ticketDrawer.includes("MANUAL PICK — model qualification not claimed; live recheck required"));
@@ -69,9 +72,17 @@ const researchLaneProbe = [
   'assert.equal(research.length, 1, "A linked 55%+ research alternative with an exact fresh quote should be public");',
   'assert.equal(research[0].builder_qualified, false);',
   'assert.equal(research[0].qualification_status, "RESEARCH_ONLY");',
-  'assert.equal(evaluate({ ...base, primary_prediction_id: "", original_pick: "" }).length, 0, "Unlinked candidates must remain withheld");',
-  'assert.equal(evaluate({ ...base, model_probability: 0.54 }).length, 0, "Research alternatives below 55% must remain withheld");',
-  'assert.equal(evaluate({ ...base, passed_builder_gates: true, model_probability: 0.60 }).length, 0, "Builder-qualified candidates still require 65%");',
+  'const unlinked = evaluate({ ...base, primary_prediction_id: "", original_pick: "" });',
+  'assert.equal(unlinked.length, 1, "Missing primary linkage should not hide a valid model-supported research alternative");',
+  'assert.equal(unlinked[0].primary_comparison_status, "PRIMARY_PROBABILITY_UNAVAILABLE");',
+  'assert.equal(unlinked[0].builder_qualified, false);',
+  'const lowProbability = evaluate({ ...base, model_probability: 0.54 });',
+  'assert.equal(lowProbability.length, 1, "Candidates below the informational research baseline remain visible");',
+  'assert.equal(lowProbability[0].below_research_baseline, true);',
+  'assert.equal(lowProbability[0].builder_qualified, false);',
+  'const belowBuilderFloor = evaluate({ ...base, passed_builder_gates: true, model_probability: 0.60 });',
+  'assert.equal(belowBuilderFloor.length, 1, "Candidates below the Builder floor remain visible as research");',
+  'assert.equal(belowBuilderFloor[0].builder_qualified, false, "Builder-qualified candidates still require 65%");',
   'console.log("Linked exact-quote research alternative lane passed.");'
 ].join("\n");
 const laneProbe = spawnSync(process.execPath, ["--experimental-default-type=module", "--input-type=module", "-e", researchLaneProbe], { encoding: "utf8" });

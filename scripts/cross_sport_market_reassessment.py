@@ -320,6 +320,221 @@ def _decorate_candidate(
     return candidate
 
 
+
+def _research_only_candidate(
+    row: dict[str, Any],
+    *,
+    sport: str,
+    market: str,
+    side: str,
+    probability: float,
+    model_source: str,
+    line: float | None = None,
+) -> dict[str, Any]:
+    """Build a model-supported research option without creating bookmaker evidence."""
+    candidate = _decorate_candidate(
+        row,
+        sport=sport,
+        market=market,
+        side=side,
+        probability=probability,
+        market_obj={},
+        odds_rows=[],
+        line=line,
+        outcome=None,
+        model_source=model_source,
+    )
+    # A copied fixture may contain old prices or provider aliases. Strip every
+    # booking input from this research-only row instead of merely labelling it.
+    candidate["sportybet_market"] = {
+        "available": False,
+        "event_id": None,
+        "fetched_at": None,
+        "markets": [],
+    }
+    candidate["sportybet_winner_odds"] = {}
+    candidate["sportybet_total_games_odds"] = []
+    candidate["sportybet_moneyline_odds"] = {}
+    candidate["sportybet_event_id"] = None
+    candidate["sportybet_market_id"] = None
+    candidate["sportybet_outcome_id"] = None
+    candidate["sportybet_outcome_name"] = None
+    candidate["sportybet_specifier"] = None
+    candidate["market_odds_timestamp"] = None
+    candidate["odds_timestamp"] = None
+    candidate["quote_timestamp"] = None
+    candidate["quote_age_seconds"] = None
+    candidate["bookmaker_odds"] = None
+    candidate["reassessment_market_rows"] = []
+    candidate["market_source"] = "Match Signal model evidence only; no verified current SportyBet quote"
+    candidate["research_only"] = True
+    candidate["bookable"] = False
+    candidate["qualification_allowed"] = False
+    candidate["builder_eligible"] = False
+    candidate["candidate_status"] = "RESEARCH_ONLY_NO_LIVE_QUOTE"
+    assessment = dict(candidate.get("market_reassessment") or {})
+    assessment.update({
+        "status": "RESEARCH_ONLY_NO_LIVE_QUOTE",
+        "market_definition_source": "existing Match Signal model output",
+        "model_probability_source": model_source,
+        "sportybet_market_id": None,
+        "quote_timestamp": None,
+        "current_price_available": False,
+        "bookable": False,
+        "qualification_allowed": False,
+        "paper_only": True,
+        "real_money_execution": False,
+    })
+    candidate["market_reassessment"] = assessment
+    return candidate
+
+
+def _research_candidate_key(row: dict[str, Any]) -> tuple[str, str, str, str, str]:
+    line = _num(row.get("line"))
+    return (
+        str(row.get("sport") or ""),
+        str(row.get("event_id") or ""),
+        str(row.get("builder_market") or ""),
+        "" if line is None else f"{line:g}",
+        str(row.get("builder_pick") or ""),
+    )
+
+
+def _append_missing_research_options(
+    existing: list[dict[str, Any]],
+    candidates: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    known = {_research_candidate_key(row) for row in existing if isinstance(row, dict)}
+    added = []
+    for candidate in candidates:
+        if not isinstance(candidate, dict):
+            continue
+        key = _research_candidate_key(candidate)
+        if key in known:
+            continue
+        known.add(key)
+        added.append(candidate)
+    return added
+
+
+def _football_research_options(row: dict[str, Any]) -> list[dict[str, Any]]:
+    """Derive unpriced alternatives from existing football model evidence only."""
+    options: list[dict[str, Any]] = []
+    probabilities = row.get("calibrated_probabilities") or row.get("probabilities") or {}
+    if not isinstance(probabilities, dict):
+        probabilities = {}
+    for side in ("p1", "draw", "p2"):
+        probability = _num(probabilities.get(side))
+        if probability is not None and 0 < probability < 1:
+            options.append(_research_only_candidate(
+                row, sport="football", market="1X2", side=side,
+                probability=probability,
+                model_source="existing calibrated football 1X2 model probability; research-only without a live quote",
+            ))
+
+    expected = row.get("expected_goals") or {}
+    expected_total = _num(expected.get("total"))
+    if expected_total is None:
+        home_goals, away_goals = _num(expected.get("p1")), _num(expected.get("p2"))
+        if home_goals is not None and away_goals is not None:
+            expected_total = home_goals + away_goals
+    markets = row.get("markets") if isinstance(row.get("markets"), dict) else {}
+    analytics = row.get("analytics") if isinstance(row.get("analytics"), dict) else {}
+    total_info = (
+        markets.get("over_under")
+        or markets.get("total_goals")
+        or analytics.get("total_goals")
+        or analytics.get("total_games")
+        or {}
+    )
+    line = _num(total_info.get("line")) if isinstance(total_info, dict) else None
+    primary_market = str(row.get("builder_market") or row.get("market") or "").lower()
+    if line is None and primary_market in {"total_goals", "total_ou", "over_under"}:
+        line = _num(row.get("line"))
+    if expected_total is not None and line is not None:
+        over_probability = _poisson_over_probability(expected_total, line)
+        if over_probability is not None:
+            for side, probability in (("over", over_probability), ("under", 1.0 - over_probability)):
+                options.append(_research_only_candidate(
+                    row, sport="football", market="total_goals", side=side,
+                    probability=probability, line=line,
+                    model_source="Poisson total-goals probability from the existing expected-goals projection; reference line is not a verified live offer",
+                ))
+
+    btts = markets.get("btts") or analytics.get("btts") or {}
+    if isinstance(btts, dict):
+        yes_probability = _num(btts.get("yes", btts.get("calibrated_yes")))
+        no_probability = _num(btts.get("no", btts.get("calibrated_no")))
+        if yes_probability is None and no_probability is not None:
+            yes_probability = 1.0 - no_probability
+        if no_probability is None and yes_probability is not None:
+            no_probability = 1.0 - yes_probability
+        for side, probability in (("yes", yes_probability), ("no", no_probability)):
+            if probability is not None and 0 < probability < 1:
+                options.append(_research_only_candidate(
+                    row, sport="football", market="btts", side=side,
+                    probability=probability,
+                    model_source="existing published both-teams-to-score model probability; research-only without a live quote",
+                ))
+
+    p1, draw, p2 = (_num(probabilities.get(key)) for key in ("p1", "draw", "p2"))
+    if all(value is not None for value in (p1, draw, p2)):
+        for side, probability in (
+            ("1x", float(p1) + float(draw)),
+            ("12", float(p1) + float(p2)),
+            ("x2", float(draw) + float(p2)),
+        ):
+            if 0 < probability < 1:
+                options.append(_research_only_candidate(
+                    row, sport="football", market="double_chance", side=side,
+                    probability=probability,
+                    model_source="sum of existing calibrated football 1X2 probabilities; research-only without a live quote",
+                ))
+    return options
+
+
+def _tennis_research_options(row: dict[str, Any]) -> list[dict[str, Any]]:
+    """Derive unpriced tennis alternatives only from published model evidence."""
+    options: list[dict[str, Any]] = []
+    probabilities = row.get("calibrated_probabilities") or row.get("probabilities") or {}
+    if not isinstance(probabilities, dict):
+        probabilities = {}
+    for side in ("p1", "p2"):
+        probability = _num(probabilities.get(side))
+        if probability is not None and 0 < probability < 1:
+            options.append(_research_only_candidate(
+                row, sport="tennis", market="winner", side=side,
+                probability=probability,
+                model_source="existing published tennis winner probability; research-only without a live quote",
+            ))
+
+    analytics = row.get("analytics") if isinstance(row.get("analytics"), dict) else {}
+    markets = row.get("markets") if isinstance(row.get("markets"), dict) else {}
+    total_info = analytics.get("total_games") or markets.get("total_games") or markets.get("over_under") or {}
+    if not isinstance(total_info, dict):
+        total_info = {}
+    line = _num(total_info.get("line"))
+    primary_market = str(row.get("builder_market") or row.get("market") or "").lower()
+    if line is None and primary_market in {"total_games", "total_ou", "over_under"}:
+        line = _num(row.get("line"))
+    over_probability = _num(total_info.get("calibrated_over", total_info.get("base_model_over", total_info.get("over"))))
+    under_probability = _num(total_info.get("calibrated_under", total_info.get("base_model_under", total_info.get("under"))))
+    if over_probability is None and under_probability is not None:
+        over_probability = 1.0 - under_probability
+    if under_probability is None and over_probability is not None:
+        under_probability = 1.0 - over_probability
+    if line is not None and abs(line - round(line)) > 1e-9:
+        for side, probability in (("over", over_probability), ("under", under_probability)):
+            if probability is not None and 0 < probability < 1:
+                options.append(_research_only_candidate(
+                    row, sport="tennis", market="total_games", side=side,
+                    probability=probability, line=line,
+                    model_source="existing published tennis total-games probability at a model reference line; line is not a verified live offer",
+                ))
+    return options
+
+
+
 def _record_options(options: list[dict[str, Any]]) -> None:
     _RUN_OPTIONS.extend(copy.deepcopy(options))
 
@@ -489,6 +704,8 @@ def _football_options(core: Any, now: datetime, rows: list[dict[str, Any]]) -> t
                 audit.append(candidate)
                 if is_fresh and p >= float(core.MIN_PROB) and outcome.get("id") and len(complete_rows) == 3:
                     active.append(candidate)
+        # Fill absent market definitions from model evidence for research display only.
+        audit.extend(_append_missing_research_options(audit, _football_research_options(row)))
     return active, audit
 
 
@@ -613,6 +830,9 @@ def _tennis_options(core: Any, now: datetime, rows: list[dict[str, Any]], baseli
                         audit.append(meta)
                         if is_fresh and 0 < p < 1.0 and p >= float(core.MIN_PROB) and outcomes[side].get("id"):
                             active.append(meta)
+
+        # Do not suppress model-supported tennis alternatives when current market definitions are absent.
+        audit.extend(_append_missing_research_options(audit, _tennis_research_options(row)))
 
     # Reuse the existing tennis recalculation output, preferring it where it already has the same exact option.
     all_rows = _dedupe_candidates(baseline + active)
@@ -976,7 +1196,11 @@ def _make_audit_record(core: Any, row: dict[str, Any], now: datetime) -> dict[st
         )
     in_builder_horizon = _within_builder_horizon(core, row, now)
     in_alternative_horizon = _within_alternative_horizon(row, now)
-    if not model_floor:
+    market_assessment = row.get("market_reassessment") or {}
+    research_only = market_assessment.get("status") == "RESEARCH_ONLY_NO_LIVE_QUOTE"
+    if research_only:
+        status = "RESEARCH_ONLY_NO_LIVE_QUOTE"
+    elif not model_floor:
         status = "BELOW_MODEL_PROBABILITY_FLOOR"
     elif not quote_exact:
         status = "NO_EXACT_CURRENT_QUOTE"
@@ -989,7 +1213,6 @@ def _make_audit_record(core: Any, row: dict[str, Any], now: datetime) -> dict[st
     else:
         status = str(leg.get("status") or "REJECTED")
     match = f"{row.get('player_1') or row.get('home_team') or row.get('home') or ''} vs {row.get('player_2') or row.get('away_team') or row.get('away') or ''}".strip()
-    market_assessment = row.get("market_reassessment") or {}
     sport = str(row.get("sport") or "").lower()
     if sport in {"efootball", "efootball_gt", "efootball_adriatic"}:
         sport = "virtual"
@@ -1032,12 +1255,14 @@ def _make_audit_record(core: Any, row: dict[str, Any], now: datetime) -> dict[st
         "reassessment_status": market_assessment.get("status") or "EXISTING_EXACT_EVIDENCE_CANDIDATE",
         "candidate_status": status,
         "passed_model_floor": bool(model_floor),
-        "passed_builder_gates": bool(leg.get("builder_eligible") and in_builder_horizon),
-        "in_builder_pool": bool(in_builder_horizon and (row.get("market_reassessment") or row.get("sport") == "virtual")),
+        "passed_builder_gates": bool(not research_only and leg.get("builder_eligible") and in_builder_horizon and quote_exact and fresh),
+        "in_builder_pool": bool(not research_only and in_builder_horizon and quote_exact and fresh and (row.get("market_reassessment") or row.get("sport") == "virtual")),
         "alternative_only": bool(in_alternative_horizon and not in_builder_horizon),
         "evidence_source": row.get("evidence_source"),
         "evidence_sample_n": row.get("evidence_sample_n"),
         "paper_only": True,
+        "research_only": bool(research_only),
+        "bookable": bool(not research_only and quote_exact and fresh and leg.get("builder_eligible") and in_builder_horizon),
         "real_money_execution": False,
         "settlement_status": "PENDING",
         "settlement_result": None,

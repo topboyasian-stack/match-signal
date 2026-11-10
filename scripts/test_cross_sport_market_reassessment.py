@@ -20,6 +20,10 @@ class FakeCore:
     MIN_PROB = 0.60
 
     @staticmethod
+    def load(path, default=None):
+        return [] if default is None else default
+
+    @staticmethod
     def within_builder_horizon(row, now):
         try:
             start = datetime.fromisoformat(str(row["start_time"]).replace("Z", "+00:00"))
@@ -237,12 +241,95 @@ class CrossSportReassessmentTests(unittest.TestCase):
         self.assertTrue(audit)
         self.assertEqual(active, [])
 
-    def test_market_discovery_requires_available_live_snapshot(self):
+    def test_research_alternatives_survive_missing_live_market_definitions_but_cannot_be_booked(self):
         row = sample_football(self.now)
         row["sportybet_market"]["available"] = False
+        row["sportybet_market"]["markets"] = []
+        # Even an apparently recent old timestamp and cached odds must not leak into
+        # research-only candidates when the exact live market snapshot is unavailable.
+        row["market_odds_timestamp"] = self.now.isoformat()
+        row["odds_timestamp"] = self.now.isoformat()
         active, audit = reassessment._football_options(FakeCore(), self.now, [row])
+
+        self.assertEqual(active, [], "model-only alternatives must never enter the active Builder pool")
+        self.assertTrue(audit, "existing model probabilities must still yield research alternatives")
+        research = [
+            item for item in audit
+            if (item.get("market_reassessment") or {}).get("status") == "RESEARCH_ONLY_NO_LIVE_QUOTE"
+        ]
+        self.assertTrue(research)
+        self.assertTrue(any(item["builder_market"] == "1X2" for item in research))
+        self.assertTrue(any(item["builder_market"] == "btts" and item["builder_pick"] == "yes" for item in research))
+        self.assertTrue(any(item["builder_market"] == "double_chance" and item["builder_pick"] == "1x" for item in research))
+        self.assertTrue(any(item["builder_market"] == "total_goals" and item.get("line") == 2.5 for item in research))
+        self.assertTrue(any(item["builder_probability"] >= FakeCore.MIN_PROB for item in research))
+
+        for item in research:
+            self.assertIsNone(item.get("bookmaker_odds"))
+            self.assertEqual(item.get("reassessment_market_rows"), [])
+            self.assertIsNone(item.get("sportybet_event_id"))
+            self.assertIsNone(item.get("sportybet_market_id"))
+            self.assertIsNone(item.get("sportybet_outcome_id"))
+            self.assertFalse(item.get("bookable"))
+            self.assertFalse(item.get("qualification_allowed"))
+            self.assertFalse(item["market_reassessment"].get("current_price_available"))
+
+        class AuditCore(FakeCore):
+            @staticmethod
+            def market_rows(candidate):
+                return candidate.get("reassessment_market_rows") or []
+
+            @staticmethod
+            def make_leg(candidate):
+                # Deliberately simulate a permissive downstream leg builder.
+                return {"builder_eligible": True, "status": "PASS_EXISTING_BUILDER_GATES"}
+
+        supported = next(item for item in research if item["builder_probability"] >= FakeCore.MIN_PROB)
+        record = reassessment._make_audit_record(AuditCore(), supported, self.now)
+        self.assertEqual(record["candidate_status"], "RESEARCH_ONLY_NO_LIVE_QUOTE")
+        self.assertFalse(record["fresh_exact_quote"])
+        self.assertFalse(record["passed_builder_gates"])
+        self.assertFalse(record["in_builder_pool"])
+        self.assertFalse(record["bookable"])
+        self.assertTrue(record["research_only"])
+
+    def test_tennis_winner_alternatives_survive_missing_live_market_definitions_but_cannot_be_booked(self):
+        row = {
+            "sport": "tennis",
+            "event_id": "tennis-test-1",
+            "start_time": (self.now + timedelta(hours=2)).isoformat(),
+            "player_1": "Player Alpha",
+            "player_2": "Player Beta",
+            "league": "Test Tournament",
+            "calibrated_probabilities": {"p1": 0.72, "p2": 0.28},
+            "sportybet_winner_odds": {"p1": 1.45, "p2": 2.55},
+            "sportybet_market": {
+                "available": False,
+                "event_id": "old-provider-event-id",
+                "fetched_at": self.now.isoformat(),
+                "markets": [],
+            },
+            "sportybet_event_id": "old-provider-event-id",
+            "sportybet_market_id": "186",
+            "sportybet_outcome_id": "old-outcome-id",
+            "market_odds_timestamp": self.now.isoformat(),
+            "odds_timestamp": self.now.isoformat(),
+            "model": "test independent tennis model",
+        }
+        active, audit = reassessment._tennis_options(FakeCore(), self.now, [row], [])
         self.assertEqual(active, [])
-        self.assertEqual(audit, [])
+        research = [
+            item for item in audit
+            if (item.get("market_reassessment") or {}).get("status") == "RESEARCH_ONLY_NO_LIVE_QUOTE"
+        ]
+        self.assertEqual({item["builder_pick"] for item in research if item["builder_market"] == "winner"}, {"p1", "p2"})
+        for item in research:
+            self.assertIsNone(item.get("bookmaker_odds"))
+            self.assertIsNone(item.get("sportybet_event_id"))
+            self.assertIsNone(item.get("sportybet_market_id"))
+            self.assertIsNone(item.get("sportybet_outcome_id"))
+            self.assertFalse(item.get("bookable"))
+            self.assertFalse(item.get("qualification_allowed"))
 
 
     def test_future_quote_timestamp_fails_closed(self):

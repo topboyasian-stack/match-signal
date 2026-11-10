@@ -58,14 +58,15 @@ export function nbaTotalsReleaseQualified(e,p){
  const selectionEvidence=Number(c.prospective_settled_selections_with_exact_snapshot_match)>=100&&Number(c.prospective_settled_selections_missing_or_mismatched_snapshot)===0&&Number(c.prospective_settled_unique_market_selections)>=100;
  return !!(e?.paper_only===true&&e?.evaluation_type==='NBA_TOTALS_FIXED_CUTOFF_V2'&&e?.holdout_protocol?.fixed_cutoff_utc===NBA_RELEASE_CUTOFF&&e?.market_id==='225'&&e?.market_definition==='full_game_total_including_overtime'&&e?.model_version===NBA_RELEASE_MODEL&&e?.release_decision==='QUALIFIED'&&Number(h.n)>=100&&Number.isFinite(Number(h.mae))&&Number.isFinite(Number(h.baseline_mae))&&Number(h.mae)<Number(h.baseline_mae)&&Number.isFinite(Number(h.bias))&&Math.abs(Number(h.bias))<=3&&Number(m.n)>=100&&Number(m.roi)>0&&Number(m.roi_ci95_lower)>0&&Number(m.roi_vs_market_favorite)>0&&p?.paper_only===true&&p?.experiment==='NBA_TOTALS_EMPIRICAL_RESIDUAL_VALUE_V3'&&p?.model_version===NBA_RELEASE_MODEL&&p?.model_projection_market_blind===true&&p?.prospective_holdout_cutoff_utc===NBA_RELEASE_CUTOFF&&p?.prospective_holdout_used_for_calibration===false&&p?.live_value_decisions_authorized===false&&Number(cal.probability_edge_threshold)===0.04&&Number(cal.expected_value_threshold)===0.03&&c.cutoff_utc===NBA_RELEASE_CUTOFF&&probabilitySample&&selectionEvidence&&p?.prospective_minimum_sample_reached===true&&p?.prospective_probability_validation_sample_met===true&&p?.prospective_clv_release_check_passed===true&&v.positive_clv_release_check_passed===true&&Number(v.near_close_observations)>=1&&Number(v.mean_probability_clv)>0&&Number(v.mean_line_clv_points)>0);
 }
-async function readNbaReleaseJson(path){
- const response=await fetch('https://raw.githubusercontent.com/topboyasian-stack/match-signal/main/'+path+'?v='+Date.now(),{headers:{Accept:'application/json'},cache:'no-store',signal:AbortSignal.timeout(10000)});
+async function readNbaReleaseJson(path, deadlineAt = null){
+ const remainingMs = deadlineAt == null ? 10000 : Math.max(250, Math.min(10000, deadlineAt - Date.now()));
+ const response=await fetch('https://raw.githubusercontent.com/topboyasian-stack/match-signal/main/'+path+'?v='+Date.now(),{headers:{Accept:'application/json'},cache:'no-store',signal:AbortSignal.timeout(remainingMs)});
  const body=await response.text();
  if(!response.ok)throw new Error(path+' HTTP '+response.status);
  try{return JSON.parse(body);}catch(_){throw new Error(path+' returned non-JSON release evidence (HTTP '+response.status+', content-type '+String(response.headers.get('content-type')||'unknown')+').');}
 }
-export async function loadNbaReleaseContext(){
- const [evidence,probability,predictions,snapshots]=await Promise.all([readNbaReleaseJson('data/nba_totals_oos_value_test.json'),readNbaReleaseJson('data/nba_totals_probability_value_experiment.json'),readNbaReleaseJson('data/nba_predictions.json'),readNbaReleaseJson('data/nba_totals_publication_snapshots.json')]);
+export async function loadNbaReleaseContext(deadlineAt = null){
+ const [evidence,probability,predictions,snapshots]=await Promise.all([readNbaReleaseJson('data/nba_totals_oos_value_test.json',deadlineAt),readNbaReleaseJson('data/nba_totals_probability_value_experiment.json',deadlineAt),readNbaReleaseJson('data/nba_predictions.json',deadlineAt),readNbaReleaseJson('data/nba_totals_publication_snapshots.json',deadlineAt)]);
  if(!Array.isArray(predictions)||!Array.isArray(snapshots))throw new Error('Invalid NBA release evidence arrays.');
  return{evidence,probability,predictions,snapshots};
 }
@@ -1061,9 +1062,10 @@ async function handlePost(context) {
     const body = await context.request.json();
     const manualMode = body?.mode === 'manual' || Array.isArray(body?.manual_selections);
     const batchId = manualMode ? 'MANUAL-TICKET' : String(body?.batch_id || '').trim();
-    // Keep browser-driven manual tickets inside a bounded request window. A slow
-    // catalogue scan/share origin must return JSON before the browser drops fetch.
-    const manualDeadlineAt = manualMode ? Date.now() + 22000 : null;
+    // Bound catalogue discovery and the final share request for Builder and manual
+    // tickets alike. This prevents a slow provider from exhausting the Pages request.
+    const requestDeadlineAt = Date.now() + 22000;
+    const catalogueDeadlineAt = Date.now() + 13000;
     let legs = [];
 
     if (manualMode) {
@@ -1147,7 +1149,7 @@ async function handlePost(context) {
       // evidence. A user-created manual ticket is a different operation: it may
       // include an explicitly unqualified NBA selection only after the exact
       // current SportyBet event, market, line, both prices and kickoff are checked.
-      try { nbaReleaseContext = await loadNbaReleaseContext(); }
+      try { nbaReleaseContext = await loadNbaReleaseContext(requestDeadlineAt); }
       catch (error) { return json({ ok: false, error: 'NBA_RELEASE_EVIDENCE_UNAVAILABLE', message: 'NBA release evidence could not be verified. No Builder ticket code was requested.' }, 503); }
       if (!nbaTotalsReleaseQualified(nbaReleaseContext.evidence, nbaReleaseContext.probability)) return json({ ok: false, error: 'NBA_RELEASE_GATE_LOCKED', booking_code_withheld: true, message: 'The independent NBA totals release gate has not passed. No Builder ticket code was requested.' }, 423);
     }
@@ -1174,7 +1176,7 @@ async function handlePost(context) {
     // First ask SportyBet for the exact stored provider event IDs. This is a
     // single-event details request and returns the complete live market list;
     // the expensive catalogue search is reserved for genuinely changed IDs.
-    const directEvents = await collectCurrentEventsById(lookupLegs, manualDeadlineAt, sharedMatchedLegs);
+    const directEvents = await collectCurrentEventsById(lookupLegs, catalogueDeadlineAt, sharedMatchedLegs);
     for (const [id, event] of directEvents) found.set(id, event);
 
     const unresolvedLegs = lookupLegs.filter(leg => !sharedMatchedLegs.has(leg));
@@ -1193,9 +1195,7 @@ async function handlePost(context) {
     // parallel and share exact-match state, preventing redundant page scans.
     const allVirtualIds = new Set([...unresolvedVirtualIds, ...unresolvedEfootballIds]);
     const allVirtualLegs = [...unresolvedVirtualLegs, ...unresolvedEfootballLegs];
-    const fastVirtualFeedDeadline = manualMode
-      ? Math.min(manualDeadlineAt, Date.now() + 8000)
-      : manualDeadlineAt;
+    const fastVirtualFeedDeadline = Math.min(catalogueDeadlineAt, Date.now() + 8000);
 
     const [
       vfootballEvents,
@@ -1213,7 +1213,7 @@ async function handlePost(context) {
             primaryPath: '/api/ng/factsCenter/wapConfigurableUpcomingEvents',
             fallbackPath: '/api/ng/factsCenter/pcUpcomingEvents',
             maxPages: manualMode ? 20 : 5,
-            deadlineAt: manualDeadlineAt,
+            deadlineAt: catalogueDeadlineAt,
             requestTimeoutMs: manualMode ? 3000 : 6000,
             pageBatchSize: manualMode ? 10 : 5,
             sharedMatchedLegs
@@ -1225,7 +1225,7 @@ async function handlePost(context) {
             marketId: '1,18,10,29,11,26,36,14,60100,186,189,202,204,210',
             timeline: catalogueTimeline,
             maxPages: manualMode ? 20 : 5,
-            deadlineAt: manualDeadlineAt,
+            deadlineAt: catalogueDeadlineAt,
             requestTimeoutMs: manualMode ? 3000 : 6000,
             pageBatchSize: manualMode ? 10 : 5,
             sharedMatchedLegs
@@ -1245,7 +1245,7 @@ async function handlePost(context) {
             maxPages: manualMode ? 20 : 5,
             primaryPath: '/api/ng/factsCenter/pcUpcomingEvents',
             fallbackPath: '/api/ng/factsCenter/wapConfigurableUpcomingEvents',
-            deadlineAt: manualDeadlineAt,
+            deadlineAt: catalogueDeadlineAt,
             requestTimeoutMs: manualMode ? 3000 : 6000,
             pageBatchSize: manualMode ? 10 : 5,
             sharedMatchedLegs
@@ -1258,14 +1258,14 @@ async function handlePost(context) {
             timeline: catalogueTimeline,
             fallbackPath: '/api/ng/factsCenter/wapConfigurableUpcomingEvents',
             maxPages: manualMode ? 20 : 5,
-            deadlineAt: manualDeadlineAt,
+            deadlineAt: catalogueDeadlineAt,
             requestTimeoutMs: manualMode ? 3000 : 6000,
             pageBatchSize: manualMode ? 10 : 5,
             sharedMatchedLegs
           }, unresolvedTennisIds, unresolvedTennisLegs)
         : Promise.resolve(new Map()),
       unresolvedBasketballLegs.length
-        ? collectBasketballEvents(context, unresolvedBasketballIds, catalogueTimeline, unresolvedBasketballLegs, manualDeadlineAt)
+        ? collectBasketballEvents(context, unresolvedBasketballIds, catalogueTimeline, unresolvedBasketballLegs, catalogueDeadlineAt)
         : Promise.resolve(new Map())
     ]);
 
@@ -1438,7 +1438,7 @@ async function handlePost(context) {
       }))
     });
 
-    const shareResult = await requestSportyBetShare(selections, { deadlineAt: manualDeadlineAt, timeoutMs: manualMode ? 6500 : 12000 });
+    const shareResult = await requestSportyBetShare(selections, { deadlineAt: requestDeadlineAt, timeoutMs: manualMode ? 6500 : 9000 });
     if (shareResult.error) {
       return json({
         ok: false,

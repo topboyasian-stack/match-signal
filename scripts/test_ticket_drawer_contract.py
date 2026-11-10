@@ -87,8 +87,12 @@ def main():
             "The shared ticket must submit all selections through the root-relative common revalidation API")
     require("AbortSignal.timeout(26000)" in drawer and "Your ticket is still saved; no code is assumed to exist." in drawer,
             "Manual ticket network timeouts must preserve the slip and avoid implying a code was created")
-    require("manualDeadlineAt = manualMode ? Date.now() + 22000 : null" in api and "requestTimeoutMs: manualMode ? 3000 : 6000" in api and "deadlineAt: manualDeadlineAt, timeoutMs: manualMode ? 6500 : 12000" in api,
-            "Manual multi-leg revalidation and share requests must have a bounded request budget")
+    require("requestDeadlineAt = Date.now() + 22000" in api and
+            "catalogueDeadlineAt = Date.now() + 13000" in api and
+            "requestTimeoutMs: manualMode ? 3000 : 6000" in api and
+            "deadlineAt: requestDeadlineAt, timeoutMs: manualMode ? 6500 : 9000" in api and
+            "loadNbaReleaseContext(requestDeadlineAt)" in api,
+            "Builder and manual revalidation, NBA evidence loading and share requests must have bounded request budgets")
     require("market==='total'?line:null" in drawer and "item.market==='total'" in drawer,
             "Football, Tennis and Basketball total legs must retain their exact line and side")
     require("data-ms-ticket-remove" in drawer and "data-ms-ticket-clear" in drawer,
@@ -140,17 +144,17 @@ def main():
             "Shared ticket catalogue scans must stop at the regional proxy's supported fifth page")
     require("export async function requestSportyBetShare" in api and
             "for (const origin of [SPORTYBET_PROXY_ORIGIN, ORIGIN])" in api and
-            "const shareResult = await requestSportyBetShare(selections, { deadlineAt: manualDeadlineAt, timeoutMs: manualMode ? 6500 : 12000 })" in api,
+            "const shareResult = await requestSportyBetShare(selections, { deadlineAt: requestDeadlineAt, timeoutMs: manualMode ? 6500 : 9000 })" in api,
             "Share-code creation must try both SportyBet sources within the manual request deadline and return JSON failures")
     require("async function collectCurrentEventsById(legs, deadlineAt = null, sharedMatchedLegs = null)" in api and
             "upstream('/api/ng/factsCenter/event'" in api and
-            "const directEvents = await collectCurrentEventsById(lookupLegs, manualDeadlineAt, sharedMatchedLegs)" in api and
+            "const directEvents = await collectCurrentEventsById(lookupLegs, catalogueDeadlineAt, sharedMatchedLegs)" in api and
             "const unresolvedLegs = lookupLegs.filter(leg => !sharedMatchedLegs.has(leg))" in api,
             "Manual booking must try SportyBet single-event details by current provider ID first, then catalogue-scan only unresolved aliases")
     require("const lookupLegs = manualMode ? legs.filter" in api and "const basketballLegs = lookupLegs.filter" in api and
             "const unresolvedBasketballLegs = unresolvedLegs.filter" in api and
             "unresolvedBasketballLegs.flatMap(leg => [leg.sportybet_event_id, leg.event_id])" in api and
-            "collectBasketballEvents(context, unresolvedBasketballIds, catalogueTimeline, unresolvedBasketballLegs, manualDeadlineAt)" in api and
+            "collectBasketballEvents(context, unresolvedBasketballIds, catalogueTimeline, unresolvedBasketballLegs, catalogueDeadlineAt)" in api and
             "targetBasketballFixtureMatches" in api and "directProvider = sportybetId ? found.get(sportybetId) : null" in api,
             "Mixed-sport tickets must try direct SportyBet event details first, then resolve only unmatched Basketball fixtures by provider ID or verified participants and kickoff, while excluding started legs")
     require("const unresolvedFootballLegs = unresolvedLegs.filter" in api and
