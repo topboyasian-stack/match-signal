@@ -50,6 +50,21 @@ class PriceCaptureTests(unittest.TestCase):
         page_html = (root / "basketball.html").read_text(encoding="utf-8")
         proxy_script = (root / "functions" / "api" / "sportybet-basketball.js").read_text(encoding="utf-8")
         booking_script = (root / "functions" / "api" / "sportybet-booking.js").read_text(encoding="utf-8")
+        basketball_booking_script = (root / "functions" / "api" / "sportybet-basketball-booking.js").read_text(encoding="utf-8")
+        espn_script = (root / "functions" / "api" / "espn.js").read_text(encoding="utf-8")
+        runtime_sources = {
+            "NBA SportyBet feed": proxy_script,
+            "NBA ticket revalidation": basketball_booking_script,
+            "shared SportyBet booking": booking_script,
+            "ESPN proxy": espn_script,
+        }
+        for label, source in runtime_sources.items():
+            for unsupported in ("cache:'no-store'", "cache: 'no-store'", 'cache: "no-store"'):
+                self.assertNotIn(unsupported, source, f"{label} must not pass unsupported RequestInit.cache in Cloudflare Workers")
+        wrangler = (root / "wrangler.toml").read_text(encoding="utf-8")
+        self.assertIn('compatibility_flags = ["nodejs_compat"]', wrangler)
+        self.assertIn('compatibility_date = "2026-11-10"', wrangler)
+
         self.assertIn("tournamentId=sr%3Atournament%3A132", page_script)
         self.assertIn("basketball-live.js?v=20261104-nba-probability-cohort1", page_html)
         self.assertIn("u.searchParams.get('tournamentId')||NBA_TOURNAMENT_ID", proxy_script)
