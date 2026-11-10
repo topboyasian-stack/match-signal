@@ -227,4 +227,23 @@ assert.doesNotMatch(
   "The production browser monitor must not use the legacy GitHub Pages mirror.",
 );
 
+assert.ok(
+  cloudflare.includes("const sourceScriptRef = (htmlPath, scriptName) =>") &&
+    cloudflare.includes("scriptRefs.basketball.ticketDrawer") &&
+    !cloudflare.includes("ticket-drawer.js?v=20261107-manual-ticket-booking1") &&
+    !cloudflare.includes("qualified-alternatives.js?v=20261108-research-alternatives2"),
+  "Production smoke contracts must derive the current shared drawer/alternatives script refs from the checked-out page source, not stale hard-coded cache versions.",
+);
+assert.ok(
+  cloudflare.includes("'EFOOTBALL_SLIP_REJECTED_PARTIAL'") &&
+    cloudflare.includes("payload?.booking_code_withheld === true") &&
+    cloudflare.includes("!payload?.booking_code"),
+  "A live eFootball partial rejection is a safe smoke outcome only when every excluded leg is explicit and no booking code is returned.",
+);
+assert.ok(
+  cloudflare.includes("MATCH SIGNAL KV NAMESPACE CANDIDATES") &&
+    cloudflare.includes("production_bindings") &&
+    cloudflare.includes("body='+String(body||'').replace"),
+  "Cloudflare deployment diagnostics must expose binding identifiers and public-alternatives error details without exposing secret values.",
+);
 console.log("Cloudflare production hosting checks passed; legacy GitHub Pages is redirect-only.");
