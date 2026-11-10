@@ -90,14 +90,36 @@ assert pipeline.sportybet_total_for_fixture(fixture, nickname_feed) is not None,
 )
 
 # Forecasts can refresh before tip-off, but must freeze once the game starts.
-fresh_snapshot = {"generated_at": (now-timedelta(hours=2)).isoformat(), "totals_model_version": pipeline.NBA_TOTALS_MODEL_VERSION}
-stale_snapshot = {"generated_at": (now-timedelta(hours=7)).isoformat(), "totals_model_version": pipeline.NBA_TOTALS_MODEL_VERSION}
-legacy_snapshot = {"generated_at": (now-timedelta(hours=1)).isoformat(), "totals_model_version": "nba-total-v1"}
+fresh_snapshot = {
+    "generated_at": (now-timedelta(hours=2)).isoformat(),
+    "totals_model_version": pipeline.NBA_TOTALS_MODEL_VERSION,
+    "winner_model_version": pipeline.NBA_WINNER_MODEL_VERSION,
+}
+stale_snapshot = {
+    "generated_at": (now-timedelta(hours=7)).isoformat(),
+    "totals_model_version": pipeline.NBA_TOTALS_MODEL_VERSION,
+    "winner_model_version": pipeline.NBA_WINNER_MODEL_VERSION,
+}
+legacy_snapshot = {
+    "generated_at": (now-timedelta(hours=1)).isoformat(),
+    "totals_model_version": pipeline.NBA_TOTALS_MODEL_VERSION,
+}
+old_totals_snapshot = {
+    "generated_at": (now-timedelta(hours=1)).isoformat(),
+    "totals_model_version": "nba-total-v1",
+    "winner_model_version": pipeline.NBA_WINNER_MODEL_VERSION,
+}
 assert pipeline.should_refresh_nba_prediction(fresh_snapshot, start, now) is False
 assert pipeline.should_refresh_nba_prediction(stale_snapshot, start, now) is True
 assert pipeline.should_refresh_nba_prediction(stale_snapshot, now-timedelta(minutes=1), now) is False
 assert pipeline.should_refresh_nba_prediction({}, start, now) is True
-assert pipeline.should_refresh_nba_prediction(legacy_snapshot, start, now) is True, "pregame forecasts from old totals logic must refresh into the versioned model"
+assert pipeline.should_refresh_nba_prediction(legacy_snapshot, start, now) is True, "fresh totals forecasts without a winner-model version must refresh"
+assert pipeline.should_refresh_nba_prediction(old_totals_snapshot, start, now) is True, "old totals model versions must still refresh"
+assert pipeline.should_refresh_nba_prediction(
+    {**fresh_snapshot, "start_time": start.isoformat()},
+    now-timedelta(minutes=1), now
+) is False, "started games must remain frozen even when their winner-model version is old"
+
 
 market = pipeline.sportybet_total_for_fixture(fixture, feed)
 assert market and market["market_id"] == "225" and market["line"] == 228.5
