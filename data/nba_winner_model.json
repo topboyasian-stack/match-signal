@@ -1,0 +1,112 @@
+{
+  "version": "nba-winner-elo-form-v1",
+  "model_type": "standardized_logistic_regression",
+  "paper_only": true,
+  "market_inputs_used": false,
+  "training_cutoff_utc": "2026-11-02T02:00:00+00:00",
+  "training_games": 1167,
+  "development_protocol": {
+    "fit_period_end_exclusive": "2026-03-26",
+    "fit_games": 928,
+    "validation_games": 239,
+    "selected_l2_regularization": 0.001,
+    "validation_metrics": {
+      "accuracy": 0.719665,
+      "brier": 0.184268,
+      "logloss": 0.543397
+    }
+  },
+  "prospective_holdout": {
+    "start_date_key_inclusive": "2026-11-02",
+    "games": 65,
+    "metrics": {
+      "accuracy": 0.738462,
+      "brier": 0.185151,
+      "logloss": 0.54407
+    },
+    "previous_winner_model_metrics": {
+      "accuracy": 0.676923,
+      "brier": 0.214984,
+      "logloss": 0.621162
+    },
+    "note": "Fixed-cutoff, date-grouped prospective history. The 65-game sample is encouraging but still limited."
+  },
+  "rating": {
+    "initial_rating": 1500,
+    "k_factor": 25,
+    "home_advantage_elo_points": 70,
+    "margin_of_victory_multiplier": "(absolute_margin + 3)^0.8 / max(7.5, 7.5 + 0.006 * pregame_elo_difference)",
+    "same_day_updates": "All games sharing an NBA game-day key use the same pre-day rating snapshot; updates are applied after the date is complete."
+  },
+  "features": [
+    "elo_rating_difference",
+    "recent5_net_efficiency_difference",
+    "recent10_net_efficiency_difference",
+    "home_away_scoring_margin_split",
+    "rest_days_difference",
+    "games_last_7_days_difference"
+  ],
+  "standardization": {
+    "mean": [
+      0.03462205245326128,
+      0.030480862610682693,
+      0.015313325444430856,
+      0.16342134476089795,
+      0.013996001142530714,
+      0.01713796058269066
+    ],
+    "sd": [
+      1.6186445962596456,
+      1.3118616075936458,
+      1.1321433650573884,
+      0.9414176620299659,
+      0.2935309031607289,
+      0.7620256912075019
+    ]
+  },
+  "coefficients": [
+    0.2269059159938471,
+    0.6307267018275329,
+    -0.027825986000970422,
+    0.25095263286823694,
+    0.17770799400264897,
+    0.04563140930754753,
+    0.030475826901107436
+  ],
+  "evaluation": {
+    "candidate": "Elo + recent 5/10 net efficiency + home/away margin splits + rest + 7-day schedule density",
+    "current_model": "NBA totals-derived logistic winner probability",
+    "development_validation": {
+      "n": 239,
+      "candidate": {
+        "accuracy": 0.719665,
+        "brier": 0.184268,
+        "logloss": 0.543397
+      },
+      "current": {
+        "accuracy": 0.711297,
+        "brier": 0.20863,
+        "logloss": 0.607741
+      }
+    },
+    "prospective_holdout": {
+      "n": 65,
+      "candidate": {
+        "accuracy": 0.738462,
+        "brier": 0.185151,
+        "logloss": 0.54407
+      },
+      "current": {
+        "accuracy": 0.676923,
+        "brier": 0.214984,
+        "logloss": 0.621162
+      }
+    }
+  },
+  "limitations": [
+    "NBA historical game dates are grouped by Eastern calendar day; same-day scores are excluded from each day's forecasts.",
+    "This candidate does not use injury or confirmed lineup information.",
+    "The model is an NBA adaptation of publicly described statistical factors, not a copy of Forebet's proprietary algorithm.",
+    "The prospective holdout is only 65 games and does not establish profitability or betting readiness."
+  ]
+}
