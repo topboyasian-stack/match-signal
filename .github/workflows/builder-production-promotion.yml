@@ -59,7 +59,7 @@ jobs:
       - name: Refresh Unified Upcoming before rebuilding the Builder
         id: pre-build-board
         env:
-          GH_TOKEN: \${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           source_sha="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq '.sha')"
@@ -71,8 +71,8 @@ jobs:
           gh workflow run unified-upcoming.yml --ref main -f promotion_child=true
           board_run_id=""
           for attempt in $(seq 1 180); do
-            board_candidates="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/unified-upcoming.yml/runs?branch=main&per_page=100" --jq ".workflow_runs[] | select(.event == \\"workflow_dispatch\\" and .head_branch == \\"main\\" and .created_at >= \\"$dispatched_at\\") | [.id, .head_sha] | @tsv")"
-            while IFS=$'\t' read -r candidate_id candidate_sha; do
+            board_candidates="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/unified-upcoming.yml/runs?branch=main&per_page=100" --jq '.workflow_runs[] | select(.event == "workflow_dispatch" and .head_branch == "main" and .created_at >= "'"$dispatched_at"'") | [.id, .head_sha] | @tsv')"
+            while IFS=$'\\t' read -r candidate_id candidate_sha; do
               [ -n "$candidate_id" ] || continue
               [ "$candidate_id" != "$last_cancelled_board_run_id" ] || continue
               merge_base="$(gh api "repos/$GITHUB_REPOSITORY/compare/$source_sha...$candidate_sha" --jq '.merge_base_commit.sha' 2>/dev/null || true)"
@@ -114,7 +114,7 @@ jobs:
             sleep 5
           done
           test -n "$board_run_id"
-          board_published_sha="$(gh api "repos/$GITHUB_REPOSITORY/commits?path=data/unified_upcoming.json&per_page=10" --jq ".[] | select(.commit.committer.date >= \\"$dispatched_at\\" and (.commit.message | test(\\"Refresh unified upcoming board\\"; \\"i\\"))) | .sha" | head -n 1)"
+          board_published_sha="$(gh api "repos/$GITHUB_REPOSITORY/commits?path=data/unified_upcoming.json&per_page=10" --jq '.[] | select(.commit.committer.date >= "'"$dispatched_at"'" and (.commit.message | test("Refresh unified upcoming board"; "i"))) | .sha' | head -n 1)"
           if [ -z "$board_published_sha" ]; then
             board_published_sha="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq '.sha')"
           fi
@@ -123,7 +123,7 @@ jobs:
           echo "board_published_sha=$board_published_sha" >> "$GITHUB_OUTPUT"
           echo "board_published_at=$board_published_at" >> "$GITHUB_OUTPUT"
           echo "Pre-build board run $board_run_id succeeded; published source $board_published_sha at $board_published_at."
-      
+
       - name: Wait for Builder refresh triggered by the pre-build board
         id: pre-build-builder
         env:
