@@ -1,0 +1,69 @@
+name: Football model adoption regression
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'scripts/independent_football_model.py'
+      - 'scripts/football_prequential_ensemble.py'
+      - 'scripts/model_upgrade.py'
+      - 'scripts/test_football_prequential_ensemble.py'
+      - 'scripts/test_model_upgrade_football_ensemble.py'
+      - '.github/workflows/autopilot-refresh.yml'
+      - '.github/workflows/football-model-adoption-regression.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/independent_football_model.py'
+      - 'scripts/football_prequential_ensemble.py'
+      - 'scripts/model_upgrade.py'
+      - 'scripts/test_football_prequential_ensemble.py'
+      - 'scripts/test_model_upgrade_football_ensemble.py'
+      - '.github/workflows/autopilot-refresh.yml'
+      - '.github/workflows/football-model-adoption-regression.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Check out proposed revision
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Compile established statistical model modules
+        run: |
+          python -m py_compile \
+            scripts/independent_football_model.py \
+            scripts/football_prequential_ensemble.py \
+            scripts/model_upgrade.py \
+            scripts/value_decision.py \
+            scripts/test_football_prequential_ensemble.py \
+            scripts/test_model_upgrade_football_ensemble.py
+
+      - name: Test chronological Elo, Dixon-Coles and ensemble rules
+        run: python scripts/test_football_prequential_ensemble.py
+
+      - name: Test validated forecast application and protected ticket gates
+        run: python scripts/test_model_upgrade_football_ensemble.py
+
+      - name: Verify the scheduled publisher applies and publishes model outputs
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          workflow = Path('.github/workflows/autopilot-refresh.yml').read_text(encoding='utf-8')
+          assert 'python scripts/model_upgrade.py' in workflow
+          assert 'python scripts/test_model_upgrade_football_ensemble.py' in workflow
+          assert 'data/predictions.json' in workflow
+          assert 'data/football_prequential_validation.json' in workflow
+          assert workflow.count('python scripts/model_upgrade.py') >= 2, 'the conflict-retry path must reapply the model to the newest forecasts'
+          assert 'release_gates_changed' in workflow
+          print('Scheduled model application, conflict retry, forecast publication and no-ticket-release checks are wired.')
+          PY
