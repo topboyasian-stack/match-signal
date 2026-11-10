@@ -1135,12 +1135,16 @@ try {
       return jsonResponse({bizCode:10000,data:{shareCode:'MUST-NOT-BE-CREATED'}});
     }
     if (url.pathname === '/api/ng/factsCenter/event') {
+      const eventId = String(url.searchParams.get('eventId') || '');
+      const second = eventId === 'sr:match:tennis-other-fixture';
       return jsonResponse({bizCode:10000,data:{event:{
-        eventId:'sr:match:tennis-only-set-one',homeTeamName:'Eva Echo',awayTeamName:'Finn Foxtrot',
-        estimateStartTime:mismatchedSetStart,matchStatus:'Not start',
+        eventId,
+        homeTeamName:second?'George Golf':'Eva Echo',
+        awayTeamName:second?'Helen Hotel':'Finn Foxtrot',
+        estimateStartTime:mismatchedSetStart + (second ? 3600000 : 0),matchStatus:'Not start',
         markets:[{id:'202',desc:'1st Set Winner',specifier:'setnr=1',status:'0',outcomes:[
-          {id:'only-s1-eva',desc:'Eva Echo',odds:1.9,isActive:1},
-          {id:'only-s1-finn',desc:'Finn Foxtrot',odds:1.9,isActive:1}
+          {id:second?'other-s1-george':'only-s1-eva',desc:second?'George Golf':'Eva Echo',odds:1.9,isActive:1},
+          {id:second?'other-s1-helen':'only-s1-finn',desc:second?'Helen Hotel':'Finn Foxtrot',odds:1.9,isActive:1}
         ]}]
       }}});
     }
@@ -1153,7 +1157,7 @@ try {
        market:'set_winner',set_number:2,market_id:'202',pick:'p1',player_1:'Eva Echo',player_2:'Finn Foxtrot',
        match:'Eva Echo vs Finn Foxtrot',start_time:new Date(mismatchedSetStart).toISOString()},
       {event_id:'tennis-other-fixture',sportybet_event_id:'sr:match:tennis-other-fixture',sport:'tennis',
-       market:'winner',pick:'p1',market_id:'186',player_1:'George Golf',player_2:'Helen Hotel',
+       market:'set_winner',set_number:1,pick:'p1',market_id:'202',player_1:'George Golf',player_2:'Helen Hotel',
        match:'George Golf vs Helen Hotel',start_time:new Date(mismatchedSetStart + 3600000).toISOString()}
     ]})
   })});
