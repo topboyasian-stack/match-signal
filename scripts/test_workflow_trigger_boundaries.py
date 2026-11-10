@@ -108,7 +108,7 @@ def main():
     )
     assert "Ignoring superseded pre-build Builder run" in promotion
     assert "Ignoring superseded post-build Builder run" in promotion
-    assert promotion.count('if [ "$builder_conclusion" = "cancelled" ] || [ "$builder_conclusion" = "skipped" ]; then') == 2, (
+    assert promotion.count('if [ "$builder_conclusion" = "cancelled" ] || [ "$builder_conclusion" = "skipped" ]; then') == 4, (
         "Superseded Builder runs must be retried instead of aborting the ordered promotion."
     )
     assert "Timed out waiting for a successful Builder refresh after the pre-build board." in promotion
