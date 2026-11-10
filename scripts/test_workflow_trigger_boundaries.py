@@ -168,17 +168,19 @@ def main():
     assert "scripts/selection_candidate_collector.py" not in autopilot_paths
     assert "python scripts/unified_upcoming.py" not in autopilot
     assert "python scripts/selection_candidate_collector.py" not in autopilot
-    autopilot_publish = autopilot.split("      - name: Publish validated football forecasts, readiness and autopilot status", 1)[1]
+    autopilot_publish = autopilot.split("      - name: Publish football readiness and autopilot status", 1)[1]
     autopilot_publish = autopilot_publish.split("      - name:", 1)[0]
     assert "data/unified_upcoming.json" not in autopilot_publish
     assert "data/selection_candidates.json" not in autopilot_publish
     assert "data/system_health.json" not in autopilot_publish
     assert "git fetch origin main" in autopilot_publish
-    assert autopilot_publish.index("git fetch origin main") < autopilot_publish.index("git rebase origin/main") < autopilot_publish.index("git push origin main"), (
-        "Autopilot must rebase model outputs onto concurrent main updates before publishing."
+    assert autopilot_publish.index("git stash push --include-untracked") < autopilot_publish.index("git fetch origin main") < autopilot_publish.index("git rebase origin/main") < autopilot_publish.index("git push origin main"), (
+        "Autopilot must stash non-owned generated health files and rebase its readiness artifacts before publishing."
     )
-    assert "Forecast/source artifacts changed concurrently; rebuild on latest main." in autopilot_publish
-    assert "python scripts/model_upgrade.py" in autopilot_publish
+    assert "Readiness/source artifacts changed concurrently; rebuild on latest main." in autopilot_publish
+    assert "data/predictions.json" not in autopilot_publish
+    assert "data/football_prequential_validation.json" not in autopilot_publish
+    assert "python scripts/model_upgrade.py" not in autopilot
 
     assert "cancel-in-progress: false" in autopilot, (
         "An upstream completion must not cancel an in-flight model publication."
