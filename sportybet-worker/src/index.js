@@ -13,6 +13,8 @@ const ALLOWED_MARKETS = new Set(["1","10","11","14","16","18","26","29","36","45
 const UPSTREAM_HEADERS = {
   "Accept": "application/json, text/plain, */*",
   "Content-Type": "application/json",
+  "Cache-Control": "no-cache",
+  "Pragma": "no-cache",
   "Current-Country": "NG",
   "Origin": ORIGIN,
   "Referer": "https://www.sportybet.com/ng/",
@@ -129,8 +131,7 @@ async function proxyShareRequest(request) {
         "Sec-Fetch-Site": "same-origin"
       },
       body: JSON.stringify({ selections: clean }),
-      cache: "no-store",
-      redirect: "follow",
+            redirect: "follow",
       signal: AbortSignal.timeout(15000)
     });
     const contentType = String(upstream.headers.get("content-type") || "unknown");
@@ -178,11 +179,11 @@ async function probe(path, params) {
   const started = Date.now();
   const url = new URL(ORIGIN + path);
   for (const [key, value] of Object.entries(params)) url.searchParams.set(key, String(value));
+  if (!url.searchParams.has("_t")) url.searchParams.set("_t", String(Date.now()));
   try {
     const response = await fetch(url.toString(), {
       headers: UPSTREAM_HEADERS,
-      cache: "no-store",
-      signal: AbortSignal.timeout(8000)
+            signal: AbortSignal.timeout(8000)
     });
     const contentType = response.headers.get("content-type") || "unknown";
     const body = await response.text();
@@ -360,11 +361,11 @@ export default {
 
     const upstreamUrl = new URL(ORIGIN + url.pathname);
     for (const [key, value] of params) upstreamUrl.searchParams.set(key, value);
+    if (!upstreamUrl.searchParams.has("_t")) upstreamUrl.searchParams.set("_t", String(Date.now()));
     try {
       const upstream = await fetch(upstreamUrl.toString(), {
         headers: UPSTREAM_HEADERS,
-        cache: "no-store",
-        signal: AbortSignal.timeout(10000)
+                signal: AbortSignal.timeout(10000)
       });
       const body = await upstream.text();
       return new Response(body, {
