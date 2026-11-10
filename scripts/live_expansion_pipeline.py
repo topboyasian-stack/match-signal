@@ -9,7 +9,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import requests
 
-from expansion_pipeline import collect, current, nba_predict, NBA_START, NBA_TOTALS_MODEL_VERSION, NBA_TOTALS_MODEL_LABEL, NOW
+from expansion_pipeline import collect, current, nba_predict, NBA_START, NBA_TOTALS_MODEL_VERSION, NBA_TOTALS_MODEL_LABEL, NBA_WINNER_MODEL_VERSION, NBA_WINNER_MODEL_LABEL, NOW
 from independent_football_model import independent_prediction
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -547,6 +547,11 @@ def should_refresh_nba_prediction(old, start, now=None, max_age_hours=6):
         return False
     if old.get("totals_model_version") != NBA_TOTALS_MODEL_VERSION:
         return True
+    # A fresh v5.1 totals projection does not make its legacy totals-derived
+    # winner probability current. Rebuild every pregame row until the winner
+    # model artifact is explicitly recorded.
+    if old.get("winner_model_version") != NBA_WINNER_MODEL_VERSION:
+        return True
     stamp = dt(old.get("generated_at") or old.get("prediction_created_at"))
     if not stamp or stamp >= start:
         return True
@@ -630,16 +635,20 @@ def main():
                     "probabilities": {"p1": round(probs["home"],6), "p2": round(probs["away"],6)},
                     "pick": "p1" if probs["home"] >= probs["away"] else "p2",
                     "confidence": round(max(probs.values()),6), "expected_score": p["expected_score"],
-                    "expected_total": p["expected_total"], "totals_model_version": p.get("totals_model_version"), "total_model_features": p.get("total_model_features"), "markets": {"moneyline": p["moneyline"]},
-                    "model": p["model"], "signal_quality": {"status":"LIVE_EXPERIMENTAL","market_odds_available":False},
+                    "expected_total": p["expected_total"], "totals_model_version": p.get("totals_model_version"), "total_model_features": p.get("total_model_features"),
+                    "winner_model_version": p["winner_model"]["version"], "winner_model_features": p["winner_model"]["feature_values"],
+                    "markets": {"moneyline": p["moneyline"]},
+                    "model": p["model"], "totals_model": p["totals_model"], "signal_quality": {"status":"LIVE_EXPERIMENTAL","market_odds_available":False},
                     "generated_at": NOW.isoformat(), "prediction_created_at": NOW.isoformat(),
                     "accuracy_eligible": True, "prediction_status": "live_experimental",
                     "paper_only": True, "live_experimental": True,
                 }
         if row.get("totals_model_version") == NBA_TOTALS_MODEL_VERSION:
-            # Prior V5 rows can retain the old V4 display label even though their
-            # stored total features are already V5 pace/efficiency calibrated.
-            row["model"] = NBA_TOTALS_MODEL_LABEL
+            # Keep the winner and totals model labels separate; do not relabel
+            # a new winner forecast as if it were produced by the totals model.
+            row["totals_model"] = NBA_TOTALS_MODEL_LABEL
+            if row.get("winner_model_version") == NBA_WINNER_MODEL_VERSION:
+                row["model"] = NBA_WINNER_MODEL_LABEL
         row = apply_sportybet_total_snapshot(row, f, sportybet_feed)
         nba_predictions.append(row)
         seen_nba.add(eid)
