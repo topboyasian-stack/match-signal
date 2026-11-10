@@ -123,7 +123,7 @@ def _market_specifier(market: dict[str, Any]) -> str:
 
 
 def _set_number_from_market(market: dict[str, Any]) -> int | None:
-    match = re.search(r"(?:^|[|,;\\s])setnr\\s*=\\s*([12])(?=$|[|,;\\s])", _market_specifier(market), re.I)
+    match = re.search(r"(?:^|[|,;\s])setnr\s*=\s*([12])(?=$|[|,;\s])", _market_specifier(market), re.I)
     return int(match.group(1)) if match else None
 
 
