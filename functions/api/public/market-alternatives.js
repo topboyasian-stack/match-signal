@@ -307,6 +307,7 @@ export function buildPublicAlternatives(document, nowMs = Date.now()) {
       }
     }
     for (const row of rankedRows) {
+      if (row.market === "set_winner" && selected.some(x => x.market === "set_winner" && Number(x.set_number) === Number(row.set_number))) continue;
       if (selected.some(x => x.market === row.market && x.set_number === row.set_number && x.line === row.line && x.pick === row.pick)) continue;
       selected.push(row);
       if (selected.length >= (hasSetWinners ? 4 : 2)) break;
