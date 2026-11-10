@@ -34,10 +34,10 @@ permissions:
 # on an untouched chronological holdout. This updates research forecasts, never
 # live-money or ticket eligibility. Unified Upcoming owns the shared board and health.
 concurrency:
-  # A new heartbeat supersedes stale readiness-only work. It cannot cancel the
-  # Unified Upcoming publisher because it uses a different concurrency group.
+  # Model evaluation and artifact publication must complete as one transaction.
+  # Queue newer heartbeat/upstream runs instead of cancelling an active publisher.
   group: match-signal-autopilot-publish
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   refresh:
