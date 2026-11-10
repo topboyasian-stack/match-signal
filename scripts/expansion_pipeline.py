@@ -14,6 +14,11 @@ NBA_TOTALS_MODEL_VERSION="nba-total-v5.1-pace-efficiency-calibrated"
 NBA_TOTALS_MODEL_LABEL="NBA totals v5.1: frozen 0.8 pace/efficiency blend minus 0.3542 points; no bookmaker inputs"
 NBA_TOTALS_PACE_BLEND_WEIGHT=0.8
 NBA_TOTALS_BIAS_CORRECTION=0.3542
+NBA_WINNER_MODEL_VERSION = "nba-winner-elo-form-v1"
+NBA_WINNER_MODEL_PATH = DATA / "nba_winner_model.json"
+NBA_WINNER_ELO_K = 25.0
+NBA_WINNER_ELO_HOME_ADVANTAGE = 70.0
+_NBA_WINNER_MODEL_CACHE = None
 NBA_PARQUET='https://raw.githubusercontent.com/llimllib/nba_data/main/data/gamelogs.parquet'
 NBA_DUCKDB_CATALOG='https://basketball-data.billmill.org/nba/nba.duckdb'
 NBA_ELO_CSV='https://datahub.io/fivethirtyeight/nba-elo/_r/-/data/nbaallelo.csv'
@@ -369,6 +374,183 @@ def nba_total_components(r,hist):
   'recency_half_life_days':30,'recent_team_total_window':12
  }
 
+def _load_nba_winner_model():
+ global _NBA_WINNER_MODEL_CACHE
+ if _NBA_WINNER_MODEL_CACHE is None:
+  try:
+   payload=json.loads(NBA_WINNER_MODEL_PATH.read_text(encoding="utf-8"))
+  except Exception as exc:
+   raise RuntimeError(f"NBA winner-model artifact is unavailable: {exc}") from exc
+  if payload.get("version") != NBA_WINNER_MODEL_VERSION:
+   raise RuntimeError("NBA winner-model artifact version does not match the production code.")
+  standardization=payload.get("standardization") or {}
+  coefficients=payload.get("coefficients") or []
+  means=standardization.get("mean") or []
+  scales=standardization.get("sd") or []
+  if len(coefficients) != len(means)+1 or len(means) != len(scales) or not means:
+   raise RuntimeError("NBA winner-model artifact has an invalid coefficient/feature shape.")
+  if any(not math.isfinite(float(x)) for x in coefficients+means+scales):
+   raise RuntimeError("NBA winner-model artifact contains non-finite values.")
+  if any(float(x) <= 0 for x in scales):
+   raise RuntimeError("NBA winner-model feature scales must be positive.")
+  _NBA_WINNER_MODEL_CACHE=payload
+ return _NBA_WINNER_MODEL_CACHE
+
+
+def _nba_winner_day_key(value):
+ stamp=dt(value)
+ if stamp is None:
+  return None
+ # Historical NBA team-game logs are keyed to the Eastern calendar day.
+ # Adding one day creates the same sortable key for date-only and tip-time rows.
+ return stamp.astimezone(ZoneInfo("America/New_York")).date()+timedelta(days=1)
+
+
+def nba_winner_features(r,hist):
+ """Build market-blind Elo, recent-efficiency, venue and schedule inputs using prior days only."""
+ cutoff_day=_nba_winner_day_key(r.get("date"))
+ if cutoff_day is None:
+  raise ValueError("NBA winner forecast requires a valid fixture date.")
+ grouped=defaultdict(list)
+ for row in hist or []:
+  if not isinstance(row,dict):
+   continue
+  day=_nba_winner_day_key(row.get("date"))
+  if day is None or day>=cutoff_day:
+   continue
+  home=str(row.get("home") or "").strip()
+  away=str(row.get("away") or "").strip()
+  try:
+   hs=float(row.get("home_score"));ass=float(row.get("away_score"))
+  except (TypeError,ValueError):
+   continue
+  if not home or not away or not math.isfinite(hs) or not math.isfinite(ass):
+   continue
+  grouped[day].append((row,home,away,hs,ass))
+
+ ratings={}
+ team_games=defaultdict(list)
+ last_game_day={}
+ for day in sorted(grouped):
+  games=sorted(grouped[day],key=lambda x:str(x[0].get("event_id") or ""))
+  rating_snapshot=dict(ratings)
+  rating_deltas=defaultdict(float)
+  # Predict every game on a date from the same pre-date rating snapshot.
+  # NBA teams do not play twice on one date, but batching also prevents ordering leakage.
+  for row,home,away,home_score,away_score in games:
+   home_rating=rating_snapshot.get(home,1500.0)
+   away_rating=rating_snapshot.get(away,1500.0)
+   elo_difference=home_rating-away_rating+NBA_WINNER_ELO_HOME_ADVANTAGE
+   expected_home=1.0/(1.0+10.0**(-elo_difference/400.0))
+   actual_home=1.0 if home_score>away_score else 0.0
+   point_margin=abs(home_score-away_score)
+   mov_multiplier=((point_margin+3.0)**0.8)/max(7.5,7.5+0.006*elo_difference)
+   update=NBA_WINNER_ELO_K*mov_multiplier*(actual_home-expected_home)
+   rating_deltas[home]+=update
+   rating_deltas[away]-=update
+  for name,delta in rating_deltas.items():
+   ratings[name]=rating_snapshot.get(name,1500.0)+delta
+
+  # Append all same-day team records only after the entire date has been rated.
+  for row,home,away,home_score,away_score in games:
+   for name,opponent,score,opponent_score,side in (
+    (home,away,home_score,away_score,"home"),
+    (away,home,away_score,home_score,"away"),
+   ):
+    offensive=float(row.get(f"{side}_off_rating") or 0.0)
+    defensive=float(row.get(f"{side}_def_rating") or 0.0)
+    if not math.isfinite(offensive):
+     offensive=0.0
+    if not math.isfinite(defensive):
+     defensive=0.0
+    team_games[name].append({
+     "day":day,
+     "opponent":opponent,
+     "margin":score-opponent_score,
+     "net_rating":offensive-defensive,
+     "venue":side,
+    })
+    last_game_day[name]=day
+
+ home=str(r.get("home") or "").strip()
+ away=str(r.get("away") or "").strip()
+ if not home or not away:
+  raise ValueError("NBA winner forecast requires named home and away teams.")
+ home_games=team_games.get(home,[])
+ away_games=team_games.get(away,[])
+
+ def mean(records,key):
+  return sum(float(item.get(key) or 0.0) for item in records)/len(records) if records else 0.0
+
+ home_recent5=home_games[-5:]
+ away_recent5=away_games[-5:]
+ home_recent10=home_games[-10:]
+ away_recent10=away_games[-10:]
+ home_venue=[item for item in home_games if item.get("venue")=="home"]
+ away_venue=[item for item in away_games if item.get("venue")=="away"]
+ home_overall_margin=mean(home_games,"margin")
+ away_overall_margin=mean(away_games,"margin")
+ home_venue_shrink=len(home_venue)/(len(home_venue)+8.0)
+ away_venue_shrink=len(away_venue)/(len(away_venue)+8.0)
+ home_venue_margin=(
+  home_venue_shrink*mean(home_venue,"margin")
+  +(1.0-home_venue_shrink)*home_overall_margin
+ )
+ away_venue_margin=(
+  away_venue_shrink*mean(away_venue,"margin")
+  +(1.0-away_venue_shrink)*away_overall_margin
+ )
+ fixture_day=cutoff_day
+ last_home=last_game_day.get(home)
+ last_away=last_game_day.get(away)
+ rest_home=(fixture_day-last_home).days if last_home else 3
+ rest_away=(fixture_day-last_away).days if last_away else 3
+ games_last_7_home=sum(1 for item in home_games if 0 < (fixture_day-item["day"]).days <= 7)
+ games_last_7_away=sum(1 for item in away_games if 0 < (fixture_day-item["day"]).days <= 7)
+ features=[
+  (ratings.get(home,1500.0)-ratings.get(away,1500.0))/100.0,
+  (mean(home_recent5,"net_rating")-mean(away_recent5,"net_rating"))/10.0,
+  (mean(home_recent10,"net_rating")-mean(away_recent10,"net_rating"))/10.0,
+  (home_venue_margin-away_venue_margin)/10.0,
+  max(-3.0,min(3.0,float(rest_home-rest_away)))/3.0,
+  max(-3.0,min(3.0,float(games_last_7_away-games_last_7_home))),
+ ]
+ names=["elo","recent5","recent10","venue","rest","schedule"]
+ return {
+  "feature_names":names,
+  "feature_values":{name:round(value,6) for name,value in zip(names,features)},
+  "raw_features":features,
+  "history_days_used":len(grouped),
+  "history_games_used":sum(len(items) for items in grouped.values()),
+ }
+
+
+def nba_winner_predict(r,hist):
+ """Return the independently calibrated NBA winner probability; never reads bookmaker prices."""
+ model=_load_nba_winner_model()
+ built=nba_winner_features(r,hist)
+ standardization=model["standardization"]
+ means=[float(value) for value in standardization["mean"]]
+ scales=[float(value) for value in standardization["sd"]]
+ coefficients=[float(value) for value in model["coefficients"]]
+ z=coefficients[0]
+ for index,value in enumerate(built["raw_features"]):
+  z+=coefficients[index+1]*((float(value)-means[index])/scales[index])
+ z=max(-25.0,min(25.0,z))
+ home_probability=1.0/(1.0+math.exp(-z))
+ return {
+  "moneyline":{"home":home_probability,"away":1.0-home_probability},
+  "model":{
+   "version":NBA_WINNER_MODEL_VERSION,
+   "feature_values":built["feature_values"],
+   "history_games_used":built["history_games_used"],
+   "history_days_used":built["history_days_used"],
+   "market_inputs_used":False,
+   "paper_only":True,
+  },
+ }
+
+
 def nba_predict(r,hist,pace_blend_weight=NBA_TOTALS_PACE_BLEND_WEIGHT,bias_adjustment=NBA_TOTALS_BIAS_CORRECTION):
  components=nba_total_components(r,hist)
  try:weight=max(0.0,min(1.0,float(pace_blend_weight)))
@@ -380,15 +562,18 @@ def nba_predict(r,hist,pace_blend_weight=NBA_TOTALS_PACE_BLEND_WEIGHT,bias_adjus
  base=components['base_total']
  pace=components['pace_total'] if components['pace_available'] else base
  expected_total=max(100.0,min(320.0,base+weight*(pace-base)-bias))
- hr=components['rest_days']['home'];ar=components['rest_days']['away']
- rest_adj=max(-2,min(2,(hr-ar)*.35))
- margin=.58*(components['home_raw']-components['away_raw'])+2.5+2*rest_adj
- margin=max(-.8*expected_total,min(.8*expected_total,margin))
- hm=expected_total/2+margin/2;am=expected_total/2-margin/2
- p=1/(1+math.exp(-margin/7.5))
+ # Keep the totals/score projection independent from the winner probability model.
+ rest_adj=max(-2,min(2,(components['rest_days']['home']-components['rest_days']['away'])*.35))
+ score_margin=.58*(components['home_raw']-components['away_raw'])+2.5+2*rest_adj
+ score_margin=max(-.8*expected_total,min(.8*expected_total,score_margin))
+ hm=expected_total/2+score_margin/2
+ am=expected_total/2-score_margin/2
+ winner=nba_winner_predict(r,hist)
+ probabilities=winner["moneyline"]
  return {
-  'moneyline':{'home':p,'away':1-p},'expected_score':{'home':hm,'away':am},
+  'moneyline':probabilities,'expected_score':{'home':hm,'away':am},
   'expected_total':expected_total,'totals_model_version':NBA_TOTALS_MODEL_VERSION,
+  'winner_model':winner["model"],
   'rest_days':components['rest_days'],
   'total_model_features':{
    'recency_half_life_days':30,'recent_team_total_window':12,
@@ -401,7 +586,7 @@ def nba_predict(r,hist,pace_blend_weight=NBA_TOTALS_PACE_BLEND_WEIGHT,bias_adjus
   },
   'model':NBA_TOTALS_MODEL_LABEL,
   'paper_only':True
-}
+ }
 def current(name):
  if name=='NBA' and NOW<NBA_START:return []
  start=NOW-timedelta(days=1)
@@ -431,7 +616,7 @@ def run():
  for r in nc:
   eid=str(r['event_id']); start=dt(r['date']); old=old_by_id.get(eid)
   old_stamp=dt(old.get('generated_at')) if old else None
-  if old and old_stamp and start and old_stamp < start:
+  if old and old_stamp and start and old_stamp < start and old.get('winner_model_version') == NBA_WINNER_MODEL_VERSION:
    p=dict(old)
   else:
    # Do not create a first-time "prediction" for a game that has already started.
@@ -445,7 +630,7 @@ def run():
        'probabilities':{'p1':round(probs['home'],6),'p2':round(probs['away'],6)},
        'pick':pick,'confidence':round(max(probs['home'],probs['away']),6),
        'expected_score':model['expected_score'],'expected_total':model['expected_total'],
-       'totals_model_version':model.get('totals_model_version'),'model':model['model'],'market':r.get('markets') or {},
+       'totals_model_version':model.get('totals_model_version'),'winner_model_version':model['winner_model']['version'],'winner_model_features':model['winner_model']['feature_values'],'model':model['model'],'market':r.get('markets') or {},
        'signal_quality':{'status':'LIVE_EXPERIMENTAL','market_odds_available':False},
        'generated_at':NOW.isoformat(),'prediction_created_at':NOW.isoformat(),
        'accuracy_eligible':True,'prediction_status':'live_experimental',
