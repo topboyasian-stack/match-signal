@@ -87,8 +87,12 @@ def main():
             "The shared ticket must submit all selections through the root-relative common revalidation API")
     require("AbortSignal.timeout(26000)" in drawer and "Your ticket is still saved; no code is assumed to exist." in drawer,
             "Manual ticket network timeouts must preserve the slip and avoid implying a code was created")
-    require("manualDeadlineAt = manualMode ? Date.now() + 22000 : null" in api and "requestTimeoutMs: manualMode ? 3000 : 6000" in api and "deadlineAt: manualDeadlineAt, timeoutMs: manualMode ? 6500 : 12000" in api,
-            "Manual multi-leg revalidation and share requests must have a bounded request budget")
+    require("requestDeadlineAt = Date.now() + 22000" in api and
+            "catalogueDeadlineAt = Date.now() + 13000" in api and
+            "requestTimeoutMs: manualMode ? 3000 : 6000" in api and
+            "deadlineAt: requestDeadlineAt, timeoutMs: manualMode ? 6500 : 9000" in api and
+            "loadNbaReleaseContext(requestDeadlineAt)" in api,
+            "Builder and manual revalidation, NBA evidence loading and share requests must have bounded request budgets")
     require("market==='total'?line:null" in drawer and "item.market==='total'" in drawer,
             "Football, Tennis and Basketball total legs must retain their exact line and side")
     require("data-ms-ticket-remove" in drawer and "data-ms-ticket-clear" in drawer,
