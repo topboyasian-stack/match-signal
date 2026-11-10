@@ -661,7 +661,9 @@ def main():
         if eid and eid not in seen_nba and start and stamp and stamp < start and start >= NOW-timedelta(hours=30):
             retained = dict(old)
             if retained.get("totals_model_version") == NBA_TOTALS_MODEL_VERSION:
-                retained["model"] = NBA_TOTALS_MODEL_LABEL
+                retained["totals_model"] = NBA_TOTALS_MODEL_LABEL
+                if retained.get("winner_model_version") == NBA_WINNER_MODEL_VERSION:
+                    retained["model"] = NBA_WINNER_MODEL_LABEL
             nba_predictions.append(retained)
             seen_nba.add(eid)
     nba_predictions.sort(key=lambda x: x.get("start_time", ""))
