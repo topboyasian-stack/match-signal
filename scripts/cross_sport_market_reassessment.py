@@ -1304,6 +1304,11 @@ def _make_audit_record(core: Any, row: dict[str, Any], now: datetime) -> dict[st
         status = "NO_EXACT_CURRENT_QUOTE"
     elif not fresh:
         status = "STALE_OR_UNTIMESTAMPED_QUOTE"
+    elif market == "set_winner":
+        # Exact market-202 identity supports manual live recheck, but the
+        # current common per-set probability is not a separately qualified
+        # set-specific value model and cannot enter the automatic Builder.
+        status = "SET_WINNER_RESEARCH_ONLY_NOT_BUILDER_QUALIFIED"
     elif in_alternative_horizon and not in_builder_horizon:
         status = "ALTERNATIVE_ONLY_OUTSIDE_BUILDER_HORIZON"
     elif leg.get("builder_eligible") is True and in_builder_horizon:
@@ -1354,15 +1359,15 @@ def _make_audit_record(core: Any, row: dict[str, Any], now: datetime) -> dict[st
         "reassessment_status": market_assessment.get("status") or "EXISTING_EXACT_EVIDENCE_CANDIDATE",
         "candidate_status": status,
         "passed_model_floor": bool(model_floor),
-        "passed_builder_gates": bool(not research_only and leg.get("builder_eligible") and in_builder_horizon and quote_exact and fresh),
-        "in_builder_pool": bool(not research_only and in_builder_horizon and quote_exact and fresh and (row.get("market_reassessment") or row.get("sport") == "virtual")),
+        "passed_builder_gates": bool(not research_only and market != "set_winner" and leg.get("builder_eligible") and in_builder_horizon and quote_exact and fresh),
+        "in_builder_pool": bool(not research_only and market != "set_winner" and in_builder_horizon and quote_exact and fresh and (row.get("market_reassessment") or row.get("sport") == "virtual")),
         "alternative_only": bool(in_alternative_horizon and not in_builder_horizon),
         "evidence_source": row.get("evidence_source"),
         "evidence_sample_n": row.get("evidence_sample_n"),
         "paper_only": True,
         "research_only": bool(research_only),
-        "qualification_allowed": bool(not research_only and quote_exact and fresh and leg.get("builder_eligible") and in_builder_horizon),
-        "bookable": bool(not research_only and quote_exact and fresh and leg.get("builder_eligible") and in_builder_horizon),
+        "qualification_allowed": bool(not research_only and market != "set_winner" and quote_exact and fresh and leg.get("builder_eligible") and in_builder_horizon),
+        "bookable": bool(not research_only and market != "set_winner" and quote_exact and fresh and leg.get("builder_eligible") and in_builder_horizon),
         "real_money_execution": False,
         "settlement_status": "PENDING",
         "settlement_result": None,
