@@ -1262,6 +1262,7 @@ def _make_audit_record(core: Any, row: dict[str, Any], now: datetime) -> dict[st
         "evidence_sample_n": row.get("evidence_sample_n"),
         "paper_only": True,
         "research_only": bool(research_only),
+        "qualification_allowed": bool(not research_only and quote_exact and fresh and leg.get("builder_eligible") and in_builder_horizon),
         "bookable": bool(not research_only and quote_exact and fresh and leg.get("builder_eligible") and in_builder_horizon),
         "real_money_execution": False,
         "settlement_status": "PENDING",
