@@ -14,7 +14,9 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
-from settle_same_day import brier
+def brier(probs, actual):
+    """Local pure Brier-score helper; importing settlement must not need HTTP clients."""
+    return round(sum((float(probs.get(key, 0)) - (1 if actual == key else 0)) ** 2 for key in probs), 6)
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
