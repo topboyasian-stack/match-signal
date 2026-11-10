@@ -215,6 +215,112 @@ def test_v2_normalizer_keeps_only_valid_regular_season_pace_metrics():
     assert rows[0]["date"]=="2026-10-26T03:59:59.999999+00:00", rows[0]["date"]
 
 
+def _winner_history_row(event_id, day_key, home, away, home_score, away_score):
+    # The NBA historical source stores game-day rows at the end of the
+    # Eastern calendar day, represented here as 03:59:59 UTC during DST.
+    return {
+        "event_id": event_id,
+        "date": f"{day_key}T03:59:59.999999+00:00",
+        "home": home,
+        "away": away,
+        "home_score": home_score,
+        "away_score": away_score,
+        "home_pace": 100.0,
+        "away_pace": 100.0,
+        "home_off_rating": 112.0 + (home_score - 100.0) / 5.0,
+        "away_off_rating": 112.0 + (away_score - 100.0) / 5.0,
+        "home_def_rating": 108.0,
+        "away_def_rating": 108.0,
+    }
+
+
+def test_nba_winner_model_is_independent_and_versioned():
+    history = []
+    for index in range(10):
+        game_day = datetime(2026, 10, 10 + index, tzinfo=UTC).date()
+        next_day = game_day + __import__("datetime").timedelta(days=1)
+        if index % 2 == 0:
+            history.append(_winner_history_row(
+                f"home-form-{index}", next_day.isoformat(),
+                "Home Team", f"Opponent {index}", 118 + index, 103,
+            ))
+        else:
+            history.append(_winner_history_row(
+                f"away-form-{index}", next_day.isoformat(),
+                f"Opponent {index}", "Away Team", 104, 110 + index,
+            ))
+    fixture = {
+        "event_id": "winner-model-check",
+        "date": "2026-10-22T23:00:00+00:00",
+        "home": "Home Team",
+        "away": "Away Team",
+    }
+    winner = p.nba_winner_predict(fixture, history)
+    assert winner["model"]["version"] == p.NBA_WINNER_MODEL_VERSION
+    assert winner["model"]["market_inputs_used"] is False
+    assert 0.0 < winner["moneyline"]["home"] < 1.0
+    assert abs(winner["moneyline"]["home"] + winner["moneyline"]["away"] - 1.0) < 1e-12
+
+    forecast = p.nba_predict(fixture, history)
+    assert forecast["winner_model"]["version"] == p.NBA_WINNER_MODEL_VERSION
+    assert forecast["totals_model_version"] == p.NBA_TOTALS_MODEL_VERSION
+    assert forecast["moneyline"] == winner["moneyline"]
+
+
+def test_nba_winner_forecast_excludes_same_day_and_future_results():
+    prior = [
+        _winner_history_row(
+            "prior-home-1", "2026-10-19", "Home Team", "Opponent A", 120, 100,
+        ),
+        _winner_history_row(
+            "prior-away-1", "2026-10-20", "Opponent B", "Away Team", 101, 117,
+        ),
+        _winner_history_row(
+            "prior-home-2", "2026-10-21", "Home Team", "Opponent C", 116, 102,
+        ),
+        _winner_history_row(
+            "prior-away-2", "2026-10-22", "Opponent D", "Away Team", 99, 113,
+        ),
+    ]
+    fixture = {
+        "event_id": "same-eastern-day-fixture",
+        # 21:00 ET on Oct 23; the historical row for Oct 23 is still pre-tip
+        # unavailable and must not enter this forecast.
+        "date": "2026-10-24T01:00:00+00:00",
+        "home": "Home Team",
+        "away": "Away Team",
+    }
+    baseline = p.nba_winner_predict(fixture, prior)
+    same_day = _winner_history_row(
+        "same-day-result", "2026-10-24", "Home Team", "Away Team", 250, 70,
+    )
+    later = _winner_history_row(
+        "future-result", "2026-10-25", "Home Team", "Away Team", 60, 220,
+    )
+    with_unavailable_results = p.nba_winner_predict(fixture, prior + [same_day, later])
+    assert with_unavailable_results["moneyline"] == baseline["moneyline"]
+    assert with_unavailable_results["model"]["feature_values"] == baseline["model"]["feature_values"]
+
+
+def test_nba_winner_model_is_invariant_to_same_day_row_order():
+    day_one = [
+        _winner_history_row("same-day-a", "2026-10-20", "Home Team", "Opponent A", 115, 102),
+        _winner_history_row("same-day-b", "2026-10-20", "Opponent B", "Away Team", 99, 118),
+    ]
+    day_two = [
+        _winner_history_row("next-day-a", "2026-10-21", "Home Team", "Opponent C", 121, 105),
+        _winner_history_row("next-day-b", "2026-10-21", "Opponent D", "Away Team", 104, 116),
+    ]
+    fixture = {
+        "event_id": "post-same-day-check",
+        "date": "2026-10-23T01:00:00+00:00",
+        "home": "Home Team",
+        "away": "Away Team",
+    }
+    first = p.nba_winner_predict(fixture, day_one + day_two)
+    second = p.nba_winner_predict(fixture, list(reversed(day_one + day_two)))
+    assert first["moneyline"] == second["moneyline"]
+    assert first["model"]["feature_values"] == second["model"]["feature_values"]
 
 
 if __name__=="__main__":
@@ -225,4 +331,7 @@ if __name__=="__main__":
     test_collection_prefers_pace_gamelogs_and_preserves_fallback_diagnostics()
     test_v4_uses_strictly_prior_scores_pace_and_efficiency()
     test_v2_normalizer_keeps_only_valid_regular_season_pace_metrics()
-    print("NBA source regression tests: PASS (7 groups)")
+    test_nba_winner_model_is_independent_and_versioned()
+    test_nba_winner_forecast_excludes_same_day_and_future_results()
+    test_nba_winner_model_is_invariant_to_same_day_row_order()
+    print("NBA source regression tests: PASS (10 groups)")
