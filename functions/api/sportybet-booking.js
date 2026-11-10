@@ -985,6 +985,15 @@ function findSetWinnerSelection(leg, event) {
       !['p1', 'p2'].includes(pick) || String(leg?.market_id || '') !== '202') {
     return { error: 'Tennis set-winner selections require Set 1 or Set 2 and exact SportyBet market 202.' };
   }
+  if (!sameParticipantPair([leg?.player_1, leg?.player_2], event, 'tennis')) {
+    return { error: 'Tennis participants changed in the current SportyBet event.' };
+  }
+  const requestedStart = Date.parse(String(leg?.start_time || ''));
+  const currentStart = Number(event?.estimateStartTime || 0);
+  if (Number.isFinite(requestedStart) && currentStart &&
+      Math.abs(requestedStart - currentStart) > 45 * 60 * 1000) {
+    return { error: 'Tennis fixture start time changed; refresh the ticket.' };
+  }
   const selectedName = String(pick === 'p1' ? leg?.player_1 || '' : leg?.player_2 || '').trim();
   if (!selectedName) return { error: 'The selected tennis player identity is missing.' };
   const escapedSet = String(setNumber);
