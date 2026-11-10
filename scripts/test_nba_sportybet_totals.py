@@ -255,6 +255,11 @@ assert '"winner_model_features": p["winner_model"]["feature_values"]' in publish
 assert '"totals_model": p["totals_model"]' in publisher_source
 assert 'old.get("winner_model_version") != NBA_WINNER_MODEL_VERSION' in publisher_source
 assert 'row["model"] = NBA_WINNER_MODEL_LABEL' in publisher_source
+assert 'row["model"] = NBA_TOTALS_MODEL_LABEL' not in publisher_source
+assert 'retained["model"] = NBA_TOTALS_MODEL_LABEL' not in publisher_source, (
+    "retained NBA rows must preserve the winner-model label too"
+)
+assert 'retained["totals_model"] = NBA_TOTALS_MODEL_LABEL' in publisher_source
 assert 'row["model"] = NBA_TOTALS_MODEL_LABEL' not in publisher_source, (
     "the live publisher must not overwrite the independent winner-model label with the totals-model label"
 )
