@@ -47,6 +47,36 @@ class BuilderLiveCoreFallbackTests(unittest.TestCase):
         self.assertEqual(source, "unified_live_refresh_fallback")
         self.assertEqual({row["event_id"] for row in result}, {"fresh-football", "fresh-tennis"})
 
+    def test_quote_captured_during_refresh_is_not_misclassified_as_future(self):
+        import cross_sport_market_reassessment as reassessment
+
+        started_at = self.now
+        quote_at = started_at + timedelta(seconds=8)
+        row = {
+            "market_odds_timestamp": quote_at.isoformat(),
+            "sportybet_market": {"fetched_at": quote_at.isoformat()},
+        }
+
+        # A source capture occurs after the Builder's initial time is recorded.
+        self.assertFalse(reassessment._fresh_quote(row, started_at)[0])
+
+        class RefreshedClock:
+            @staticmethod
+            def now(tz=None):
+                return quote_at + timedelta(seconds=2)
+
+        original_datetime = core.datetime
+        core.datetime = RefreshedClock
+        try:
+            evaluated_at = core._evaluation_time_after_market_refresh(started_at)
+        finally:
+            core.datetime = original_datetime
+
+        self.assertEqual(evaluated_at, quote_at + timedelta(seconds=2))
+        self.assertTrue(reassessment._fresh_quote(row, evaluated_at)[0],
+                        "a newly fetched SportyBet quote must be evaluated against the post-refresh clock")
+
+
     def test_builder_candidates_use_active_fallback_but_never_tennis_watch_rows(self):
         future = (self.now + timedelta(hours=1)).isoformat()
         core.ACTIVE_PREDICTION_ROWS = [
