@@ -104,6 +104,11 @@ export function publicAlternative(row, quote = {}) {
     match, market, market_label: marketLabel,
     pick, line, market_id: marketId, odds,
     probability,
+    // Identify the replace-on-refresh no-quote lane so it can remain visible
+    // ahead of stale provider-mapped rows when no fresh exact quote exists.
+    model_only_research: row.research_only === true && row.bookable === false &&
+      row.qualification_allowed === false && row.fresh_exact_quote === false &&
+      row.bookmaker_odds == null && !row.sportybet_event_id && !row.sportybet_market_id,
     builder_qualified: builderQualified,
     ticket_selectable: ticketSelectable,
     quote_status: quoteStatus,
@@ -166,6 +171,7 @@ export function buildPublicAlternatives(document, nowMs = Date.now()) {
     records_seen: historicalRows.length + currentResearchRows.length,
     current_research_candidates_seen: currentResearchRows.length,
     current_research_candidates_generated_at: document.current_research_candidates_generated_at || null,
+    model_only_research_selected_count: 0,
     role_source_match: 0,
     marked_fresh_exact_quote: 0,
     primary_link_present: 0,
@@ -269,18 +275,20 @@ export function buildPublicAlternatives(document, nowMs = Date.now()) {
   const alternatives = [];
   for (const rows of grouped.values()) {
     rows.sort((a, b) => b.probability - a.probability || b.odds - a.odds);
-    // Prefer ticket-mapped alternatives first so unsupported research markets
-    // cannot occupy both public slots and hide selections the user can add.
-    // If fewer than two mapped options exist, fill the remaining slot(s) with
-    // the highest-probability research-only options.
-    const ticketRows = rows.filter(row => row.ticket_selectable === true);
-    const researchRows = rows.filter(row => row.ticket_selectable !== true);
-    const rankedRows = ticketRows.length ? [...ticketRows, ...researchRows] : rows;
+    // Fresh exact offers take priority. When no current exact offer exists,
+    // the replace-on-refresh model-only lane must outrank stale provider-mapped
+    // rows; otherwise stale tennis lines can occupy both fixture slots and hide
+    // the unpriced research options this endpoint is meant to retain.
+    const freshTicketRows = rows.filter(row => row.ticket_selectable === true && row.quote_status === "FRESH_EXACT");
+    const modelResearchRows = rows.filter(row => row.model_only_research === true);
+    const otherRows = rows.filter(row => !(row.ticket_selectable === true && row.quote_status === "FRESH_EXACT") && row.model_only_research !== true);
+    const rankedRows = [...freshTicketRows, ...modelResearchRows, ...otherRows];
     // Show at most two distinct market/line/side options per fixture.
     const selected = [];
     for (const row of rankedRows) {
       if (selected.some(x => x.market === row.market && x.line === row.line && x.pick === row.pick)) continue;
       selected.push(row);
+      if (row.model_only_research === true) diagnostics.model_only_research_selected_count++;
       if (selected.length === 2) break;
     }
     alternatives.push(...selected);
