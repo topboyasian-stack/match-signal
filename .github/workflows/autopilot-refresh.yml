@@ -121,7 +121,7 @@ jobs:
       - name: Run autonomous freshness and source coverage guard
         run: python scripts/autopilot_guard.py
 
-      - name: Publish validated football forecasts, readiness and autopilot status
+      - name: Publish football readiness and autopilot status
         shell: bash
         run: |
           set -euo pipefail
@@ -133,26 +133,43 @@ jobs:
             exit 0
           fi
           git commit -m "🤖 Apply validated football models and refresh readiness"
-          for attempt in 1 2 3; do
+
+          # Other Match Signal publishers also write main. Rebase cleanly when their
+          # commits touch different files; if forecast artifacts conflict, rebuild
+          # against the newest main instead of repeatedly pushing a stale commit.
+          for attempt in $(seq 1 12); do
+            echo "Autopilot publication attempt $attempt/12."
+            if ! git fetch origin main; then
+              echo "Could not fetch main; retrying."
+              sleep $((attempt < 5 ? attempt * 2 : 8))
+              continue
+            fi
+
+            if ! git rebase origin/main; then
+              echo "Forecast artifacts conflict with a newer publisher; rebuilding on current main."
+              git rebase --abort || true
+              git reset --hard origin/main
+              if [ -s data/football_team_history.json ] && grep -q '"event_id"' data/football_team_history.json; then
+                python scripts/football_model_council.py
+              fi
+              python scripts/model_upgrade.py
+              python scripts/football_forward_readiness.py
+              python scripts/system_health_audit.py
+              python scripts/autopilot_guard.py
+              git add data/predictions.json data/football_prequential_validation.json data/autopilot_status.json data/football_model_council.json data/football_forward_readiness.json
+              if git diff --cached --quiet; then
+                echo "Latest main already contains the current football outputs."
+                exit 0
+              fi
+              git commit -m "🤖 Apply validated football models and refresh readiness"
+            fi
+
             if git push origin main; then
-              echo "Football readiness publication succeeded."
+              echo "Validated football forecasts and readiness published successfully."
               exit 0
             fi
-            git fetch origin main
-            git reset --hard origin/main
-            if [ -s data/football_team_history.json ] && grep -q '"event_id"' data/football_team_history.json; then
-              python scripts/football_model_council.py
-            fi
-            python scripts/model_upgrade.py
-            python scripts/football_forward_readiness.py
-            python scripts/system_health_audit.py
-            python scripts/autopilot_guard.py
-            git add data/predictions.json data/football_prequential_validation.json data/autopilot_status.json data/football_model_council.json data/football_forward_readiness.json
-            if git diff --cached --quiet; then
-              echo "Latest main already contains the current football readiness artifacts."
-              exit 0
-            fi
-            git commit -m "🤖 Apply validated football models and refresh readiness"
-            sleep $((attempt * 2))
+            echo "main advanced during publication; retrying against the newest commit."
+            sleep $((attempt < 5 ? attempt * 2 : 8))
           done
+          echo "Unable to publish validated football forecasts after 12 conflict-safe attempts."
           exit 1
