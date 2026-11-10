@@ -1262,6 +1262,7 @@ def _make_audit_record(core: Any, row: dict[str, Any], now: datetime) -> dict[st
         "evidence_sample_n": row.get("evidence_sample_n"),
         "paper_only": True,
         "research_only": bool(research_only),
+        "qualification_allowed": bool(not research_only and quote_exact and fresh and leg.get("builder_eligible") and in_builder_horizon),
         "bookable": bool(not research_only and quote_exact and fresh and leg.get("builder_eligible") and in_builder_horizon),
         "real_money_execution": False,
         "settlement_status": "PENDING",
@@ -1403,6 +1404,90 @@ def _evidence_summary(records: list[dict[str, Any]]) -> dict[str, Any]:
         }
     return summary
 
+
+def _current_research_candidates(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Export current unpriced football/tennis options separately from immutable quote history."""
+    output: list[dict[str, Any]] = []
+    seen: set[tuple[str, str, str, str, str]] = set()
+    for row in records:
+        if not isinstance(row, dict):
+            continue
+        if (
+            row.get("research_only") is not True
+            or row.get("candidate_status") != "RESEARCH_ONLY_NO_LIVE_QUOTE"
+            or row.get("bookable") is not False
+            or row.get("qualification_allowed") is not False
+            or row.get("fresh_exact_quote") is not False
+        ):
+            continue
+        sport = str(row.get("sport") or "").lower()
+        if sport not in {"football", "tennis"}:
+            continue
+        market = str(row.get("market") or "")
+        if market not in {"1X2", "winner", "total_goals", "total_games", "btts", "double_chance"}:
+            continue
+        event_id = str(row.get("event_id") or "")
+        start_time = str(row.get("start_time") or "")
+        pick = str(row.get("pick") or "")
+        probability = _num(row.get("model_probability"))
+        if not event_id or not start_time or not pick or probability is None or not 0 < probability < 1:
+            continue
+        # Defensive invariant: an unpriced research row must never carry quote
+        # amounts, timestamps, or provider market/outcome identifiers to the API.
+        if any(row.get(key) is not None for key in (
+            "bookmaker_odds", "quote_timestamp", "market_odds_timestamp", "odds_timestamp",
+            "sportybet_event_id", "sportybet_market_id", "sportybet_outcome_id",
+            "sportybet_outcome_name", "sportybet_specifier",
+        )):
+            continue
+        line = _num(row.get("line"))
+        key = (sport, event_id, market, "" if line is None else f"{line:g}", pick)
+        if key in seen:
+            continue
+        seen.add(key)
+        # Explicit allow-list keeps the public research lane small and prevents
+        # internal audit, ROI, quote, or provider fields from leaking.
+        output.append({
+            "sport": sport,
+            "product": row.get("product"),
+            "league": row.get("league"),
+            "event_id": event_id,
+            "start_time": start_time,
+            "match": str(row.get("match") or ""),
+            "market": market,
+            "line": line,
+            "pick": pick,
+            "model_probability": round(float(probability), 6),
+            "original_pick": row.get("original_pick"),
+            "original_primary_pick": row.get("original_primary_pick"),
+            "original_primary_market": row.get("original_primary_market"),
+            "original_primary_line": row.get("original_primary_line"),
+            "original_primary_probability": _num(row.get("original_primary_probability")),
+            "primary_prediction_id": row.get("primary_prediction_id"),
+            "prediction_role": "ALTERNATIVE",
+            "alternative_source": "SYSTEM_RECOMMENDED",
+            "candidate_status": "RESEARCH_ONLY_NO_LIVE_QUOTE",
+            "research_only": True,
+            "bookable": False,
+            "qualification_allowed": False,
+            "passed_builder_gates": False,
+            "fresh_exact_quote": False,
+            "bookmaker_odds": None,
+            "quote_timestamp": None,
+            "market_odds_timestamp": None,
+            "odds_timestamp": None,
+            "sportybet_event_id": None,
+            "sportybet_market_id": None,
+            "sportybet_outcome_id": None,
+            "sportybet_outcome_name": None,
+            "sportybet_specifier": None,
+            "paper_only": True,
+            "real_money_execution": False,
+        })
+    return output[:2000]
+
+
+
 def _write_reassessment_artifact(core: Any, now: datetime) -> dict[str, Any]:
     global _LAST_DIAGNOSTICS
     raw_options = _dedupe_candidates(_RUN_OPTIONS)
@@ -1531,6 +1616,10 @@ def _write_reassessment_artifact(core: Any, now: datetime) -> dict[str, Any]:
         "strategy": "Evaluate current exact market alternatives from independent model probabilities; capture immutable snapshots and settle them from existing Match Signal result sources.",
         "sports": sport_summary,
         "candidate_options": records[:1200],
+        # Unpriced model alternatives are a replace-on-refresh research lane,
+        # not immutable quote history. The KV publisher stores this separately.
+        "current_research_candidates": _current_research_candidates(records),
+        "current_research_candidates_generated_at": now.isoformat(),
         "preferred_alternatives": preferred[:100],
         "nba_dedicated_lane": nba_diag,
         "history": history_summary,

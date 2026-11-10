@@ -159,8 +159,13 @@ function repeatsPrimaryPick(source, item) {
 
 export function buildPublicAlternatives(document, nowMs = Date.now()) {
   const grouped = new Map();
+  const historicalRows = Array.isArray(document.records) ? document.records : [];
+  const currentResearchRows = Array.isArray(document.current_research_candidates)
+    ? document.current_research_candidates : [];
   const diagnostics = {
-    records_seen: Array.isArray(document.records) ? document.records.length : 0,
+    records_seen: historicalRows.length + currentResearchRows.length,
+    current_research_candidates_seen: currentResearchRows.length,
+    current_research_candidates_generated_at: document.current_research_candidates_generated_at || null,
     role_source_match: 0,
     marked_fresh_exact_quote: 0,
     primary_link_present: 0,
@@ -180,7 +185,10 @@ export function buildPublicAlternatives(document, nowMs = Date.now()) {
     diagnostics.rejected_by_reason[reason] = (diagnostics.rejected_by_reason[reason] || 0) + 1;
   };
 
-  for (const row of Array.isArray(document.records) ? document.records : []) {
+  // Model-only research options are a replace-on-refresh feed separate from
+  // immutable quote-backed history. They remain visible but have no current price
+  // or provider identifiers, so publicAlternative marks them unbookable.
+  for (const row of [...historicalRows, ...currentResearchRows]) {
     if (!row || typeof row !== "object" || Array.isArray(row)) {
       reject("invalid_record");
       continue;
@@ -284,6 +292,7 @@ export function buildPublicAlternatives(document, nowMs = Date.now()) {
     status: alternatives.length ? "OK" : "EMPTY",
     publication_policy_version: "research-visible-v2",
     generated_at: document.updated_at || document.generated_at || null,
+    current_research_candidates_generated_at: document.current_research_candidates_generated_at || null,
     min_probability: 0,
     research_display_baseline: RESEARCH_DISPLAY_BASELINE,
     builder_min_probability: MIN_RECOMMENDED_PROBABILITY,
