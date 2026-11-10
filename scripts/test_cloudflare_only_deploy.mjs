@@ -66,6 +66,9 @@ assert.ok(privateEvidenceSync.includes('document["current_research_candidates"] 
 assert.ok(privateEvidenceSync.includes('_validate_current_research_artifact'));
 assert.ok(wranglerConfig.includes("[env.production]"), "The private evidence KV binding must be scoped to the production Pages environment.");
 assert.ok(wranglerConfig.includes("[[env.production.kv_namespaces]]"), "Declare the production KV binding in the Wrangler source of truth.");
+const productionEnvConfig = (wranglerConfig.split("[env.production]")[1] || "").split("[[env.production.kv_namespaces]]")[0];
+assert.ok(wranglerConfig.split("[env.production]")[0].includes('pages_build_output_dir = "./dist"'), "Keep the Pages build output directory at the top level.");
+assert.ok(!productionEnvConfig.includes("pages_build_output_dir"), "Wrangler Pages does not allow pages_build_output_dir inside env.production.");
 const productionKvConfig = wranglerConfig.split("[[env.production.kv_namespaces]]")[1] || "";
 assert.ok(productionKvConfig.includes('binding = "MATCH_SIGNAL_ANALYST_STORE"'), "The production alternatives and Analyst Functions need their exact KV binding.");
 assert.ok(productionKvConfig.includes('id = "fcc1a4a2872b4f1ebe6de0754a11253a"'), "Use the verified match-signal-analyst-private KV namespace.");
