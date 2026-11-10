@@ -50,6 +50,7 @@ const alternativesUi = fs.readFileSync("qualified-alternatives.js", "utf8");
 const ticketDrawer = fs.readFileSync("ticket-drawer.js", "utf8");
 const reassessmentGenerator = fs.readFileSync("scripts/cross_sport_market_reassessment.py", "utf8");
 const privateEvidenceSync = fs.readFileSync("scripts/sync_cross_sport_private_evidence.py", "utf8");
+const wranglerConfig = fs.readFileSync("wrangler.toml", "utf8");
 assert.ok(alternativesApi.includes("const MIN_RECOMMENDED_PROBABILITY = 0.65;"));
 assert.ok(alternativesApi.includes("const RESEARCH_DISPLAY_BASELINE = 0.55;"));
 assert.ok(alternativesApi.includes("const belowBaseline = probability < RESEARCH_DISPLAY_BASELINE;"));
@@ -63,6 +64,14 @@ assert.ok(alternativesApi.includes("current_research_candidates_seen: currentRes
 assert.ok(reassessmentGenerator.includes('"current_research_candidates": _current_research_candidates(records)'));
 assert.ok(privateEvidenceSync.includes('document["current_research_candidates"] = research_candidates'));
 assert.ok(privateEvidenceSync.includes('_validate_current_research_artifact'));
+assert.ok(wranglerConfig.includes("[env.production]"), "The private evidence KV binding must be scoped to the production Pages environment.");
+assert.ok(wranglerConfig.includes("[[env.production.kv_namespaces]]"), "Declare the production KV binding in the Wrangler source of truth.");
+const productionKvConfig = wranglerConfig.split("[[env.production.kv_namespaces]]")[1] || "";
+assert.ok(productionKvConfig.includes('binding = "MATCH_SIGNAL_ANALYST_STORE"'), "The production alternatives and Analyst Functions need their exact KV binding.");
+assert.ok(productionKvConfig.includes('id = "fcc1a4a2872b4f1ebe6de0754a11253a"'), "Use the verified match-signal-analyst-private KV namespace.");
+assert.ok(!wranglerConfig.includes("[[kv_namespaces]]"), "Do not expose the private evidence store to preview deployments.");
+assert.ok(!wranglerConfig.includes("[[env.preview.kv_namespaces]]"), "Do not bind production private evidence into preview deployments.");
+
 assert.ok(alternativesUi.includes("Research only · Builder gate not passed"));
 assert.ok(alternativesUi.includes("String(x.builder_qualified===true)"));
 assert.ok(ticketDrawer.includes("model_qualified:raw.model_qualified===true"));
@@ -139,6 +148,10 @@ assert.ok(
   "The ESPN summary proxy must trigger and be permitted in Cloudflare deployments when its implementation changes.",
 );
 
+assert.ok(
+  cloudflare.includes("      - 'wrangler.toml'") && cloudflare.includes("|wrangler.toml|"),
+  "Wrangler production binding changes must trigger and be permitted by Cloudflare Pages deployment.",
+);
 const analystDeploymentPaths = [
   "analyst.html",
   "analyst.js",

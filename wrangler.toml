@@ -2,3 +2,15 @@ name = "match-signal"
 pages_build_output_dir = "./dist"
 compatibility_date = "2026-11-10"
 compatibility_flags = ["nodejs_compat"]
+
+# The private evidence store is production-only. Preview deployments must not inherit
+# the production KV namespace or gain access to private cross-sport research records.
+[env.production]
+name = "match-signal"
+pages_build_output_dir = "./dist"
+compatibility_date = "2026-11-10"
+compatibility_flags = ["nodejs_compat"]
+
+[[env.production.kv_namespaces]]
+binding = "MATCH_SIGNAL_ANALYST_STORE"
+id = "fcc1a4a2872b4f1ebe6de0754a11253a"
