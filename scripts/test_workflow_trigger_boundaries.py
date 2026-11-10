@@ -93,6 +93,26 @@ def main():
         "Builder artifact must flow through the promotion workflow, not trigger a second board refresh."
     )
     assert "gh workflow run builder-production-promotion.yml --ref main" in builder
+
+    # Ordered promotion must accept the Builder's workflow_run fallback when a
+    # queued workflow_dispatch is superseded, while still requiring a successful
+    # completed run before advancing to the deployment stage.
+    promotion = (WORKFLOWS / "builder-production-promotion.yml").read_text(encoding="utf-8")
+    escaped_quote = chr(92) + '"'
+    accepted_builder_events = (
+        f'.event == {escaped_quote}workflow_dispatch{escaped_quote} or '
+        f'.event == {escaped_quote}workflow_run{escaped_quote}'
+    )
+    assert promotion.count(accepted_builder_events) == 2, (
+        "Both pre-build and post-build promotion gates must accept dispatch and workflow_run Builder refreshes."
+    )
+    assert "Ignoring superseded pre-build Builder run" in promotion
+    assert "Ignoring superseded post-build Builder run" in promotion
+    assert promotion.count('if [ "$builder_conclusion" = "cancelled" ] || [ "$builder_conclusion" = "skipped" ]; then') == 2, (
+        "Superseded Builder runs must be retried instead of aborting the ordered promotion."
+    )
+    assert "Timed out waiting for a successful Builder refresh after the pre-build board." in promotion
+    assert "Timed out waiting for a successful Builder refresh after the post-build board." in promotion
     assert "data/odds_ticket_tracker.json" not in board_paths, (
         "Ticket tracker is downstream of the Builder; its generated output must not start another board build."
     )
