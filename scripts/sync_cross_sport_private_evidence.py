@@ -20,6 +20,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 PRIVATE_DIR = ROOT / "data" / "calibration_private"
 HISTORY_PATH = PRIVATE_DIR / "cross_sport_market_reassessment_history.json"
+CURRENT_OUTPUT_PATH = PRIVATE_DIR / "cross_sport_market_reassessment_private.json"
 REVISION_PATH = PRIVATE_DIR / ".cross_sport_market_reassessment_revision"
 NAMESPACE_PATH = PRIVATE_DIR / ".cross_sport_evidence_namespace_id"
 EVIDENCE_KEY = "private-cross-sport-market-reassessment-v1"
@@ -195,6 +196,59 @@ def _kv_get(namespace_id: str) -> dict[str, Any] | None:
     return value
 
 
+
+def _load_current_research_candidates() -> tuple[list[dict[str, Any]], str]:
+    """Read and validate the generated unpriced research lane without mixing it into settled history."""
+    try:
+        artifact = json.loads(CURRENT_OUTPUT_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError("Current cross-sport research artifact is unavailable or invalid JSON") from exc
+    if not isinstance(artifact, dict) or not isinstance(artifact.get("current_research_candidates"), list):
+        raise RuntimeError("Current research artifact is missing the replace-on-refresh current_research_candidates array")
+    generated_at = str(artifact.get("current_research_candidates_generated_at") or artifact.get("generated_at") or "").strip()
+    if not generated_at:
+        raise RuntimeError("Current research candidate array has no generation timestamp")
+
+    allowed_markets = {"1X2", "winner", "total_goals", "total_games", "btts", "double_chance"}
+    price_fields = (
+        "bookmaker_odds", "quote_timestamp", "market_odds_timestamp", "odds_timestamp",
+        "sportybet_event_id", "sportybet_market_id", "sportybet_outcome_id",
+        "sportybet_outcome_name", "sportybet_specifier",
+    )
+    result: list[dict[str, Any]] = []
+    for row in artifact["current_research_candidates"]:
+        if not isinstance(row, dict):
+            raise RuntimeError("Current research candidates contain a non-object row")
+        probability = row.get("model_probability")
+        try:
+            p = float(probability)
+        except (TypeError, ValueError):
+            raise RuntimeError("Current research candidate has an invalid model probability")
+        if (
+            row.get("sport") not in {"football", "tennis"}
+            or row.get("market") not in allowed_markets
+            or row.get("prediction_role") != "ALTERNATIVE"
+            or row.get("alternative_source") != "SYSTEM_RECOMMENDED"
+            or row.get("candidate_status") != "RESEARCH_ONLY_NO_LIVE_QUOTE"
+            or row.get("research_only") is not True
+            or row.get("bookable") is not False
+            or row.get("qualification_allowed") is not False
+            or row.get("passed_builder_gates") is not False
+            or row.get("fresh_exact_quote") is not False
+            or not str(row.get("event_id") or "").strip()
+            or not str(row.get("start_time") or "").strip()
+            or not str(row.get("pick") or "").strip()
+            or not 0 < p < 1
+            or any(row.get(field) is not None for field in price_fields)
+        ):
+            raise RuntimeError("Unsafe or malformed current research candidate; refusing to publish it")
+        result.append(dict(row))
+    if len(result) > 2000:
+        raise RuntimeError("Current research candidate array exceeded its 2,000-row publication cap")
+    return result, generated_at
+
+
+
 def _kv_put(namespace_id: str, document: dict[str, Any]) -> None:
     token, _ = _credentials()
     data = json.dumps(document, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
@@ -262,9 +316,16 @@ def publish() -> int:
         document = json.loads(HISTORY_PATH.read_text(encoding="utf-8"))
         if not isinstance(document, dict) or not isinstance(document.get("records"), list):
             raise RuntimeError("local private evidence ledger has an invalid shape")
+        # Keep current model-only options separate from immutable, quote-backed history.
+        # Replace this array on every Builder refresh so research candidates never become
+        # historical price observations and never inherit stale provider/price fields.
+        research_candidates, research_generated_at = _load_current_research_candidates()
         document["record_type"] = "cross_sport_market_reassessment"
         document["mode"] = "PAPER_ONLY"
         document["record_count"] = len(document["records"])
+        document["current_research_candidates"] = research_candidates
+        document["current_research_candidates_generated_at"] = research_generated_at
+        document["current_research_candidate_count"] = len(research_candidates)
         document["updated_at"] = datetime.now(timezone.utc).isoformat()
         _kv_put(namespace_id, document)
         _write_json(HISTORY_PATH, document)
@@ -273,6 +334,8 @@ def publish() -> int:
             "status": "PRIVATE_EVIDENCE_SAVED",
             "revision": document["updated_at"],
             "record_count": len(document["records"]),
+            "current_research_candidate_count": len(research_candidates),
+            "current_research_candidates_generated_at": research_generated_at,
         }))
         return 0
     except Exception as exc:
