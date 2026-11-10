@@ -116,6 +116,7 @@ jobs:
           if not nba_live.get('updated_at'):
               nba_live = load('data/nba_live_observations.json')
           nba_totals_ledger = load('data/nba_totals_ledger.json')
+          nba_totals_capture_status = load('data/nba_totals_price_capture_status.json')
           virtual_status = load('data/virtual_lab_status.json')
           virtual_lifecycle = load('data/virtual_lab_participant_lifecycle.json')
           virtual_model_eval = load('data/virtual_lab_model_eval.json')
@@ -204,6 +205,154 @@ jobs:
                   if r.get('event') == 'workflow_dispatch' and minutes_since(r.get('createdAt')) is not None
               ]
               return (min(ages) if ages else None), None
+
+          # The exact market-225 capture is a separate prerequisite from settlement freshness.
+          # Recover a missed capture heartbeat before its 15-minute quote contract can sit stale.
+          NBA_TOTALS_CAPTURE_MAX_AGE_MINUTES = 15
+          NBA_TOTALS_CAPTURE_STALE_RUN_MAX_AGE_MINUTES = 15
+          NBA_TOTALS_CAPTURE_STALE_QUEUE_MAX_AGE_MINUTES = 10
+          NBA_TOTALS_CAPTURE_DISPATCH_COOLDOWN_MINUTES = 10
+          nba_totals_capture_age_minutes = minutes_since(nba_totals_capture_status.get('checked_at'))
+          nba_totals_capture_runs, nba_totals_capture_history_error = recent_runs(
+              'nba-totals-price-capture.yml', 30
+          )
+          nba_totals_capture_active_runs = [
+              run for run in (nba_totals_capture_runs or [])
+              if run.get('status') in {'queued', 'in_progress', 'waiting', 'pending'}
+          ]
+          nba_totals_capture_active_run_age_minutes = max(
+              [minutes_since(run.get('createdAt')) for run in nba_totals_capture_active_runs
+               if minutes_since(run.get('createdAt')) is not None],
+              default=None
+          )
+          oldest_active_nba_totals_capture_run = max(
+              nba_totals_capture_active_runs,
+              key=lambda run: minutes_since(run.get('createdAt')) or 0,
+              default=None
+          )
+          nba_totals_capture_active_run_status = (
+              oldest_active_nba_totals_capture_run.get('status')
+              if oldest_active_nba_totals_capture_run else None
+          )
+          nba_totals_capture_latest_run = (
+              nba_totals_capture_runs[0] if nba_totals_capture_runs else None
+          )
+          nba_totals_capture_dispatch_age_minutes, nba_totals_capture_dispatch_history_error = last_dispatch_age(
+              'nba-totals-price-capture.yml', 30
+          )
+          nba_totals_capture_stale = (
+              nba_totals_capture_age_minutes is None
+              or nba_totals_capture_age_minutes > NBA_TOTALS_CAPTURE_MAX_AGE_MINUTES
+          )
+          nba_totals_capture_recovery_status = 'FRESH' if not nba_totals_capture_stale else 'STALE'
+
+          if nba_totals_capture_stale:
+              if nba_totals_capture_runs is None:
+                  nba_totals_capture_recovery_status = 'HISTORY_ERROR'
+                  actions.append({
+                      'workflow':'nba-totals-price-capture.yml',
+                      'action':'inspect_stale_nba_totals_capture',
+                      'status':'failed',
+                      'detail':nba_totals_capture_history_error
+                  })
+              else:
+                  stale_nba_totals_capture_runs = [
+                      run for run in nba_totals_capture_active_runs
+                      if minutes_since(run.get('createdAt')) is not None
+                      and (
+                          minutes_since(run.get('createdAt')) > NBA_TOTALS_CAPTURE_STALE_RUN_MAX_AGE_MINUTES
+                          or (
+                              run.get('status') in {'queued', 'waiting', 'pending'}
+                              and minutes_since(run.get('createdAt')) > NBA_TOTALS_CAPTURE_STALE_QUEUE_MAX_AGE_MINUTES
+                          )
+                      )
+                  ]
+                  if stale_nba_totals_capture_runs:
+                      capture_cancel_failures = []
+                      for run in stale_nba_totals_capture_runs:
+                          run_id = run.get('databaseId')
+                          if not run_id:
+                              capture_cancel_failures.append('stale NBA capture run has no database ID')
+                              continue
+                          cancel = subprocess.run(['gh', 'run', 'cancel', str(run_id)], text=True, capture_output=True)
+                          if cancel.returncode != 0:
+                              capture_cancel_failures.append(cancel.stderr.strip() or ('could not cancel NBA capture run '+str(run_id)))
+                          else:
+                              actions.append({
+                                  'workflow':'nba-totals-price-capture.yml',
+                                  'action':'cancel_stale_nba_totals_capture_run',
+                                  'status':'requested',
+                                  'detail':'Cancelled stale NBA market-225 capture run '+str(run_id)+' after '+str(minutes_since(run.get('createdAt')))+' minutes.'
+                              })
+                      if capture_cancel_failures:
+                          nba_totals_capture_recovery_status = 'CANCEL_FAILED'
+                          actions.append({
+                              'workflow':'nba-totals-price-capture.yml',
+                              'action':'recover_stale_nba_totals_capture',
+                              'status':'failed',
+                              'detail':'; '.join(capture_cancel_failures)
+                          })
+                      elif any(run not in stale_nba_totals_capture_runs for run in nba_totals_capture_active_runs):
+                          nba_totals_capture_recovery_status = 'NEWER_RUN_ACTIVE'
+                          actions.append({
+                              'workflow':'nba-totals-price-capture.yml',
+                              'action':'recover_stale_nba_totals_capture',
+                              'status':'suppressed_active_run',
+                              'detail':'Cancelled stale NBA capture run(s); a newer exact-market capture run is still active.'
+                          })
+                      else:
+                          dispatch = subprocess.run(
+                              ['gh', 'workflow', 'run', 'nba-totals-price-capture.yml', '--ref', 'main'],
+                              text=True, capture_output=True
+                          )
+                          nba_totals_capture_recovery_status = 'DISPATCHED' if dispatch.returncode == 0 else 'DISPATCH_FAILED'
+                          actions.append({
+                              'workflow':'nba-totals-price-capture.yml',
+                              'action':'recover_stale_nba_totals_capture',
+                              'status':'requested' if dispatch.returncode == 0 else 'failed',
+                              'detail':dispatch.stderr.strip() if dispatch.returncode else 'Cancelled stuck NBA capture run(s) and dispatched a fresh exact SportyBet market-225 capture.'
+                          })
+                  elif nba_totals_capture_active_runs:
+                      nba_totals_capture_recovery_status = 'SUPPRESSED_ACTIVE_RUN'
+                      actions.append({
+                          'workflow':'nba-totals-price-capture.yml',
+                          'action':'recover_stale_nba_totals_capture',
+                          'status':'suppressed_active_run',
+                          'detail':'NBA market-225 capture status is '+str(nba_totals_capture_age_minutes)+' minutes old; an exact-market capture run is already queued or active (oldest age '+str(nba_totals_capture_active_run_age_minutes)+' minutes, status '+str(nba_totals_capture_active_run_status)+').'
+                      })
+                  elif nba_totals_capture_dispatch_history_error:
+                      nba_totals_capture_recovery_status = 'DISPATCH_HISTORY_ERROR'
+                      actions.append({
+                          'workflow':'nba-totals-price-capture.yml',
+                          'action':'inspect_nba_totals_capture_dispatch_cooldown',
+                          'status':'failed',
+                          'detail':nba_totals_capture_dispatch_history_error
+                      })
+                  elif (
+                      nba_totals_capture_dispatch_age_minutes is not None
+                      and nba_totals_capture_dispatch_age_minutes < NBA_TOTALS_CAPTURE_DISPATCH_COOLDOWN_MINUTES
+                  ):
+                      nba_totals_capture_recovery_status = 'SUPPRESSED_COOLDOWN'
+                      actions.append({
+                          'workflow':'nba-totals-price-capture.yml',
+                          'action':'recover_stale_nba_totals_capture',
+                          'status':'suppressed_cooldown',
+                          'detail':'NBA market-225 capture fallback was dispatched '+str(nba_totals_capture_dispatch_age_minutes)+' minute(s) ago; cooldown is '+str(NBA_TOTALS_CAPTURE_DISPATCH_COOLDOWN_MINUTES)+' minutes.'
+                      })
+                  else:
+                      dispatch = subprocess.run(
+                          ['gh', 'workflow', 'run', 'nba-totals-price-capture.yml', '--ref', 'main'],
+                          text=True, capture_output=True
+                      )
+                      nba_totals_capture_recovery_status = 'DISPATCHED' if dispatch.returncode == 0 else 'DISPATCH_FAILED'
+                      actions.append({
+                          'workflow':'nba-totals-price-capture.yml',
+                          'action':'recover_stale_nba_totals_capture',
+                          'status':'requested' if dispatch.returncode == 0 else 'failed',
+                          'detail':dispatch.stderr.strip() if dispatch.returncode else (
+                              'NBA market-225 capture status is '+str(nba_totals_capture_age_minutes)+' minutes old; dispatched exact SportyBet capture recovery.'
+                          )
+                      })
 
           # Independent eFootball winner/GG-NG archive freshness is monitored separately
           # from the live desk. A stale shadow archive should trigger research recovery,
@@ -956,6 +1105,20 @@ jobs:
               'nba_totals_active_run_status': nba_totals_active_run_status,
               'nba_totals_stale_run_max_age_minutes': NBA_TOTALS_LEDGER_STALE_RUN_MAX_AGE_MINUTES,
               'nba_totals_stale_queue_max_age_minutes': NBA_TOTALS_LEDGER_STALE_QUEUE_MAX_AGE_MINUTES,
+              'nba_totals_capture_checked_at': nba_totals_capture_status.get('checked_at'),
+              'nba_totals_capture_age_minutes': nba_totals_capture_age_minutes,
+              'nba_totals_capture_max_age_minutes': NBA_TOTALS_CAPTURE_MAX_AGE_MINUTES,
+              'nba_totals_capture_recovery_status': nba_totals_capture_recovery_status,
+              'nba_totals_capture_dispatch_age_minutes': nba_totals_capture_dispatch_age_minutes,
+              'nba_totals_capture_active_run_age_minutes': nba_totals_capture_active_run_age_minutes,
+              'nba_totals_capture_active_run_status': nba_totals_capture_active_run_status,
+              'nba_totals_capture_stale_run_max_age_minutes': NBA_TOTALS_CAPTURE_STALE_RUN_MAX_AGE_MINUTES,
+              'nba_totals_capture_stale_queue_max_age_minutes': NBA_TOTALS_CAPTURE_STALE_QUEUE_MAX_AGE_MINUTES,
+              'nba_totals_capture_latest_run_id': (nba_totals_capture_latest_run or {}).get('databaseId'),
+              'nba_totals_capture_latest_run_event': (nba_totals_capture_latest_run or {}).get('event'),
+              'nba_totals_capture_latest_run_status': (nba_totals_capture_latest_run or {}).get('status'),
+              'nba_totals_capture_latest_run_conclusion': (nba_totals_capture_latest_run or {}).get('conclusion'),
+              'nba_totals_capture_latest_run_created_at': (nba_totals_capture_latest_run or {}).get('createdAt'),
               'virtual_lab_status_age_hours': round(virtual_status_age, 2),
               'virtual_lab_participant_history_age_minutes': virtual_lab_participant_history_age_minutes,
               'virtual_lab_collector_max_age_minutes': VIRTUAL_LAB_COLLECTOR_MAX_AGE_MINUTES,
