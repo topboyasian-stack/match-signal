@@ -180,8 +180,8 @@ def main():
     assert "Forecast/source artifacts changed concurrently; rebuild on latest main." in autopilot_publish
     assert "python scripts/model_upgrade.py" in autopilot_publish
 
-    assert "cancel-in-progress: true" in autopilot, (
-        "A newer readiness-only heartbeat should supersede stale autopilot work instead of publishing behind it."
+    assert "cancel-in-progress: false" in autopilot, (
+        "An upstream completion must not cancel an in-flight model publication."
     )
 
     collector_publish = collector.split("      - name: Publish collector artifacts", 1)[1]
