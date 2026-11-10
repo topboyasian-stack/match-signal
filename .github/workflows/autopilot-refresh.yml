@@ -32,7 +32,7 @@ permissions:
 concurrency:
   # Model evaluation and forecast publication must finish as one operation.
   # Later schedule/upstream events queue rather than cancelling an in-flight
-  # model refresh; the publisher rebases before commit to absorb concurrent writes.
+  # readiness refresh; the publisher stashes non-owned health outputs and rebases.
   group: match-signal-autopilot-publish-v2
   cancel-in-progress: false
 
@@ -95,8 +95,9 @@ jobs:
           fi
           git commit -m "🤖 Refresh derived readiness and health layer"
           for attempt in 1 2 3 4 5; do
-            # Other Match Signal publishers run concurrently. Rebase the prepared
-            # model snapshot onto the newest main immediately before pushing it.
+            # Keep non-owned system-health outputs out of the worktree before rebase.
+            # Other workflows own those artifacts and may publish them concurrently.
+            git stash push --include-untracked -m "defer Autopilot non-owned health output" || true
             git fetch origin main
             if ! git rebase origin/main; then
               echo "Readiness/source artifacts changed concurrently; rebuild on latest main."
@@ -114,12 +115,13 @@ jobs:
                 exit 0
               fi
               git commit -m "🤖 Refresh derived readiness and health layer"
+              git stash push --include-untracked -m "defer Autopilot non-owned health output" || true
               sleep $((attempt * 2))
               continue
             fi
 
             if git push origin main; then
-              echo "Validated football forecasts and readiness published successfully."
+              echo "Football readiness, council and Autopilot status published successfully."
               exit 0
             fi
 
