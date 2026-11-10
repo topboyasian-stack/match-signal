@@ -197,12 +197,8 @@ def _kv_get(namespace_id: str) -> dict[str, Any] | None:
 
 
 
-def _load_current_research_candidates() -> tuple[list[dict[str, Any]], str]:
-    """Read and validate the generated unpriced research lane without mixing it into settled history."""
-    try:
-        artifact = json.loads(CURRENT_OUTPUT_PATH.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        raise RuntimeError("Current cross-sport research artifact is unavailable or invalid JSON") from exc
+def _validate_current_research_artifact(artifact: Any) -> tuple[list[dict[str, Any]], str]:
+    """Validate the generated unpriced research lane without mixing it into quote history."""
     if not isinstance(artifact, dict) or not isinstance(artifact.get("current_research_candidates"), list):
         raise RuntimeError("Current research artifact is missing the replace-on-refresh current_research_candidates array")
     generated_at = str(artifact.get("current_research_candidates_generated_at") or artifact.get("generated_at") or "").strip()
@@ -247,6 +243,13 @@ def _load_current_research_candidates() -> tuple[list[dict[str, Any]], str]:
         raise RuntimeError("Current research candidate array exceeded its 2,000-row publication cap")
     return result, generated_at
 
+
+def _load_current_research_candidates() -> tuple[list[dict[str, Any]], str]:
+    try:
+        artifact = json.loads(CURRENT_OUTPUT_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError("Current cross-sport research artifact is unavailable or invalid JSON") from exc
+    return _validate_current_research_artifact(artifact)
 
 
 def _kv_put(namespace_id: str, document: dict[str, Any]) -> None:
