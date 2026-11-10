@@ -10,6 +10,7 @@ on:
       - 'scripts/test_football_prequential_ensemble.py'
       - 'scripts/test_model_upgrade_football_ensemble.py'
       - '.github/workflows/autopilot-refresh.yml'
+      - '.github/workflows/tennis_pipeline.yml'
       - '.github/workflows/football-model-adoption-regression.yml'
   push:
     branches: [main]
@@ -58,17 +59,21 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
+          core = Path('.github/workflows/tennis_pipeline.yml').read_text(encoding='utf-8')
           workflow = Path('.github/workflows/autopilot-refresh.yml').read_text(encoding='utf-8')
-          assert 'python scripts/model_upgrade.py' in workflow
-          assert 'python scripts/test_model_upgrade_football_ensemble.py' in workflow
-          assert 'data/predictions.json' in workflow
-          assert 'data/football_prequential_validation.json' in workflow
-          assert workflow.count('python scripts/model_upgrade.py') >= 2, 'the conflict-retry path must reapply the model to the newest forecasts'
-          assert 'release_gates_changed' in workflow
+          assert 'python scripts/model_upgrade.py' in core
+          assert 'Assert football ensemble audit is fresh and paper-only' in core
+          assert 'data/predictions.json' in core
+          assert 'data/football_prequential_validation.json' in core
+          assert 'python scripts/model_upgrade.py' not in workflow
+          publish = workflow.split('      - name: Publish football readiness and autopilot status', 1)[1]
+          assert 'data/predictions.json' not in publish
+          assert 'data/football_prequential_validation.json' not in publish
+          assert 'data/autopilot_status.json' in publish
+          assert 'data/football_model_council.json' in publish
+          assert 'data/football_forward_readiness.json' in publish
           assert 'cancel-in-progress: false' in workflow
           assert 'git rebase origin/main' in workflow
-          publish = workflow.split('      - name: Publish validated football forecasts, readiness and autopilot status', 1)[1]
-          assert publish.index('git fetch origin main') < publish.index('git rebase origin/main') < publish.index('git push origin main')
-          assert 'Forecast/source artifacts changed concurrently; rebuild on latest main.' in publish
-          print('Scheduled model application, conflict retry, forecast publication and no-ticket-release checks are wired.')
+          assert 'Readiness/source artifacts changed concurrently; rebuild on latest main.' in publish
+          print('Canonical prediction pipeline is sole owner of model application/feed; Autopilot only publishes readiness and status.')
           PY
