@@ -377,6 +377,11 @@ class CrossSportReassessmentTests(unittest.TestCase):
         options = reassessment._tennis_research_options(row)
         set_rows = [item for item in options if item.get("builder_market") == "set_winner"]
         self.assertEqual({item.get("set_number") for item in set_rows}, {1, 2})
+        self.assertEqual(
+            {item.get("set_number") for item in reassessment._dedupe_candidates(set_rows)},
+            {1, 2},
+            "generic candidate deduplication must not collapse Set 1 and Set 2",
+        )
         self.assertEqual({item.get("builder_pick") for item in set_rows}, {"p1"})
         self.assertTrue(all(abs(item["builder_probability"] - 0.5772) < 1e-9 for item in set_rows))
         self.assertTrue(all("stationary" in item["market_reassessment"]["model_probability_source"] for item in set_rows))
