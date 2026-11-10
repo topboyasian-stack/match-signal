@@ -60,8 +60,8 @@ export async function onRequestGet(context){
           // Pull the paged basketball feed unfiltered, then keep exact NBA IDs below.
           Object.entries(params).forEach(([k,v])=>url.searchParams.set(k,v));
           const r=await fetch(url.toString(),{
-            headers:{'Accept':'application/json, text/plain, */*','Current-Country':'NG'},
-            cache:'no-store',signal:AbortSignal.timeout(12000)
+            headers:{'Accept':'application/json, text/plain, */*','Current-Country':'NG','Cache-Control':'no-cache','Pragma':'no-cache'},
+            signal:AbortSignal.timeout(12000)
           });
           const body=await r.text();
           if(!r.ok)throw new Error('HTTP '+r.status+' '+body.slice(0,160));
