@@ -28,7 +28,7 @@ function active(x){return x?.active!==false && (x?.isActive==null || x.isActive=
 function sameTeam(a,b){return String(a||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim()===String(b||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();}
 async function liveEvents(request){
   const url=new URL('/api/sportybet-basketball?pageSize=100&timeline=96&_t='+Date.now(), request.url);
-  const response=await fetch(url.toString(),{headers:{'Accept':'application/json','Cache-Control':'no-cache'},cache:'no-store',signal:AbortSignal.timeout(18000)});
+  const response=await fetch(url.toString(),{headers:{'Accept':'application/json','Cache-Control':'no-cache','Pragma':'no-cache'},signal:AbortSignal.timeout(18000)});
   if(!response.ok) throw new Error('Current SportyBet feed HTTP '+response.status);
   const data=await response.json();
   if(data?.ok!==true || !Array.isArray(data.events)) throw new Error(data?.error||'Current SportyBet basketball feed unavailable');
@@ -86,7 +86,6 @@ async function createShare(selections){
           'Sec-Fetch-Site':'same-origin'
         },
         body:requestBody,
-        cache:'no-store',
         redirect:'follow',
         signal:AbortSignal.timeout(12000)
       });

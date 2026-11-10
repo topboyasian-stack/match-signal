@@ -18,6 +18,8 @@ const BROWSER_HEADERS = {
   'Accept': 'application/json, text/plain, */*',
   'Content-Type': 'application/json',
   'Current-Country': 'NG',
+  'Cache-Control': 'no-cache',
+  'Pragma': 'no-cache',
   'Origin': 'https://www.sportybet.com',
   'Referer': 'https://www.sportybet.com/ng/',
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/152.0.0.0 Safari/537.36'
@@ -60,7 +62,7 @@ export function nbaTotalsReleaseQualified(e,p){
 }
 async function readNbaReleaseJson(path, deadlineAt = null){
  const remainingMs = deadlineAt == null ? 10000 : Math.max(250, Math.min(10000, deadlineAt - Date.now()));
- const response=await fetch('https://raw.githubusercontent.com/topboyasian-stack/match-signal/main/'+path+'?v='+Date.now(),{headers:{Accept:'application/json'},cache:'no-store',signal:AbortSignal.timeout(remainingMs)});
+ const response=await fetch('https://raw.githubusercontent.com/topboyasian-stack/match-signal/main/'+path+'?v='+Date.now(),{headers:{Accept:'application/json','Cache-Control':'no-cache','Pragma':'no-cache'},signal:AbortSignal.timeout(remainingMs)});
  const body=await response.text();
  if(!response.ok)throw new Error(path+' HTTP '+response.status);
  try{return JSON.parse(body);}catch(_){throw new Error(path+' returned non-JSON release evidence (HTTP '+response.status+', content-type '+String(response.headers.get('content-type')||'unknown')+').');}
@@ -207,8 +209,9 @@ export async function upstream(path, params, { timeoutMs = 6000, deadlineAt = nu
       for (const [key, value] of Object.entries(params || {})) {
         if (value != null) url.searchParams.set(key, String(value));
       }
+      if (!url.searchParams.has('_t')) url.searchParams.set('_t', String(Date.now()));
       const response = await fetch(url.toString(), {
-        headers: BROWSER_HEADERS, cache: 'no-store', signal: AbortSignal.timeout(Math.max(250, Math.min(timeoutMs, deadlineAt == null ? timeoutMs : deadlineAt - Date.now())))
+        headers: BROWSER_HEADERS, signal: AbortSignal.timeout(Math.max(250, Math.min(timeoutMs, deadlineAt == null ? timeoutMs : deadlineAt - Date.now())))
       });
       const body = await response.text();
       const contentType = String(response.headers.get('content-type') || 'unknown');
@@ -273,7 +276,6 @@ export async function requestSportyBetShare(selections, { deadlineAt = null, tim
           'Sec-Fetch-Site': 'same-origin'
         },
         body: payload,
-        cache: 'no-store',
         redirect: 'follow',
         signal: AbortSignal.timeout(remainingMs)
       });
@@ -831,8 +833,7 @@ async function collectVirtualEventsFromLiveFeed(
       url.searchParams.set('sources', sources);
       url.searchParams.set('_t', String(Date.now()));
       const response = await fetch(url.toString(), {
-        headers: { 'Accept': 'application/json', 'Cache-Control': 'no-cache' },
-        cache: 'no-store',
+        headers: { 'Accept': 'application/json', 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' },
         signal: AbortSignal.timeout(Math.max(250, Math.min(5000, remainingMs)))
       });
       if (!response.ok) break;
@@ -898,13 +899,14 @@ function productForLeg(leg) {
 
 async function loadBuilder(context) {
   const assetUrl = new URL('/data/odds_builder.json', context.request.url);
+  assetUrl.searchParams.set('_t', String(Date.now()));
   let response;
   if (context.env?.ASSETS?.fetch) {
     response = await context.env.ASSETS.fetch(new Request(assetUrl.toString(), {
       headers: { 'Accept': 'application/json' }
     }));
   } else {
-    response = await fetch(assetUrl.toString(), { cache: 'no-store' });
+    response = await fetch(assetUrl.toString(), { headers: { 'Accept': 'application/json', 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' } });
   }
   if (!response.ok) throw new Error('Builder artifact HTTP ' + response.status);
   const payload = await response.json();

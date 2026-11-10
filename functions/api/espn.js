@@ -18,14 +18,14 @@ export async function onRequestGet(context){
     target.searchParams.set('contentorigin',target.searchParams.get('contentorigin')||'espn');
   }
   try{
-    const requestHeaders={Accept:'application/json','User-Agent':'MatchSignal/4.0 (+https://github.com/topboyasian-stack/match-signal)'};
-    let upstream=await fetch(target.toString(),{headers:requestHeaders,cache:'no-store',signal:AbortSignal.timeout(8000)});
+    const requestHeaders={Accept:'application/json','Cache-Control':'no-cache','Pragma':'no-cache','User-Agent':'MatchSignal/4.0 (+https://github.com/topboyasian-stack/match-signal)'};
+    let upstream=await fetch(target.toString(),{headers:requestHeaders,signal:AbortSignal.timeout(8000)});
     let body=await upstream.text();
     // ESPN sometimes serves the same game-summary payload more reliably from
     // site.web.api. Keep scoreboard requests on site.api and retry only summary.
     if(!upstream.ok && target.pathname.endsWith('/summary')){
       const fallbackTarget=new URL(target.pathname+target.search,'https://site.web.api.espn.com');
-      const fallback=await fetch(fallbackTarget.toString(),{headers:requestHeaders,cache:'no-store',signal:AbortSignal.timeout(8000)});
+      const fallback=await fetch(fallbackTarget.toString(),{headers:requestHeaders,signal:AbortSignal.timeout(8000)});
       const fallbackBody=await fallback.text();
       if(fallback.ok){upstream=fallback;body=fallbackBody;}
       else body=JSON.stringify({ok:false,error:'ESPN_SUMMARY_UPSTREAM_FAILED',primary_status:upstream.status,fallback_status:fallback.status,primary_body:body.slice(0,100),fallback_body:fallbackBody.slice(0,100)});
