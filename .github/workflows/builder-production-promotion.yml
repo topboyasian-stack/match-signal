@@ -68,7 +68,10 @@ jobs:
           echo "dispatched_at=$dispatched_at" >> "$GITHUB_OUTPUT"
           dispatch_count=0
           last_cancelled_board_run_id=""
-          gh workflow run unified-upcoming.yml --ref main -f promotion_child=true
+          dispatch_promotion_child_board() {
+            gh workflow run unified-upcoming.yml --ref main -f promotion_child=true
+          }
+          dispatch_promotion_child_board
           board_run_id=""
           for attempt in $(seq 1 180); do
             board_candidates="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/unified-upcoming.yml/runs?branch=main&per_page=100" --jq '.workflow_runs[] | select(.event == "workflow_dispatch" and .head_branch == "main" and .created_at >= "'"$dispatched_at"'") | [.id, .head_sha] | @tsv')"
@@ -93,7 +96,7 @@ jobs:
                     exit 1
                   fi
                   sleep 2
-                  gh workflow run unified-upcoming.yml --ref main -f promotion_child=true
+                  dispatch_promotion_child_board
                   break
                 fi
                 echo "Pre-build Unified Upcoming run $candidate_id failed: $board_conclusion" >&2
