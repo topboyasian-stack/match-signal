@@ -992,13 +992,13 @@ function findSetWinnerSelection(leg, event) {
     if (String(market?.id || '') !== '202') continue;
     const specifier = [market?.specifier, market?.specifiers, market?.marketSpecifier]
       .find(value => typeof value === 'string' && value.trim())?.trim() || '';
-    const scope = specifier.match(/(?:^|[|,;\\s])setnr\\s*=\\s*([12])(?=$|[|,;\\s])/i);
+    const scope = specifier.match(/(?:^|[|,;\s])setnr\s*=\s*([12])(?=$|[|,;\s])/i);
     if (!scope || scope[1] !== escapedSet) continue;
     const desc = String(market?.desc || market?.name || market?.title || '').toLowerCase();
     if (desc && !/winner/.test(desc)) continue;
     const status = String(market?.status || '').trim().toLowerCase();
     if (/suspend|closed|inactive|settled|unavailable|stop/i.test(status) ||
-        (status !== '' && /^\\d+$/.test(status) && status !== '0')) continue;
+        (status !== '' && /^\d+$/.test(status) && status !== '0')) continue;
     const outcomes = Array.isArray(market?.outcomes) ? market.outcomes : [];
     const outcome = outcomes.find(item => {
       const rawName = String(item?.desc || item?.name || item?.title || '').trim();
