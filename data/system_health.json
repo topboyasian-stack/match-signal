@@ -1,26 +1,26 @@
 {
-  "generated_at": "2026-11-11T20:06:22.797716+00:00",
-  "status": "HEALTHY",
-  "critical_issues": 0,
+  "generated_at": "2026-11-11T20:17:30.517895+00:00",
+  "status": "FAIL",
+  "critical_issues": 1,
   "warning_issues": 0,
   "info_issues": 1,
   "checks": [
     {
       "engine": "core_prediction_pipeline",
       "status": "PASS",
-      "age_hours": 3.97,
+      "age_hours": 0.09,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.23,
+      "age_hours": 0.16,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
-      "status": "PASS",
-      "age_hours": 3.92,
+      "status": "STALE",
+      "age_hours": 4.1,
       "threshold_hours": 4
     },
     {
@@ -32,27 +32,27 @@
     {
       "engine": "prediction_desk_health",
       "status": "PASS",
-      "age_hours": 0.03,
+      "age_hours": 0.04,
       "threshold_hours": 2
     },
     {
       "engine": "virtual_participant_history",
       "status": "PASS",
-      "max_input_age_minutes": 6.0,
-      "virtual_lab_status_age_minutes": 7.5,
+      "max_input_age_minutes": 16.5,
+      "virtual_lab_status_age_minutes": 18.7,
       "threshold_minutes": 30.0,
       "stale_inputs": []
     },
     {
       "engine": "tennis_forward_discovery",
       "status": "PASS",
-      "age_hours": 0.29,
+      "age_hours": 0.47,
       "threshold_hours": 8
     },
     {
       "engine": "virtual_live_feed",
       "status": "PASS",
-      "age_hours": 0.14,
+      "age_hours": 0.32,
       "threshold_hours": 0.5,
       "heartbeat_source": "virtual_lab_live.json",
       "events_count": 727
@@ -64,7 +64,7 @@
       "threshold_hours": 0.25,
       "heartbeat_source": "nba_live_observations.json.gz",
       "games_tracked": 89,
-      "snapshots_recorded": 11999
+      "snapshots_recorded": 12011
     },
     {
       "engine": "engine_lifecycle",
@@ -103,6 +103,11 @@
   ],
   "issues": [
     {
+      "code": "STALE_EXPANSION",
+      "severity": "critical",
+      "detail": "updated_at age 4.10h exceeds 4h"
+    },
+    {
       "code": "SELECTION_GATE_EMPTY",
       "severity": "info",
       "detail": "Current prediction feed exists but the selected-candidate layer returned zero qualified selections; no gate was weakened"
@@ -111,11 +116,11 @@
   "policy": "Proactive operational guard. Visibility is never reduced to zero just because an evidence gate is unmet.",
   "paper_only": true,
   "prediction_desk_filters": {
-    "past_kickoff_rows_hidden": 108,
+    "past_kickoff_rows_hidden": 1,
     "stale_live_flags_hidden": 0,
     "expired_settled_rows_hidden": 0,
-    "virtual_market_rows_held_for_kickoff_window": 270,
+    "virtual_market_rows_held_for_kickoff_window": 275,
     "virtual_rows_held_for_stale_participant_history": 0,
-    "virtual_rows_held_for_recent_product_drawdown": 34
+    "virtual_rows_held_for_recent_product_drawdown": 33
   }
 }
