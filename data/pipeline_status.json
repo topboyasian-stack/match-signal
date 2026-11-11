@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-11-11T07:12:08.670847+00:00",
+  "updated_at": "2026-11-11T13:03:48.442693+00:00",
   "prediction_count": 81,
   "football_count": 76,
   "tennis_count": 5,
@@ -24,17 +24,17 @@
   },
   "market_data": {
     "provider": "SportyBet NG",
-    "fetched_at": "2026-11-11T07:11:41.307409+00:00",
-    "football_events": 1092,
-    "tennis_events": 446,
-    "matched": 59,
-    "unmatched": 22,
+    "fetched_at": "2026-11-11T13:03:14.283364+00:00",
+    "football_events": 1127,
+    "tennis_events": 386,
+    "matched": 58,
+    "unmatched": 23,
     "match_errors": [],
     "fetch_errors": [],
     "per_sport": {
       "football": {
         "predictions_seen": 76,
-        "events_fetched": 1092,
+        "events_fetched": 1127,
         "matched_events": 54,
         "unmatched_events": 22,
         "winner_market_available": 54,
@@ -476,37 +476,21 @@
       },
       "tennis": {
         "predictions_seen": 5,
-        "events_fetched": 446,
-        "matched_events": 5,
-        "unmatched_events": 0,
-        "winner_market_available": 5,
-        "total_market_available": 5,
-        "unmatched_reason_counts": {},
+        "events_fetched": 386,
+        "matched_events": 4,
+        "unmatched_events": 1,
+        "winner_market_available": 4,
+        "total_market_available": 4,
+        "unmatched_reason_counts": {
+          "no_sufficient_fixture_match": 1
+        },
         "market_id_counts": {
-          "186": 5,
-          "189": 5,
-          "202": 5,
-          "204": 5
+          "186": 4,
+          "189": 4,
+          "202": 4,
+          "204": 4
         },
         "match_examples": [
-          {
-            "prediction_event_id": "186540",
-            "sportybet_event_id": "sr:match:76430130",
-            "league": "ATP",
-            "sportybet_tournament": "ATP Stockholm, Sweden Men Singles",
-            "match": "Sonego, Lorenzo vs Tabilo, Alejandro",
-            "kickoff_delta_minutes": 0.0,
-            "match_score": 0.9039,
-            "match_method": "direct",
-            "market_ids": [
-              "186",
-              "189",
-              "202",
-              "204"
-            ],
-            "winner_market_available": true,
-            "total_market_count": 13
-          },
           {
             "prediction_event_id": "186545",
             "sportybet_event_id": "sr:match:76430178",
@@ -541,7 +525,7 @@
               "204"
             ],
             "winner_market_available": true,
-            "total_market_count": 13
+            "total_market_count": 14
           },
           {
             "prediction_event_id": "186538",
@@ -580,12 +564,59 @@
             "total_market_count": 13
           }
         ],
-        "unmatched_examples": [],
-        "match_rate": 1.0,
+        "unmatched_examples": [
+          {
+            "event_id": "186540",
+            "league": "ATP",
+            "player_1": "Lorenzo Sonego",
+            "player_2": "Alejandro Tabilo",
+            "start_time": "2026-11-11T12:05Z",
+            "reason": "no_sufficient_fixture_match",
+            "nearest_markets": [
+              {
+                "event_id": "sr:match:111111114668866",
+                "home": "Alejandro Moreno",
+                "away": "Alexander Okonkwo",
+                "tournament": "ITF M25 Columbus, OH",
+                "start_time_ms": 1794412800000,
+                "kickoff_delta_minutes": 235.0,
+                "name_direct": 0.4727,
+                "name_reverse": 0.505,
+                "combined_score": 0.5794,
+                "competition_identity_ok": true
+              },
+              {
+                "event_id": "sr:match:111111114668689",
+                "home": "Alexander Rozin",
+                "away": "Daniel De Jonge",
+                "tournament": "ITF M25 Montreal",
+                "start_time_ms": 1794412800000,
+                "kickoff_delta_minutes": 235.0,
+                "name_direct": 0.2325,
+                "name_reverse": 0.4972,
+                "combined_score": 0.573,
+                "competition_identity_ok": true
+              },
+              {
+                "event_id": "sr:match:76430178",
+                "home": "Fritz, Taylor",
+                "away": "Norrie, Cameron",
+                "tournament": "ATP Stockholm, Sweden Men Singles",
+                "start_time_ms": 1794403800000,
+                "kickoff_delta_minutes": 85.0,
+                "name_direct": 0.2487,
+                "name_reverse": 0.4286,
+                "combined_score": 0.5261,
+                "competition_identity_ok": true
+              }
+            ]
+          }
+        ],
+        "match_rate": 0.8,
         "winner_price_coverage": 1.0
       }
     },
-    "coverage": 0.7284
+    "coverage": 0.716
   },
   "data_source": "ESPN public scoreboards + ESPN ATP/WTA rankings + recent 60-day results + SportyBet NG live market layer",
   "free_server_cost": true,
