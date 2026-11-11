@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-11T14:40:24.701039+00:00",
+  "generated_at": "2026-11-11T15:14:49.455516+00:00",
   "status": "DEGRADED",
   "critical_issues": 0,
   "warning_issues": 2,
@@ -8,63 +8,63 @@
     {
       "engine": "core_prediction_pipeline",
       "status": "PASS",
-      "age_hours": 1.61,
+      "age_hours": 2.18,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.39,
+      "age_hours": 0.04,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
       "status": "PASS",
-      "age_hours": 1.62,
+      "age_hours": 0.1,
       "threshold_hours": 4
     },
     {
       "engine": "unified_upcoming",
       "status": "PASS",
-      "age_hours": 0.01,
+      "age_hours": 0.02,
       "threshold_hours": 2
     },
     {
       "engine": "prediction_desk_health",
       "status": "PASS",
-      "age_hours": 0.03,
+      "age_hours": 0.07,
       "threshold_hours": 2
     },
     {
       "engine": "virtual_participant_history",
       "status": "STALE",
-      "max_input_age_minutes": 34.1,
-      "virtual_lab_status_age_minutes": 36.0,
+      "max_input_age_minutes": 66.0,
+      "virtual_lab_status_age_minutes": 70.4,
       "threshold_minutes": 30.0,
       "stale_inputs": []
     },
     {
       "engine": "tennis_forward_discovery",
-      "status": "PASS",
-      "age_hours": 7.48,
+      "status": "STALE",
+      "age_hours": 8.06,
       "threshold_hours": 8
     },
     {
       "engine": "virtual_live_feed",
       "status": "PASS",
-      "age_hours": 0.45,
+      "age_hours": 0.05,
       "threshold_hours": 0.5,
       "heartbeat_source": "virtual_lab_live.json",
-      "events_count": 611
+      "events_count": 748
     },
     {
       "engine": "nba_live_observation_recorder",
-      "status": "STALE",
-      "age_hours": 0.46,
+      "status": "PASS",
+      "age_hours": 0.03,
       "threshold_hours": 0.25,
       "heartbeat_source": "nba_live_observations.json.gz",
       "games_tracked": 89,
-      "snapshots_recorded": 11891
+      "snapshots_recorded": 11909
     },
     {
       "engine": "engine_lifecycle",
@@ -72,11 +72,11 @@
       "lanes": {
         "darts_x": {
           "status": "RETIRED",
-          "artifact_at": "2026-11-11T13:02:57.363329+00:00"
+          "artifact_at": "2026-11-11T14:49:26.166593+00:00"
         },
         "table_tennis_x": {
           "status": "RETIRED",
-          "artifact_at": "2026-11-11T13:03:25.289236+00:00"
+          "artifact_at": "2026-11-11T14:57:42.482184+00:00"
         },
         "basketball_core_moneyline": {
           "status": "RETIRED",
@@ -105,12 +105,12 @@
     {
       "code": "VIRTUAL_PARTICIPANT_HISTORY_STALE",
       "severity": "warning",
-      "detail": "input older than 30 minutes: participant_lifecycle, collector_status, model_evaluation; oldest participant/settlement/model input is 34.1 minutes old; virtual_lab_status.json is 36.0 minutes old; current eFootball/virtual predictions must remain withheld until the source collector publishes fresh data"
+      "detail": "input older than 30 minutes: participant_lifecycle, collector_status, model_evaluation; oldest participant/settlement/model input is 66.0 minutes old; virtual_lab_status.json is 70.4 minutes old; current eFootball/virtual predictions must remain withheld until the source collector publishes fresh data"
     },
     {
-      "code": "NBA_LIVE_OBSERVATION_STALE",
+      "code": "TENNIS_FORWARD_DISCOVERY_STALE",
       "severity": "warning",
-      "detail": "nba_live_observations.json.gz age 0.46h exceeds 0.25h; the in-game observation recorder has not published a recent heartbeat"
+      "detail": "tennis_forward_status age 8.06h exceeds the 8h threshold; the discovery result is too old to confirm current fixture coverage"
     },
     {
       "code": "SELECTION_GATE_EMPTY",
@@ -121,11 +121,11 @@
   "policy": "Proactive operational guard. Visibility is never reduced to zero just because an evidence gate is unmet.",
   "paper_only": true,
   "prediction_desk_filters": {
-    "past_kickoff_rows_hidden": 2,
+    "past_kickoff_rows_hidden": 3,
     "stale_live_flags_hidden": 0,
     "expired_settled_rows_hidden": 0,
     "virtual_market_rows_held_for_kickoff_window": 0,
-    "virtual_rows_held_for_stale_participant_history": 4765,
-    "virtual_rows_held_for_recent_product_drawdown": 43
+    "virtual_rows_held_for_stale_participant_history": 5155,
+    "virtual_rows_held_for_recent_product_drawdown": 58
   }
 }
