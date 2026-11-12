@@ -1139,7 +1139,9 @@ async function buildSelection(leg, event) {
 
   const sport = String(leg?.sport || '').toLowerCase();
   const market = String(leg?.market || '').toLowerCase();
-  if (sport === 'basketball') return findBasketballSelection(leg,event);
+  if (sport === 'basketball') return market === 'winner'
+    ? findBasketballWinnerSelection(leg,event)
+    : findBasketballSelection(leg,event);
   if (sport === 'tennis' && market === 'set_winner') return findSetWinnerSelection(leg,event);
   if (market === 'total' && ['football','tennis'].includes(sport)) return findVirtualSelection(leg,event);
   if (sport === 'football' || market === '1x2' || market === 'winner') {
