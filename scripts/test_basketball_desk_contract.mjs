@@ -41,7 +41,7 @@ assert.ok(api.includes("sportId:'sr:sport:2'"), "SportyBet basketball feed must 
 assert.ok(api.includes("210,219") && api.includes("winner_market_event_count"), "SportyBet NBA feed must request and count the two-way market-219 winner feed");
 assert.ok(ui.includes("d.catalogue_page_has_more!==true"), "NBA feed paging must follow the raw provider pagination signal instead of filtered NBA page length");
 assert.ok(api.includes("https://www.sportybet.com"), "SportyBet feed must fall back to the direct Nigeria endpoint if the proxy rejects basketball");
-assert.ok(api.includes("const STANDARD_MARKET_IDS='1,18,10,29,11,26,36,14,60100,186,189,202,204,210'") && api.includes("marketId:'225'"), "Feed must request the provider's supported standard market list and probe O/U incl overtime separately");
+assert.ok(api.includes("const STANDARD_MARKET_IDS='1,18,10,29,11,26,36,14,60100,186,189,202,204,210,219'") && api.includes("marketId:'225'"), "Feed must request the provider's supported standard market list and probe O/U incl overtime separately");
 assert.ok(api.includes("/api/ng/factsCenter/wapConfigurableUpcomingEvents"), "Feed must have a supported SportyBet upcoming-event fallback");
 assert.ok(ui.includes("suspend|closed|inactive|settled|unavailable|stop"), "Suspended or closed SportyBet total markets must be withheld");
 assert.ok(ui.includes("function bestSportyBetTotalMarket(markets)") && ui.includes("balance=Math.abs(Math.log") && ui.includes("status!=='0'"), "Totals must choose an active, balanced mainline instead of the first alternate line and reject non-open numeric statuses");
