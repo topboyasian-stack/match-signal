@@ -311,7 +311,9 @@ function currentSelectionForTarget(leg, event) {
   const sport = String(leg?.sport || '').toLowerCase();
   const market = String(leg?.market || '').toLowerCase();
   const product = productForLeg(leg);
-  if (sport === 'basketball') return findBasketballSelection(leg, event);
+  if (sport === 'basketball') return market === 'winner'
+    ? findBasketballWinnerSelection(leg, event)
+    : findBasketballSelection(leg, event);
   if (sport === 'tennis' && market === 'set_winner') return findSetWinnerSelection(leg, event);
   // Odds Builder's eFootball legs are serialized as sport="virtual",
   // market="virtual_total", product="efootball_gt". Treat that shape as an
@@ -554,6 +556,41 @@ export async function collectBasketballEvents(context, targetIds, timeline = 168
     if (payload.catalogue_page_has_more !== true) break;
   }
   return found;
+}
+function findBasketballWinnerSelection(leg,event){
+  const pick=String(leg?.pick||'').toLowerCase();
+  if(pick!=='p1'&&pick!=='p2')return{error:'NBA match winners must select Player 1 or Player 2.'};
+  if(String(leg?.market_id||'')!=='219')return{error:'NBA match winners require exact SportyBet market 219 (Winner incl. overtime).'};
+  if(!sameParticipantPair([leg?.player_1,leg?.player_2],event,'basketball'))return{error:'Basketball participants changed in the current SportyBet catalogue.'};
+  const rs=Date.parse(String(leg?.start_time||'')),es=Number(event?.estimateStartTime||0);
+  if(!Number.isFinite(rs)||!es||Math.abs(rs-es)>2700000)return{error:'Basketball fixture start time changed; refresh the ticket.'};
+  const p1IsHome=participantNameMatches(leg?.player_1,event?.homeTeamName);
+  const p1IsAway=participantNameMatches(leg?.player_1,event?.awayTeamName);
+  const p2IsHome=participantNameMatches(leg?.player_2,event?.homeTeamName);
+  const p2IsAway=participantNameMatches(leg?.player_2,event?.awayTeamName);
+  if(!((p1IsHome&&p2IsAway)||(p1IsAway&&p2IsHome)))return{error:'NBA Player 1/Player 2 orientation does not match the current SportyBet home/away teams.'};
+  for(const market of (Array.isArray(event?.markets)?event.markets:[])){
+    const status=String(market?.status??'').trim().toLowerCase();
+    if(String(market?.id||'')!=='219'||/suspend|closed|inactive|settled|unavailable|stop/i.test(status)||(status!==''&&/^\d+$/.test(status)&&status!=='0'))continue;
+    const outcomes=Array.isArray(market?.outcomes)?market.outcomes:[];
+    const active=side=>outcomes.find(o=>{
+      const label=canonicalParticipant(o?.desc||o?.name||o?.title||'');
+      const ok=o?.isActive==null?(o?.active!==false):(Number(o.isActive)===1||o.isActive===true);
+      const odds=Number(o?.odds);
+      return ok&&String(o?.id||'')&&label===side&&Number.isFinite(odds)&&odds>1;
+    });
+    const home=active('home'),away=active('away');
+    if(!home||!away)continue;
+    const selectedHome=pick==='p1'?p1IsHome:p2IsHome;
+    const selected=selectedHome?home:away;
+    return{
+      eventId:event.eventId,marketId:'219',specifier:market?.specifier??null,
+      outcomeId:String(selected.id),outcomeName:String(selected.desc||selected.name||(selectedHome?'Home':'Away')),
+      odds:Number(selected.odds),homeOdds:Number(home.odds),awayOdds:Number(away.odds),
+      fetchedAt:String(event?.fetchedAt||''),sportybetEventId:String(event.eventId||'')
+    };
+  }
+  return{error:'Exact current SportyBet market-219 Home/Away winner prices are unavailable.'};
 }
 function findBasketballSelection(leg,event){
   const side=String(leg?.pick||'').toLowerCase(),line=Number(leg?.line);
@@ -1153,6 +1190,9 @@ async function handlePost(context) {
       if (new Set(basketballProviderIds).size !== basketballProviderIds.length || legs.some(leg => {
           if (!leg.event_id || !leg.player_1 || !leg.player_2) return true;
           if (leg.sport === 'basketball') {
+            if (leg.market === 'winner') {
+              return !['p1', 'p2'].includes(leg.pick) || leg.market_id !== '219' || !leg.sportybet_event_id;
+            }
             return leg.market !== 'total' || !['over', 'under'].includes(leg.pick) ||
               !Number.isFinite(Number(leg.line)) || Number(leg.line) < 100 || Number(leg.line) > 300 ||
               leg.market_id !== '225';
@@ -1183,7 +1223,7 @@ async function handlePost(context) {
             (leg.sport === 'tennis' && leg.pick === 'draw');
         }) ||
           ids.some(id => !id) || new Set(ids).size !== ids.length) {
-        return json({ ok: false, error: 'INVALID_MANUAL_SELECTION', message: 'Manual tickets support Football/Tennis match winners, Tennis Set 1/Set 2 winners, exact totals, experimental eFootball GT/eAdriatic and NBA market-225 totals. Every leg must still match a currently open SportyBet event, exact market scope, participant outcome and live odds.' }, 422);
+        return json({ ok: false, error: 'INVALID_MANUAL_SELECTION', message: 'Manual tickets support Football/Tennis match winners, Tennis Set 1/Set 2 winners, exact totals, experimental eFootball GT/eAdriatic, NBA market-219 full-game winners (overtime included) and NBA market-225 totals. Every leg must still match a currently open SportyBet event, exact market scope, participant outcome and live odds.' }, 422);
       }
     } else {
       // Desk research batches remain subject to their existing Builder qualification gates.
@@ -1402,23 +1442,28 @@ async function handlePost(context) {
         if (!nbaQualification.ok) { validation.push(validationFailure(leg, nbaQualification.reason)); continue; }
       }
       if (basketballLeg && manualMode) {
-        // Manual selections are not model-qualified by this path. They still
-        // require a fresh, pre-kickoff quote for market 225 with both active
-        // side prices and the exact current provider event ID.
+        // Manual basketball selections remain independent of the totals release
+        // gate, but the exact market and both live outcomes must still be fresh.
         const quoteAt = Date.parse(String(selection?.fetchedAt || ''));
         const requestedStart = Date.parse(String(leg?.start_time || ''));
+        const isWinner = leg.market === 'winner';
+        const expectedMarket = isWinner ? '219' : '225';
+        const pricesComplete = isWinner
+          ? Number.isFinite(Number(selection?.homeOdds)) && Number(selection.homeOdds) > 1 &&
+            Number.isFinite(Number(selection?.awayOdds)) && Number(selection.awayOdds) > 1
+          : Number.isFinite(Number(selection?.overOdds)) && Number(selection.overOdds) > 1 &&
+            Number.isFinite(Number(selection?.underOdds)) && Number(selection.underOdds) > 1;
         if (!Number.isFinite(quoteAt) || quoteAt > Date.now() + 120000 ||
             Date.now() - quoteAt > 15 * 60 * 1000 || !Number.isFinite(requestedStart) ||
-            quoteAt >= requestedStart || String(selection?.marketId || '') !== '225' ||
+            quoteAt >= requestedStart || String(selection?.marketId || '') !== expectedMarket ||
             String(selection?.sportybetEventId || selection?.eventId || '') !== String(event?.eventId || '') ||
-            !Number.isFinite(Number(selection?.overOdds)) || Number(selection.overOdds) <= 1 ||
-            !Number.isFinite(Number(selection?.underOdds)) || Number(selection.underOdds) <= 1) {
-          validation.push(validationFailure(leg, 'Current SportyBet market-225 quote is stale or incomplete; refresh this basketball selection.'));
+            !pricesComplete || !Number.isFinite(Number(selection?.odds)) || Number(selection.odds) <= 1) {
+          validation.push(validationFailure(leg, 'Current SportyBet NBA market quote is stale or incomplete; refresh this basketball selection.'));
           continue;
         }
       }
       selections.push(selection);
-      validation.push({event_id:eventId,ok:true,resolved_by:resolved.matched_by,resolved_event_id:event.eventId,market_id:selection.marketId,outcome_id:selection.outcomeId,specifier:selection.specifier,outcome:selection.outcomeName,current_odds:selection.odds,current_line:selection.line??null,current_over_odds:selection.overOdds??null,current_under_odds:selection.underOdds??null,publication_snapshot_id:nbaQualification?.snapshot_id||null});
+      validation.push({event_id:eventId,ok:true,resolved_by:resolved.matched_by,resolved_event_id:event.eventId,market_id:selection.marketId,outcome_id:selection.outcomeId,specifier:selection.specifier,outcome:selection.outcomeName,current_odds:selection.odds,current_line:selection.line??null,current_over_odds:selection.overOdds??null,current_under_odds:selection.underOdds??null,current_home_odds:selection.homeOdds??null,current_away_odds:selection.awayOdds??null,publication_snapshot_id:nbaQualification?.snapshot_id||null});
     }
 
     const preExcluded = validation.filter(item => item.ok !== true);
