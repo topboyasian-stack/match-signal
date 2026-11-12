@@ -1139,6 +1139,8 @@ async function buildSelection(leg, event) {
 
   const sport = String(leg?.sport || '').toLowerCase();
   const market = String(leg?.market || '').toLowerCase();
+  // Keep final mapping aligned with currentSelectionForTarget: NBA winners
+  // use the two-way 219 market; full-game totals remain on 225.
   if (sport === 'basketball') return market === 'winner'
     ? findBasketballWinnerSelection(leg,event)
     : findBasketballSelection(leg,event);
