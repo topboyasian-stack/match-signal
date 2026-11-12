@@ -1,5 +1,5 @@
 const ORIGIN='https://match-signal-sportybet-proxy.topboyasian.workers.dev';
-const STANDARD_MARKET_IDS='1,18,10,29,11,26,36,14,60100,186,189,202,204,210';
+const STANDARD_MARKET_IDS='1,18,10,29,11,26,36,14,60100,186,189,202,204,210,219';
 // Scope the bounded feed to NBA so NCAA events cannot crowd out market-225 fixtures.
 const NBA_TOURNAMENT_ID='sr:tournament:132';
 function headers(){return {'Content-Type':'application/json; charset=utf-8','Cache-Control':'public, max-age=15, s-maxage=15, stale-while-revalidate=15','Access-Control-Allow-Origin':'*','Access-Control-Allow-Methods':'GET,OPTIONS'}}
@@ -144,6 +144,7 @@ export async function onRequestGet(context){
     }
     const events=Array.from(eventMap.values());
     const totalMarketEvents=events.filter(e=>e.markets.some(m=>String(m.id)==='225')).length;
+    const winnerMarketEvents=events.filter(e=>e.markets.some(m=>String(m.id)==='219')).length;
     const sourceErrors=attempts.filter(a=>a.error).map(a=>a.error);
     const hasValidEventList=attempts.some(a=>a.payload&&(
       Array.isArray(a.payload?.data?.tournaments)||
@@ -160,7 +161,7 @@ export async function onRequestGet(context){
       source_origins:Array.from(new Set(attempts.filter(a=>a.payload).map(a=>a.source_origin))),
       market_contract:{winner_including_overtime:'219',handicap_including_overtime:'223',total_including_overtime:'225',team_total_points:['227','228']},
       fetched_at:new Date().toISOString(),elapsed_ms:Date.now()-started,event_count:events.length,
-      total_market_event_count:totalMarketEvents,source_errors:sourceErrors,
+      total_market_event_count:totalMarketEvents,winner_market_event_count:winnerMarketEvents,source_errors:sourceErrors,
       // Raw upstream pages can be full while the post-filtered NBA result has
       // fewer than 100 rows. Preserve the raw page's pagination signal.
       catalogue_page_has_more:attempts.some(attempt=>{
