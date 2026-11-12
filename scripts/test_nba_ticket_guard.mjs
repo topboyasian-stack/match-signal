@@ -149,6 +149,22 @@ function manualLeg(row) {
   };
 }
 
+function manualWinnerLeg(row, pick = 'p1') {
+  return {
+    event_id: row.espnId,
+    sportybet_event_id: row.sportybetId,
+    sport: 'basketball',
+    market: 'winner',
+    pick,
+    market_id: '219',
+    model_qualified: false,
+    start_time: row.startTime,
+    player_1: row.home,
+    player_2: row.away,
+    match: row.home + ' vs ' + row.away
+  };
+}
+
 function sportBetEvent(row) {
   const line = Number(row.line == null ? 220.5 : row.line);
   return {
@@ -159,6 +175,14 @@ function sportBetEvent(row) {
     fetched_at: new Date().toISOString(),
     tournament: 'NBA',
     markets: [{
+      id: '219',
+      name: 'Winner (incl. overtime)',
+      status: '0',
+      outcomes: [
+        { id: '4', name: 'Home', odds: 1.55, active: true },
+        { id: '5', name: 'Away', odds: 2.45, active: true }
+      ]
+    }, {
       id: '225',
       name: 'Game Total',
       specifier: 'total=' + line,
@@ -362,6 +386,65 @@ test('manual NBA share-code preparation remains available when model evidence is
     assert.equal(mock.calls.feed, 0, 'direct event details should avoid broad catalogue paging when both NBA legs are current');
     assert.equal(mock.calls.share, 1, 'the full manually selected ticket should be sent for share-code preparation');
     assert.ok(body.selections.every(row => row.ok === true));
+  } finally {
+    mock.restore();
+  }
+});
+
+test('manual NBA market-219 match winners work when the separate totals evidence remains research-only', async () => {
+  const one = fixture('espn-one', 'sr:match:one', 'Boston Celtics', 'New York Knicks');
+  const two = fixture('espn-two', 'sr:match:two', 'Cleveland Cavaliers', 'Chicago Bulls', 30);
+  const bundle = buildEvidence([one, two]);
+  bundle.evidence.release_decision = 'RESEARCH_ONLY';
+  const mock = installFetchMock({
+    bundle,
+    events: [one, two],
+    shareResponse: {
+      bizCode: 10000,
+      data: {
+        shareCode: 'NBAWINNER219',
+        outcomes: [{ eventId: one.sportybetId, odds: 1.55 }, { eventId: two.sportybetId, odds: 1.55 }]
+      }
+    }
+  });
+
+  try {
+    const response = await onRequest({ request: requestFor([manualWinnerLeg(one, 'p1'), manualWinnerLeg(two, 'p2')]) });
+    const body = await response.json();
+    assert.equal(response.status, 200, JSON.stringify(body));
+    assert.equal(body.ok, true);
+    assert.equal(body.booking_code, 'NBAWINNER219');
+    assert.equal(body.selection_count, 2);
+    assert.equal(mock.calls.raw, 0, 'manual winner picks must not fetch or depend on separate totals release artifacts');
+    assert.equal(mock.calls.event, 2, 'both exact SportyBet NBA event IDs must be rechecked');
+    assert.equal(mock.calls.feed, 0, 'exact current event details resolve both market-219 selections');
+    assert.equal(mock.calls.share, 1, 'the complete manually selected ticket reaches SportyBet share preparation');
+    assert.ok(body.selections.every(row => row.ok === true && row.market_id === '219'));
+    assert.equal(body.selections[0].market_id, '219');
+    assert.equal(body.selections[1].market_id, '219');
+    assert.equal(body.selections[0].outcome_id, '4', 'Player 1 maps to the exact Home outcome');
+    assert.equal(body.selections[1].outcome_id, '5', 'Player 2 maps to the exact Away outcome');
+    assert.equal(body.selections[0].current_home_odds, 1.55);
+    assert.equal(body.selections[0].current_away_odds, 2.45);
+  } finally {
+    mock.restore();
+  }
+});
+
+test('NBA 1X2 market 1 is not accepted as a substitute for two-way market-219 match winner', async () => {
+  const one = fixture('espn-one', 'sr:match:one', 'Boston Celtics', 'New York Knicks');
+  const two = fixture('espn-two', 'sr:match:two', 'Cleveland Cavaliers', 'Chicago Bulls', 30);
+  const mock = installFetchMock({ events: [one, two] });
+  try {
+    const response = await onRequest({ request: requestFor([
+      { ...manualWinnerLeg(one), market_id: '1' },
+      manualWinnerLeg(two)
+    ]) });
+    const body = await response.json();
+    assert.equal(response.status, 422);
+    assert.equal(body.error, 'INVALID_MANUAL_SELECTION');
+    assert.equal(mock.calls.event, 0, 'invalid three-way market IDs must be rejected before any provider call');
+    assert.equal(mock.calls.share, 0);
   } finally {
     mock.restore();
   }
