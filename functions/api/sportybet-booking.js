@@ -1141,6 +1141,8 @@ async function buildSelection(leg, event) {
   const market = String(leg?.market || '').toLowerCase();
   // Keep final mapping aligned with currentSelectionForTarget: NBA winners
   // use the two-way 219 market; full-game totals remain on 225.
+  // The direct-ID preflight and final share mapper must use the same
+  // market-specific resolver so an NBA winner cannot fall back to O/U totals.
   if (sport === 'basketball') return market === 'winner'
     ? findBasketballWinnerSelection(leg,event)
     : findBasketballSelection(leg,event);
