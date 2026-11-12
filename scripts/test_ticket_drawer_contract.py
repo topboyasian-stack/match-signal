@@ -171,11 +171,13 @@ def main():
             "const [\n      vfootballEvents" in api and "footballEvents,\n      tennisEvents" in api,
             "Parallel Football and Tennis alias scans must only process legs not resolved by the direct event-details lookup")
     require("leg?.model_qualified!==true" in api and "leg?.market_id!=='225'" in api and
+            "leg.market === 'winner'" in api and "leg.market_id !== '219'" in api and
             "!leg.sportybet_event_id" in api and "NBA_RELEASE_GATE_LOCKED" in api and
             "nbaTotalTicketLegQualified" in api and "if (hasBasketballLeg && !manualMode)" in api and
             "if (basketballLeg && !manualMode)" in api and
-            "Current SportyBet market-225 quote is stale or incomplete" in api,
-            "Automated NBA Builder batches must keep the strict model-release gate; manual mixed-sport tickets may proceed only after fresh exact SportyBet validation")
+            "const expectedMarket = isWinner ? '219' : '225'" in api and
+            "15 * 60 * 1000" in api,
+            "Automated NBA totals Builder batches must retain the strict model-release gate; manual market-219 winner and market-225 total picks must pass exact fresh quote validation")
     require("prospective_probability_fixture_coverage" in api and
             "valid_unique_settled_fixtures" in api and "binary_scored_unique_fixtures" in api and
             "snapshot_linkage_failure_count" in api and
