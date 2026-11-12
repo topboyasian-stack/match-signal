@@ -170,6 +170,43 @@ class PriceCaptureTests(unittest.TestCase):
         self.assertEqual([call.kwargs["params"]["pageNum"] for call in feed_get.call_args_list], [1, 2, 3])
         self.assertEqual({row["event_id"] for row in events}, {"short-0", "short-1", "short-2", "later-0", "later-1"})
 
+    def test_feed_continues_when_filtered_page_is_empty_but_catalogue_has_more(self):
+        first_page = [
+            {"event_id": "nba-first", "home": "Home A", "away": "Away A",
+             "fetched_at": self.now.isoformat(), "markets": []}
+        ]
+        third_page = [
+            {"event_id": "nba-third", "home": "Home C", "away": "Away C",
+             "fetched_at": self.now.isoformat(), "markets": []}
+        ]
+
+        class Response:
+            def __init__(self, events, has_more):
+                self.events = events
+                self.has_more = has_more
+            def raise_for_status(self):
+                return None
+            def json(self):
+                return {
+                    "ok": True,
+                    "events": self.events,
+                    "catalogue_page_has_more": self.has_more,
+                }
+
+        # Page 2 contains no NBA events after the server-side filter, but the
+        # raw SportyBet catalogue still has page 3. The collector must not stop.
+        with patch("capture_nba_totals_prices.S.get", side_effect=[
+            Response(first_page, True), Response([], True), Response(third_page, False)
+        ]) as feed_get:
+            events, error, diagnostics = sportybet_basketball_feed_paged(max_pages=5)
+
+        self.assertIsNone(error)
+        self.assertEqual(
+            [call.kwargs["params"]["pageNum"] for call in feed_get.call_args_list],
+            [1, 2, 3],
+        )
+        self.assertEqual({row["event_id"] for row in events}, {"nba-first", "nba-third"})
+
     def test_feed_returns_partial_pages_and_retains_upstream_diagnostics(self):
         class Response:
             def __init__(self, events, ok=True, error=None, source_diagnostics=None):
