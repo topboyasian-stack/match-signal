@@ -66,7 +66,7 @@ assert.ok(booking.includes("host+'/api/ng/orders/share") && booking.includes("bo
 assert.ok(booking.includes("leg.market_id||'225'") && booking.includes("SELECTIONS_CHANGED") && booking.includes("NON_STAKING_BETSLIP_PREPARATION"), "Basketball code generation must revalidate exact total market 225 and fail closed without staking");
 
 assert.ok(/async function refreshSportyBet\(\)[\s\S]*pageSize=100&timeline=168&pageNum=/.test(ui), "Visible basketball desk must page through the full seven-day SportyBet feed instead of stopping at page one.");
-assert.ok(/d\.events\.length<100\|\|newIds===0/.test(ui), "SportyBet browser pagination must stop on a short final page or repeated event page.");
+assert.ok(ui.includes("d.catalogue_page_has_more!==true"), "SportyBet browser pagination must follow the proxy's raw catalogue pagination signal because NBA filtering may return short or empty pages before the catalogue ends.");
 assert.ok(ui.includes("String(m.id||'')+'|'+String(m.specifier||'')"), "Duplicate SportyBet events must merge markets by market ID and specifier without dropping later-page prices.");
 assert.ok(ui.includes("nba_live_current.json") && ui.includes("live_total_projection") && ui.includes("score_pace_total"), "Live desk must load the latest ESPN in-game observation and display a separate score-pace estimate.");
 assert.ok(ui.includes("/apis/site/v2/sports/basketball/nba/summary") && ui.includes("./api/espn?path=") && ui.includes("await refreshLiveObservations();") && ui.includes("},45000)"), "Live desk must refresh current ESPN summaries after scoreboard updates on the 45-second browser cycle.");
