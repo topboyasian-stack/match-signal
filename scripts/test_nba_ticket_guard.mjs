@@ -420,6 +420,8 @@ test('manual NBA market-219 match winners work when the separate totals evidence
     assert.equal(mock.calls.feed, 0, 'exact current event details resolve both market-219 selections');
     assert.equal(mock.calls.share, 1, 'the complete manually selected ticket reaches SportyBet share preparation');
     assert.ok(body.selections.every(row => row.ok === true && row.market_id === '219'));
+    assert.equal(body.selections[0].market_id, '219');
+    assert.equal(body.selections[1].market_id, '219');
     assert.equal(body.selections[0].outcome_id, '4', 'Player 1 maps to the exact Home outcome');
     assert.equal(body.selections[1].outcome_id, '5', 'Player 2 maps to the exact Away outcome');
     assert.equal(body.selections[0].current_home_odds, 1.55);
