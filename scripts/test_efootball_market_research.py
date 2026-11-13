@@ -341,4 +341,4 @@ def test_efootball_display_calibration_is_applied():
 
 if __name__=="__main__":
  test_live_feed_compaction_preserves_scope_ids();test_markets();test_capture();test_live_snapshot_freshness_gate();test_live_market_coverage_reports_actual_btts_availability();test_settlement_and_summary();test_settlement_accepts_provider_final_set_score();test_legacy_missing_scope_uses_bounded_discovery();test_draw_and_append_only_merge();test_settlement_due_uses_elapsed_time_not_exact_minute();test_scoped_result_lookup_uses_bounded_time_window();test_legacy_scope_discovery_uses_bounded_time_window();test_result_queries_bucket_stale_observations_with_three_hour_windows();test_result_scope_budget_always_includes_eadriatic_when_gt_has_more_than_twelve_scopes();test_result_scope_rotation_prevents_old_competitions_from_starving_later_scopes();test_settlement_coverage_reports_partial_and_overdue_results();test_result_proxy_upstream_errors_are_preserved();test_efootball_display_calibration_is_applied()
- print("eFootball winner/BTTS research tests: PASS (16 groups)")
+ print("eFootball winner/BTTS research tests: PASS (18 groups)")
