@@ -258,6 +258,18 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
                          "CI-only test workflow changes must not trigger a production Pages deployment")
         self.assertNotIn("functions/api/sportybet-booking.js", direct_paths,
                          "the shared ticket handler must use ordered board/Builder promotion")
+        self.assertNotIn("basketball.html", direct_paths,
+                         "Basketball page changes must use ordered board/Builder promotion")
+        self.assertNotIn("basketball-live.js", direct_paths,
+                         "Basketball live-feed UI changes must use ordered board/Builder promotion")
+        self.assertNotIn("functions/api/sportybet-basketball.js", direct_paths,
+                         "the NBA live feed must use ordered promotion with fresh board/Builder evidence")
+        self.assertNotIn("functions/api/sportybet-basketball-booking.js", direct_paths,
+                         "the Basketball ticket gate must use ordered promotion")
+        self.assertIn('      - "basketball.html"', PROMOTION_WORKFLOW)
+        self.assertIn('      - "basketball-live.js"', PROMOTION_WORKFLOW)
+        self.assertIn('      - "functions/api/sportybet-basketball.js"', PROMOTION_WORKFLOW)
+        self.assertIn('      - "functions/api/sportybet-basketball-booking.js"', PROMOTION_WORKFLOW)
         self.assertNotIn("scripts/test_ticket_drawer_contract.py", direct_paths,
                          "contract-test edits must not deploy Pages without production-code changes")
         self.assertNotIn(".github/workflows/ticket-drawer-contract.yml", direct_paths,
@@ -309,14 +321,10 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             "virtual-lab-terminal.css",
             "football.html",
             "tennis.html",
-            "basketball.html",
-            "basketball-live.js",
             "live.html",
             "match-signal-ip.js",
             "api-access.html",
             "basketball-design.css",
-            "functions/api/sportybet-basketball.js",
-            "functions/api/sportybet-basketball-booking.js",
             "wrangler.toml",
             "sport-hubs.css",
             "sport-hubs.js",
@@ -341,6 +349,11 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             ".github/workflows/odds_builder.yml",
             "functions/api/sportybet-booking.js",
             ".github/workflows/cloudflare-pages.yml",
+            "basketball.html",
+            "basketball-live.js",
+            "functions/api/sportybet-basketball.js",
+            "functions/api/sportybet-basketball-booking.js",
+            ".github/workflows/unified-upcoming.yml",
         }
         self.assertTrue(builder_owned_paths.isdisjoint(direct_paths),
                         "Builder data/code and Pages workflow changes must deploy only after a fresh Unified Upcoming board")
@@ -348,6 +361,10 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         allowed_line = next(line for line in PAGES_WORKFLOW.splitlines() if "allowed='|" in line)
         self.assertNotIn("|functions/api/sportybet-booking.js|", allowed_line,
                          "the shared ticket handler is not eligible for direct promotion")
+        self.assertNotIn("|basketball.html|", allowed_line)
+        self.assertNotIn("|basketball-live.js|", allowed_line)
+        self.assertNotIn("|functions/api/sportybet-basketball.js|", allowed_line)
+        self.assertNotIn("|functions/api/sportybet-basketball-booking.js|", allowed_line)
         self.assertNotIn("|scripts/test_ticket_drawer_contract.py|", allowed_line,
                          "contract-test-only edits are not direct deployment inputs")
         self.assertNotIn("|.github/workflows/ticket-drawer-contract.yml|", allowed_line,

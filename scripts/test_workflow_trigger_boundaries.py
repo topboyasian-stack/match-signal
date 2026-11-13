@@ -46,6 +46,24 @@ def main():
 
     builder_paths = push_paths("odds_builder.yml")
     board_paths = push_paths("unified-upcoming.yml")
+    assert "functions/**" not in board_paths, (
+        "Ticket/API changes must not launch a duplicate 24MB board publication."
+    )
+    assert ".github/workflows/unified-upcoming.yml" not in board_paths, (
+        "The board workflow must not trigger a second normal publication on its own workflow edits."
+    )
+    assert ".github/workflows/cloudflare-pages.yml" not in board_paths, (
+        "Deployment-workflow edits must use ordered promotion rather than a parallel board run."
+    )
+    assert "scripts/test_live_virtual_quote_coverage.mjs" not in board_paths, (
+        "Deployment smoke-test edits must not trigger an unrelated board publication."
+    )
+    assert ".github/workflows/qualified-best-production-watch.yml" not in board_paths, (
+        "Monitor-workflow edits must not trigger an unrelated board publication."
+    )
+    assert "basketball.html" not in board_paths and "basketball-live.js" not in board_paths, (
+        "Basketball UI changes are owned by ordered production promotion, not a parallel board publication."
+    )
     tracker_paths = push_paths("odds-ticket-tracker.yml")
     collector_paths = push_paths("virtual-lab-collector.yml")
     autopilot_paths = push_paths("autopilot-refresh.yml")
