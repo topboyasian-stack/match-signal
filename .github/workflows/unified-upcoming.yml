@@ -137,8 +137,8 @@ concurrency:
   # Let a board build finish. Cancelling an active refresh every five minutes prevented
   # the slower model + publication steps from ever updating the canonical board.
   # Promotion-child refreshes remain isolated from the normal schedule.
-  # Queue generation 12 releases stale generation-11 locks. Normal board publishers remain serialized; the ordered promotion child gets a dedicated publisher slot so unrelated upstream completions cannot replace its pending run. The publish step rebases, retries, and skips stale candidates before pushing.
-  group: match-signal-unified-upcoming-v12-${{ github.event_name }}-${{ github.event_name == 'workflow_run' && github.event.workflow_run.name || github.event_name == 'workflow_dispatch' && inputs.promotion_child && 'promotion' || 'normal' }}
+  # Queue generation 13 releases stale generation-12 locks. Normal board publishers remain serialized; the ordered promotion child gets a dedicated publisher slot so unrelated upstream completions cannot replace its pending run. The publish step rebases, retries, and skips stale candidates before pushing.
+  group: match-signal-unified-upcoming-v13-${{ github.event_name }}-${{ github.event_name == 'workflow_run' && github.event.workflow_run.name || github.event_name == 'workflow_dispatch' && inputs.promotion_child && 'promotion' || 'normal' }}
   cancel-in-progress: false
 
 jobs:
@@ -150,7 +150,7 @@ jobs:
     # must not push generated artifacts concurrently. The outer workflow queues remain
     # event-specific; this job-level lock serializes the actual build/publish phase.
     concurrency:
-      group: match-signal-unified-board-publisher-v12-${{ github.event_name == 'workflow_dispatch' && inputs.promotion_child == true && 'promotion' || 'normal' }}
+      group: match-signal-unified-board-publisher-v13-${{ github.event_name == 'workflow_dispatch' && inputs.promotion_child == true && 'promotion' || 'normal' }}
       cancel-in-progress: false
     steps:
       - name: Checkout latest main
@@ -193,7 +193,7 @@ jobs:
           assert "group: match-signal-unified-upcoming-" in concurrency and "'promotion'" in concurrency
           assert "github.event.workflow_run.name" in concurrency
           unified_job = source.split("\n  unified:\n", 1)[1]
-          assert "group: match-signal-unified-board-publisher-v12-" in unified_job
+          assert "group: match-signal-unified-board-publisher-v13-" in unified_job
           assert "inputs.promotion_child == true" in unified_job
           assert "'promotion' || 'normal'" in unified_job
           assert "cancel-in-progress: false" in unified_job
