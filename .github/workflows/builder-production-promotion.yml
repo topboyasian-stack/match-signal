@@ -41,9 +41,9 @@ permissions:
   actions: write
   contents: read
 
-# Fresh v16 namespace releases stale queued promotion runs; poll exact run IDs with bounded retries for GitHub API propagation.
+# Fresh v17 namespace releases stale queued promotion runs while the board publisher queue is re-armed.
 concurrency:
-  group: builder-production-promotion-v16
+  group: builder-production-promotion-v17
   cancel-in-progress: false
 
 jobs:
