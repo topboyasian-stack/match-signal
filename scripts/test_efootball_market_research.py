@@ -269,6 +269,42 @@ def test_result_scope_rotation_prevents_old_competitions_from_starving_later_sco
  assert first & second, "the cursor rotates fairly and may wrap after the active queue"
 
 
+def test_result_scope_watermark_advances_when_cursor_scope_is_settled_and_removed():
+ now=datetime(2026,11,2,19,0,tzinfo=timezone.utc)
+ samples=[]
+ for i in range(16):
+  samples.append({
+   "event_id":f"gt-{i}","product":"efootball_gt",
+   "category_id":f"gt-cat-{i:02d}","tournament_id":f"gt-tour-{i:02d}",
+   "start_time":(now-timedelta(hours=20-i)).isoformat(),
+  })
+
+ def run_batch(rows,cursor):
+  queried=[]
+  class FakeResponse:
+   def raise_for_status(self):pass
+   def json(self):return {"events":[]}
+  def fake_get(url,params,timeout):
+   queried.append(params.copy())
+   return FakeResponse()
+  with patch.object(mod.requests,"get",side_effect=fake_get):
+   events,errors,next_cursor=mod.fetch_results(rows,now,cursor)
+  assert not events and not errors,(events,errors)
+  return queried,next_cursor
+
+ first_queries,cursor=run_batch(samples,None)
+ assert len(first_queries)==12,len(first_queries)
+ last_cursor=cursor["efootball_gt"]
+ assert last_cursor["label"].endswith("gt-cat-11|gt-tour-11"),last_cursor
+
+ # The last scope checked has now settled and is no longer pending. The
+ # scheduler must continue at scope 12, not reset to still-pending scope 0.
+ remaining=[row for row in samples if row["event_id"]!="gt-11"]
+ second_queries,next_cursor=run_batch(remaining,cursor)
+ assert second_queries[0]["categoryId"]=="gt-cat-12",second_queries
+ assert next_cursor["efootball_gt"]["label"].endswith("gt-cat-07|gt-tour-07"),next_cursor
+
+
 def test_settlement_coverage_reports_partial_and_overdue_results():
  now=datetime(2026,10,11,11,0,tzinfo=timezone.utc)
  pending=[
@@ -340,5 +376,5 @@ def test_efootball_display_calibration_is_applied():
  assert 'if(["efootball_gt","efootball_adriatic"].includes(product)&&isOverUnderPrediction(x))return null;' in source
 
 if __name__=="__main__":
- test_live_feed_compaction_preserves_scope_ids();test_markets();test_capture();test_live_snapshot_freshness_gate();test_live_market_coverage_reports_actual_btts_availability();test_settlement_and_summary();test_settlement_accepts_provider_final_set_score();test_legacy_missing_scope_uses_bounded_discovery();test_draw_and_append_only_merge();test_settlement_due_uses_elapsed_time_not_exact_minute();test_scoped_result_lookup_uses_bounded_time_window();test_legacy_scope_discovery_uses_bounded_time_window();test_result_queries_bucket_stale_observations_with_three_hour_windows();test_result_scope_budget_always_includes_eadriatic_when_gt_has_more_than_twelve_scopes();test_result_scope_rotation_prevents_old_competitions_from_starving_later_scopes();test_settlement_coverage_reports_partial_and_overdue_results();test_result_proxy_upstream_errors_are_preserved();test_efootball_display_calibration_is_applied()
- print("eFootball winner/BTTS research tests: PASS (18 groups)")
+ test_live_feed_compaction_preserves_scope_ids();test_markets();test_capture();test_live_snapshot_freshness_gate();test_live_market_coverage_reports_actual_btts_availability();test_settlement_and_summary();test_settlement_accepts_provider_final_set_score();test_legacy_missing_scope_uses_bounded_discovery();test_draw_and_append_only_merge();test_settlement_due_uses_elapsed_time_not_exact_minute();test_scoped_result_lookup_uses_bounded_time_window();test_legacy_scope_discovery_uses_bounded_time_window();test_result_queries_bucket_stale_observations_with_three_hour_windows();test_result_scope_budget_always_includes_eadriatic_when_gt_has_more_than_twelve_scopes();test_result_scope_rotation_prevents_old_competitions_from_starving_later_scopes();test_result_scope_watermark_advances_when_cursor_scope_is_settled_and_removed();test_settlement_coverage_reports_partial_and_overdue_results();test_result_proxy_upstream_errors_are_preserved();test_efootball_display_calibration_is_applied()
+ print("eFootball winner/BTTS research tests: PASS (19 groups)")
