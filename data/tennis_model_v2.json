@@ -1,10 +1,10 @@
 {
-  "updated_at": "2026-11-12T16:53:29.816779+00:00",
+  "updated_at": "2026-11-13T12:12:41.789056+00:00",
   "model_version": "2026-11-10-atp-prequential-set-win-sync",
   "status": "PAPER_RESEARCH_ONLY",
   "active_scope": "ATP",
-  "training_records": 194,
-  "archived_valid_records_all_tours": 351,
+  "training_records": 202,
+  "archived_valid_records_all_tours": 359,
   "inactive_tours_retained_as_research": [
     "WTA"
   ],
@@ -15,33 +15,33 @@
       {
         "elo_weight": 0.0,
         "n": 80,
-        "accuracy": 0.3625,
-        "brier": 0.30319
+        "accuracy": 0.375,
+        "brier": 0.2977
       },
       {
         "elo_weight": 0.25,
         "n": 80,
-        "accuracy": 0.4,
-        "brier": 0.28638
+        "accuracy": 0.4125,
+        "brier": 0.28227
       },
       {
         "elo_weight": 0.5,
         "n": 80,
         "accuracy": 0.4125,
-        "brier": 0.27141
+        "brier": 0.26873
       },
       {
         "elo_weight": 0.75,
         "n": 80,
-        "accuracy": 0.425,
-        "brier": 0.25828
+        "accuracy": 0.45,
+        "brier": 0.25709
       }
     ],
     "selected": {
       "elo_weight": 0.75,
       "n": 80,
-      "accuracy": 0.425,
-      "brier": 0.25828
+      "accuracy": 0.45,
+      "brier": 0.25709
     },
     "objective": "minimum chronological-window Brier; accuracy tie-breaker",
     "current_candidate_weight": 0.75,
@@ -52,14 +52,14 @@
   "prequential_walkforward": {
     "active_scope": "ATP",
     "prequential_model": {
-      "n": 194,
+      "n": 202,
       "accuracy": 0.5,
-      "brier": 0.25629
+      "brier": 0.25605
     },
     "raw_base_model": {
-      "n": 194,
-      "accuracy": 0.4278,
-      "brier": 0.2899
+      "n": 202,
+      "accuracy": 0.4307,
+      "brier": 0.28934
     },
     "brier_improved": true,
     "evaluation": "each fixture is forecast using only earlier ATP results; ELO weight is reselected from prior results only"
@@ -1422,21 +1422,77 @@
       "prior_records": 193,
       "elo_weight": 0.75,
       "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "187454",
+      "start_time": "2026-11-08T12:30Z",
+      "prior_records": 194,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "186535",
+      "start_time": "2026-11-09T11:30Z",
+      "prior_records": 195,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "186529",
+      "start_time": "2026-11-09T12:00Z",
+      "prior_records": 196,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "186537",
+      "start_time": "2026-11-09T13:00Z",
+      "prior_records": 197,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "186536",
+      "start_time": "2026-11-09T13:30Z",
+      "prior_records": 198,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "186533",
+      "start_time": "2026-11-10T13:30Z",
+      "prior_records": 199,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "186543",
+      "start_time": "2026-11-10T18:30Z",
+      "prior_records": 200,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "186538",
+      "start_time": "2026-11-11T17:00Z",
+      "prior_records": 201,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
     }
   ],
   "players_in_elo": 150,
   "ranking_coverage": {
     "ATP": 150
   },
-  "current_predictions_with_rank_enrichment": 15,
-  "current_active_predictions_rewritten": 15,
+  "current_predictions_with_rank_enrichment": 14,
+  "current_active_predictions_rewritten": 14,
   "walkforward_probability_calibration": [
     {
       "low": 0.5,
       "high": 0.55,
-      "n": 142,
-      "accuracy": 0.5211,
-      "calibrated_confidence": 0.5211
+      "n": 150,
+      "accuracy": 0.52,
+      "calibrated_confidence": 0.52
     },
     {
       "low": 0.55,
