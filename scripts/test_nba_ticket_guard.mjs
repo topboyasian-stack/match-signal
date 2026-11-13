@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { onRequest } from '../functions/api/sportybet-booking.js';
+import { onRequest, nbaTotalsReleaseQualified } from '../functions/api/sportybet-booking.js';
 
 const MODEL = 'nba-total-v5.1-pace-efficiency-calibrated';
 const CUTOFF = '2026-11-02T02:00:00+00:00';
@@ -79,6 +79,20 @@ function buildEvidence(fixtures) {
       n: 100, roi: 0.12, roi_ci95_lower: 0.01, roi_vs_market_favorite: 0.02
     }
   };
+  const settledAudit = Array.from({ length: 100 }, (_, index) => {
+    const eventId = `settled-${index + 1}`;
+    return {
+      event_id: eventId,
+      publication_snapshot_id: `nba-total-pub:${eventId}`,
+      selected_side: 'OVER',
+      sportybet_market_225_line: 220.5,
+      over_odds: 1.91,
+      under_odds: 1.89,
+      selected_side_odds: 1.91
+    };
+  });
+  evidence.market_record_audit = settledAudit;
+
   const probability = {
     paper_only: true,
     experiment: 'NBA_TOTALS_EMPIRICAL_RESIDUAL_VALUE_V3',
@@ -96,7 +110,8 @@ function buildEvidence(fixtures) {
       cutoff_utc: CUTOFF,
       prospective_settled_selections_with_exact_snapshot_match: 100,
       prospective_settled_selections_missing_or_mismatched_snapshot: 0,
-      prospective_settled_unique_market_selections: 100
+      prospective_settled_unique_market_selections: 100,
+      snapshot_linkage_complete_for_settled_selections: true
     },
     prospective_probability_score_summary: {
       n: 30, sufficient_for_probability_validation: true
@@ -115,7 +130,17 @@ function buildEvidence(fixtures) {
       positive_clv_release_check_passed: true,
       near_close_observations: 2,
       mean_probability_clv: 0.01,
-      mean_line_clv_points: 0.5
+      mean_line_clv_points: 0.5,
+      fixtures: settledAudit.map(row => ({
+        event_id: row.event_id,
+        selected_side: row.selected_side,
+        opening: {
+          snapshot_id: row.publication_snapshot_id,
+          line: row.sportybet_market_225_line,
+          over_odds: row.over_odds,
+          under_odds: row.under_odds
+        }
+      }))
     },
     upcoming_exact_fresh_market_225_value_diagnostics: diagnostics
   };
@@ -131,6 +156,20 @@ function fixture(espnId, sportybetId, home, away, offsetMinutes = 0) {
     startTime: new Date(Date.now() + (120 + offsetMinutes) * 60_000).toISOString()
   };
 }
+
+test('NBA release gate rejects mismatched ROI and CLV snapshot linkage', () => {
+  const bundle = buildEvidence([fixture('audit-check', 'sr:match:audit-check', 'Boston Celtics', 'New York Knicks')]);
+  assert.equal(nbaTotalsReleaseQualified(bundle.evidence, bundle.probability), true);
+  const clvRow = bundle.probability.prospective_clv_diagnostics.fixtures[0];
+  const originalSnapshotId = clvRow.opening.snapshot_id;
+  clvRow.opening.snapshot_id = 'nba-total-pub:wrong-snapshot';
+  assert.equal(nbaTotalsReleaseQualified(bundle.evidence, bundle.probability), false);
+  clvRow.opening.snapshot_id = originalSnapshotId;
+  const originalOdds = clvRow.opening.over_odds;
+  clvRow.opening.over_odds = 1.92;
+  assert.equal(nbaTotalsReleaseQualified(bundle.evidence, bundle.probability), false);
+  clvRow.opening.over_odds = originalOdds;
+});
 
 function manualLeg(row) {
   return {

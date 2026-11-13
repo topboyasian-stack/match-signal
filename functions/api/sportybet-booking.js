@@ -54,11 +54,34 @@ export function ticketCatalogueTimeline(legs, now = Date.now(), maxHours = 720) 
 const NBA_RELEASE_CUTOFF='2026-11-02T02:00:00+00:00';
 export const NBA_RELEASE_MODEL='nba-total-v5.1-pace-efficiency-calibrated';
 function nbaReleaseClose(a,b){return Number.isFinite(Number(a))&&Number.isFinite(Number(b))&&Math.abs(Number(a)-Number(b))<=1e-9;}
+function nbaMarketCohortMatchesSnapshotEvidence(e,p){
+ const m=e?.market_holdout||{},rows=e?.market_record_audit,c=p?.prospective_pregame_snapshot_coverage||{},v=p?.prospective_clv_diagnostics||{},clvRows=v.fixtures;
+ const expected=Number(m.n);
+ if(!Number.isInteger(expected)||expected<1||!Array.isArray(rows)||!Array.isArray(clvRows)||rows.length!==expected||clvRows.length!==expected)return false;
+ if(Number(c.prospective_settled_unique_market_selections)!==expected||Number(c.prospective_settled_selections_with_exact_snapshot_match)!==expected||Number(c.prospective_settled_selections_missing_or_mismatched_snapshot)!==0||c.snapshot_linkage_complete_for_settled_selections!==true)return false;
+ const roiByEvent=new Map(),roiSnapshotIds=new Set();
+ for(const row of rows){
+  const eventId=String(row?.event_id||'').trim(),snapshotId=String(row?.publication_snapshot_id||'').trim(),side=String(row?.selected_side||'').trim().toUpperCase();
+  const line=Number(row?.sportybet_market_225_line),over=Number(row?.over_odds),under=Number(row?.under_odds),selectedOdds=Number(row?.selected_side_odds);
+  if(!eventId||!snapshotId||roiByEvent.has(eventId)||roiSnapshotIds.has(snapshotId)||!['OVER','UNDER'].includes(side)||!Number.isFinite(line)||!Number.isFinite(over)||over<=1||!Number.isFinite(under)||under<=1||!nbaReleaseClose(selectedOdds,side==='OVER'?over:under))return false;
+  roiByEvent.set(eventId,{snapshotId,side,line,over,under});
+  roiSnapshotIds.add(snapshotId);
+ }
+ const clvEvents=new Set(),clvSnapshotIds=new Set();
+ for(const row of clvRows){
+  const eventId=String(row?.event_id||'').trim(),snapshotId=String(row?.opening?.snapshot_id||'').trim(),base=roiByEvent.get(eventId),side=String(row?.selected_side||'').trim().toUpperCase();
+  const line=Number(row?.opening?.line),over=Number(row?.opening?.over_odds),under=Number(row?.opening?.under_odds);
+  if(!base||!snapshotId||clvEvents.has(eventId)||clvSnapshotIds.has(snapshotId)||snapshotId!==base.snapshotId||side!==base.side||!nbaReleaseClose(line,base.line)||!nbaReleaseClose(over,base.over)||!nbaReleaseClose(under,base.under))return false;
+  clvEvents.add(eventId);
+  clvSnapshotIds.add(snapshotId);
+ }
+ return clvEvents.size===expected&&clvSnapshotIds.size===expected;
+}
 export function nbaTotalsReleaseQualified(e,p){
  const h=e?.walk_forward?.holdout||{},m=e?.market_holdout||{},c=p?.prospective_pregame_snapshot_coverage||{},pc=p?.prospective_probability_fixture_coverage||{},s=p?.prospective_probability_score_summary||{},v=p?.prospective_clv_diagnostics||{},cal=p?.calibration_protocol||{};
  const probabilitySample=Number(s.n)>=30&&s.sufficient_for_probability_validation===true&&Number(pc.valid_unique_settled_fixtures)>=30&&Number(pc.binary_scored_unique_fixtures)>=30&&Number(pc.snapshot_linkage_failure_count)===0&&pc.sample_threshold_met===true;
  const selectionEvidence=Number(c.prospective_settled_selections_with_exact_snapshot_match)>=100&&Number(c.prospective_settled_selections_missing_or_mismatched_snapshot)===0&&Number(c.prospective_settled_unique_market_selections)>=100;
- return !!(e?.paper_only===true&&e?.evaluation_type==='NBA_TOTALS_FIXED_CUTOFF_V2'&&e?.holdout_protocol?.fixed_cutoff_utc===NBA_RELEASE_CUTOFF&&e?.market_id==='225'&&e?.market_definition==='full_game_total_including_overtime'&&e?.model_version===NBA_RELEASE_MODEL&&e?.release_decision==='QUALIFIED'&&Number(h.n)>=100&&Number.isFinite(Number(h.mae))&&Number.isFinite(Number(h.baseline_mae))&&Number(h.mae)<Number(h.baseline_mae)&&Number.isFinite(Number(h.bias))&&Math.abs(Number(h.bias))<=3&&Number(m.n)>=100&&Number(m.roi)>0&&Number(m.roi_ci95_lower)>0&&Number(m.roi_vs_market_favorite)>0&&p?.paper_only===true&&p?.experiment==='NBA_TOTALS_EMPIRICAL_RESIDUAL_VALUE_V3'&&p?.model_version===NBA_RELEASE_MODEL&&p?.model_projection_market_blind===true&&p?.prospective_holdout_cutoff_utc===NBA_RELEASE_CUTOFF&&p?.prospective_holdout_used_for_calibration===false&&p?.live_value_decisions_authorized===false&&Number(cal.probability_edge_threshold)===0.04&&Number(cal.expected_value_threshold)===0.03&&c.cutoff_utc===NBA_RELEASE_CUTOFF&&probabilitySample&&selectionEvidence&&p?.prospective_minimum_sample_reached===true&&p?.prospective_probability_validation_sample_met===true&&p?.prospective_clv_release_check_passed===true&&v.positive_clv_release_check_passed===true&&Number(v.near_close_observations)>=1&&Number(v.mean_probability_clv)>0&&Number(v.mean_line_clv_points)>0);
+ return !!(e?.paper_only===true&&e?.evaluation_type==='NBA_TOTALS_FIXED_CUTOFF_V2'&&e?.holdout_protocol?.fixed_cutoff_utc===NBA_RELEASE_CUTOFF&&e?.market_id==='225'&&e?.market_definition==='full_game_total_including_overtime'&&e?.model_version===NBA_RELEASE_MODEL&&e?.release_decision==='QUALIFIED'&&Number(h.n)>=100&&Number.isFinite(Number(h.mae))&&Number.isFinite(Number(h.baseline_mae))&&Number(h.mae)<Number(h.baseline_mae)&&Number.isFinite(Number(h.bias))&&Math.abs(Number(h.bias))<=3&&Number(m.n)>=100&&nbaMarketCohortMatchesSnapshotEvidence(e,p)&&Number(m.roi)>0&&Number(m.roi_ci95_lower)>0&&Number(m.roi_vs_market_favorite)>0&&p?.paper_only===true&&p?.experiment==='NBA_TOTALS_EMPIRICAL_RESIDUAL_VALUE_V3'&&p?.model_version===NBA_RELEASE_MODEL&&p?.model_projection_market_blind===true&&p?.prospective_holdout_cutoff_utc===NBA_RELEASE_CUTOFF&&p?.prospective_holdout_used_for_calibration===false&&p?.live_value_decisions_authorized===false&&Number(cal.probability_edge_threshold)===0.04&&Number(cal.expected_value_threshold)===0.03&&c.cutoff_utc===NBA_RELEASE_CUTOFF&&probabilitySample&&selectionEvidence&&p?.prospective_minimum_sample_reached===true&&p?.prospective_probability_validation_sample_met===true&&p?.prospective_clv_release_check_passed===true&&v.positive_clv_release_check_passed===true&&Number(v.near_close_observations)>=1&&Number(v.mean_probability_clv)>0&&Number(v.mean_line_clv_points)>0);
 }
 async function readNbaReleaseJson(path, deadlineAt = null){
  const remainingMs = deadlineAt == null ? 10000 : Math.max(250, Math.min(10000, deadlineAt - Date.now()));

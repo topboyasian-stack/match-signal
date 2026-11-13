@@ -61,11 +61,24 @@ const probability = {
 
 
 test('the probability sample counts unique settled fixtures separately from 100 ROI-grade selections', () => {
+  const qualifiedAudit = Array.from({ length: 100 }, (_, index) => {
+    const eventId = `settled-${index + 1}`;
+    return {
+      event_id: eventId,
+      publication_snapshot_id: `nba-total-pub:${eventId}`,
+      selected_side: 'OVER',
+      sportybet_market_225_line: 220.5,
+      over_odds: 1.91,
+      under_odds: 1.89,
+      selected_side_odds: 1.91
+    };
+  });
   const qualifiedEvidence = {
     ...oos,
     release_decision: 'QUALIFIED',
     walk_forward: { holdout: { n: 100, mae: 20, baseline_mae: 21, bias: 0.5 } },
-    market_holdout: { n: 100, roi: 0.08, roi_ci95_lower: 0.02, roi_vs_market_favorite: 0.01 }
+    market_holdout: { n: 100, roi: 0.08, roi_ci95_lower: 0.02, roi_vs_market_favorite: 0.01 },
+    market_record_audit: qualifiedAudit
   };
   const qualifiedProbability = {
     ...probability,
@@ -76,7 +89,8 @@ test('the probability sample counts unique settled fixtures separately from 100 
       cutoff_utc: '2026-11-02T02:00:00+00:00',
       prospective_settled_selections_with_exact_snapshot_match: 100,
       prospective_settled_selections_missing_or_mismatched_snapshot: 0,
-      prospective_settled_unique_market_selections: 100
+      prospective_settled_unique_market_selections: 100,
+      snapshot_linkage_complete_for_settled_selections: true
     },
     prospective_probability_score_summary: { n: 30, sufficient_for_probability_validation: true },
     prospective_probability_fixture_coverage: {
@@ -90,10 +104,30 @@ test('the probability sample counts unique settled fixtures separately from 100 
       positive_clv_release_check_passed: true,
       near_close_observations: 1,
       mean_probability_clv: 0.01,
-      mean_line_clv_points: 0.5
+      mean_line_clv_points: 0.5,
+      fixtures: qualifiedAudit.map(row => ({
+        event_id: row.event_id,
+        selected_side: row.selected_side,
+        opening: {
+          snapshot_id: row.publication_snapshot_id,
+          line: row.sportybet_market_225_line,
+          over_odds: row.over_odds,
+          under_odds: row.under_odds
+        }
+      }))
     }
   };
   assert.equal(nbaTotalsReleaseQualified(qualifiedEvidence, qualifiedProbability), true);
+  const mismatchedSnapshot = {
+    ...qualifiedProbability,
+    prospective_clv_diagnostics: {
+      ...qualifiedProbability.prospective_clv_diagnostics,
+      fixtures: qualifiedProbability.prospective_clv_diagnostics.fixtures.map((row, index) =>
+        index === 0 ? { ...row, opening: { ...row.opening, snapshot_id: 'nba-total-pub:wrong-snapshot' } } : row
+      )
+    }
+  };
+  assert.equal(nbaTotalsReleaseQualified(qualifiedEvidence, mismatchedSnapshot), false);
   const underSampled = {
     ...qualifiedProbability,
     prospective_probability_validation_sample_met: false,
