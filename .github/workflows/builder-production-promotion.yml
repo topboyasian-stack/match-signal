@@ -76,14 +76,15 @@ jobs:
               return 1
             fi
             echo "Dispatched promotion-child Unified Upcoming run $run_id." >&2
-            printf '%s\\n' "$run_id"
+            printf '%s\n' "$run_id"
           }
           get_workflow_run_field() {
             local run_id="$1" field="$2" value=""
             for attempt in $(seq 1 12); do
-              value="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id" --jq ".$field" 2>/dev/null || true)"
+              response="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id" 2>/dev/null || true)"
+              value="$(printf '%s\n' "$response" | jq -r --arg field "$field" '.[$field] // empty' 2>/dev/null || true)"
               if [ -n "$value" ] && [ "$value" != "null" ]; then
-                printf '%s\\n' "$value"
+                printf '%s\n' "$value"
                 return 0
               fi
               sleep 2
@@ -229,9 +230,10 @@ jobs:
           get_workflow_run_field() {
             local run_id="$1" field="$2" value=""
             for attempt in $(seq 1 12); do
-              value="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id" --jq ".$field" 2>/dev/null || true)"
+              response="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id" 2>/dev/null || true)"
+              value="$(printf '%s\n' "$response" | jq -r --arg field "$field" '.[$field] // empty' 2>/dev/null || true)"
               if [ -n "$value" ] && [ "$value" != "null" ]; then
-                printf '%s\\n' "$value"
+                printf '%s\n' "$value"
                 return 0
               fi
               sleep 2
@@ -368,9 +370,10 @@ jobs:
           get_workflow_run_field() {
             local run_id="$1" field="$2" value=""
             for attempt in $(seq 1 12); do
-              value="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id" --jq ".$field" 2>/dev/null || true)"
+              response="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id" 2>/dev/null || true)"
+              value="$(printf '%s\n' "$response" | jq -r --arg field "$field" '.[$field] // empty' 2>/dev/null || true)"
               if [ -n "$value" ] && [ "$value" != "null" ]; then
-                printf '%s\\n' "$value"
+                printf '%s\n' "$value"
                 return 0
               fi
               sleep 2
@@ -378,7 +381,7 @@ jobs:
             echo "Timed out waiting for GitHub Actions run record $run_id to appear." >&2
             return 1
           }
-          candidate_sha="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$deploy_run_id" --jq '.head_sha')"
+          candidate_sha="$(get_workflow_run_field "$deploy_run_id" head_sha)"
           if [ "$candidate_sha" != "$deployment_source_sha" ]; then
             merge_base="$(gh api "repos/$GITHUB_REPOSITORY/compare/$deployment_source_sha...$candidate_sha" --jq '.merge_base_commit.sha' 2>/dev/null || true)"
             if [ "$merge_base" != "$deployment_source_sha" ]; then
