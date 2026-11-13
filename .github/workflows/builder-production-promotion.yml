@@ -41,9 +41,9 @@ permissions:
   actions: write
   contents: read
 
-# Fresh v15 namespace releases stale queued promotion runs after the exact-run polling change.
+# Fresh v16 namespace releases stale queued promotion runs; poll exact run IDs with bounded retries for GitHub API propagation.
 concurrency:
-  group: builder-production-promotion-v15
+  group: builder-production-promotion-v16
   cancel-in-progress: false
 
 jobs:
@@ -78,9 +78,22 @@ jobs:
             echo "Dispatched promotion-child Unified Upcoming run $run_id." >&2
             printf '%s\\n' "$run_id"
           }
+          get_workflow_run_field() {
+            local run_id="$1" field="$2" value=""
+            for attempt in $(seq 1 12); do
+              value="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id" --jq ".$field" 2>/dev/null || true)"
+              if [ -n "$value" ] && [ "$value" != "null" ]; then
+                printf '%s\\n' "$value"
+                return 0
+              fi
+              sleep 2
+            done
+            echo "Timed out waiting for GitHub Actions run record $run_id to appear." >&2
+            return 1
+          }
           validate_board_run_source() {
             local run_id="$1" candidate_sha merge_base
-            candidate_sha="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id" --jq '.head_sha')"
+            candidate_sha="$(get_workflow_run_field "$run_id" head_sha)"
             if [ "$candidate_sha" = "$source_sha" ]; then
               return 0
             fi
@@ -93,9 +106,9 @@ jobs:
           board_run_id="$(dispatch_promotion_child_board)"
           validate_board_run_source "$board_run_id"
           for attempt in $(seq 1 180); do
-            board_status="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$board_run_id" --jq '.status')"
+            board_status="$(get_workflow_run_field "$board_run_id" status)"
             if [ "$board_status" = "completed" ]; then
-              board_conclusion="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$board_run_id" --jq '.conclusion')"
+              board_conclusion="$(get_workflow_run_field "$board_run_id" conclusion)"
               if [ "$board_conclusion" = "success" ]; then
                 break
               fi
@@ -213,7 +226,20 @@ jobs:
             echo "Could not parse post-build Unified Upcoming run ID from: $board_dispatch_url" >&2
             exit 1
           fi
-          candidate_sha="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$board_run_id" --jq '.head_sha')"
+          get_workflow_run_field() {
+            local run_id="$1" field="$2" value=""
+            for attempt in $(seq 1 12); do
+              value="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id" --jq ".$field" 2>/dev/null || true)"
+              if [ -n "$value" ] && [ "$value" != "null" ]; then
+                printf '%s\\n' "$value"
+                return 0
+              fi
+              sleep 2
+            done
+            echo "Timed out waiting for GitHub Actions run record $run_id to appear." >&2
+            return 1
+          }
+          candidate_sha="$(get_workflow_run_field "$board_run_id" head_sha)"
           if [ "$candidate_sha" != "$source_sha" ]; then
             merge_base="$(gh api "repos/$GITHUB_REPOSITORY/compare/$source_sha...$candidate_sha" --jq '.merge_base_commit.sha' 2>/dev/null || true)"
             if [ "$merge_base" != "$source_sha" ]; then
@@ -339,6 +365,19 @@ jobs:
             echo "Could not parse Cloudflare Pages run ID from: $deploy_dispatch_url" >&2
             exit 1
           fi
+          get_workflow_run_field() {
+            local run_id="$1" field="$2" value=""
+            for attempt in $(seq 1 12); do
+              value="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id" --jq ".$field" 2>/dev/null || true)"
+              if [ -n "$value" ] && [ "$value" != "null" ]; then
+                printf '%s\\n' "$value"
+                return 0
+              fi
+              sleep 2
+            done
+            echo "Timed out waiting for GitHub Actions run record $run_id to appear." >&2
+            return 1
+          }
           candidate_sha="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$deploy_run_id" --jq '.head_sha')"
           if [ "$candidate_sha" != "$deployment_source_sha" ]; then
             merge_base="$(gh api "repos/$GITHUB_REPOSITORY/compare/$deployment_source_sha...$candidate_sha" --jq '.merge_base_commit.sha' 2>/dev/null || true)"
@@ -348,9 +387,9 @@ jobs:
             fi
           fi
           for attempt in $(seq 1 180); do
-            deploy_status="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$deploy_run_id" --jq '.status')"
+            deploy_status="$(get_workflow_run_field "$deploy_run_id" status)"
             if [ "$deploy_status" = "completed" ]; then
-              deploy_conclusion="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$deploy_run_id" --jq '.conclusion')"
+              deploy_conclusion="$(get_workflow_run_field "$deploy_run_id" conclusion)"
               if [ "$deploy_conclusion" != "success" ]; then
                 echo "Cloudflare Pages run $deploy_run_id failed: $deploy_conclusion" >&2
                 exit 1

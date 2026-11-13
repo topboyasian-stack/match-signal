@@ -130,6 +130,9 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         self.assertIn('board_run_id="${board_dispatch_url##*/}"', PROMOTION_WORKFLOW)
         self.assertIn('deploy_dispatch_url="$(gh workflow run cloudflare-pages.yml --ref main)"', PROMOTION_WORKFLOW)
         self.assertIn('deploy_run_id="${deploy_dispatch_url##*/}"', PROMOTION_WORKFLOW)
+        self.assertEqual(PROMOTION_WORKFLOW.count("get_workflow_run_field() {"), 3)
+        self.assertIn('value="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id" --jq ".$field" 2>/dev/null || true)"', PROMOTION_WORKFLOW)
+        self.assertIn("Timed out waiting for GitHub Actions run record $run_id to appear.", PROMOTION_WORKFLOW)
         self.assertEqual(
             PROMOTION_WORKFLOW.count("select(.event =="),
             2,
