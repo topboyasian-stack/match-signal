@@ -104,8 +104,21 @@ jobs:
               return 1
             fi
           }
-          board_run_id="$(dispatch_promotion_child_board)"
-          validate_board_run_source "$board_run_id"
+          dispatch_validated_board_run() {
+            local run_id
+            for source_attempt in $(seq 1 4); do
+              run_id="$(dispatch_promotion_child_board)"
+              if validate_board_run_source "$run_id"; then
+                printf '%s\n' "$run_id"
+                return 0
+              fi
+              echo "Promotion-child board run $run_id resolved to a stale or unrelated main SHA; retrying after ref propagation (attempt $source_attempt/4)." >&2
+              sleep 3
+            done
+            echo "Unable to dispatch a promotion-child board run based on source main $source_sha after four attempts." >&2
+            return 1
+          }
+          board_run_id="$(dispatch_validated_board_run)"
           for attempt in $(seq 1 180); do
             board_status="$(get_workflow_run_field "$board_run_id" status)"
             if [ "$board_status" = "completed" ]; then
@@ -120,8 +133,7 @@ jobs:
                   echo "Unified Upcoming promotion child was superseded more than five times." >&2
                   exit 1
                 fi
-                board_run_id="$(dispatch_promotion_child_board)"
-                validate_board_run_source "$board_run_id"
+                board_run_id="$(dispatch_validated_board_run)"
                 continue
               fi
               echo "Pre-build Unified Upcoming run $board_run_id failed: $board_conclusion" >&2
@@ -220,15 +232,8 @@ jobs:
           dispatched_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           echo "source_sha=$source_sha" >> "$GITHUB_OUTPUT"
           echo "dispatched_at=$dispatched_at" >> "$GITHUB_OUTPUT"
-          board_dispatch_url="$(gh workflow run unified-upcoming.yml --ref main -f promotion_child=true)"
-          echo "Dispatched post-build Unified Upcoming run ${board_dispatch_url##*/}." >&2
-          board_run_id="${board_dispatch_url##*/}"
-          if ! [[ "$board_run_id" =~ ^[0-9]+$ ]]; then
-            echo "Could not parse post-build Unified Upcoming run ID from: $board_dispatch_url" >&2
-            exit 1
-          fi
           get_workflow_run_field() {
-            local run_id="$1" field="$2" value=""
+            local run_id="$1" field="$2" value="" response=""
             for attempt in $(seq 1 12); do
               response="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id" 2>/dev/null || true)"
               value="$(printf '%s\n' "$response" | jq -r --arg field "$field" '.[$field] // empty' 2>/dev/null || true)"
@@ -241,18 +246,37 @@ jobs:
             echo "Timed out waiting for GitHub Actions run record $run_id to appear." >&2
             return 1
           }
-          candidate_sha="$(get_workflow_run_field "$board_run_id" head_sha)"
-          if [ "$candidate_sha" != "$source_sha" ]; then
-            merge_base="$(gh api "repos/$GITHUB_REPOSITORY/compare/$source_sha...$candidate_sha" --jq '.merge_base_commit.sha' 2>/dev/null || true)"
-            if [ "$merge_base" != "$source_sha" ]; then
-              echo "Post-build board run $board_run_id is not based on source main $source_sha (head $candidate_sha)." >&2
-              exit 1
-            fi
-          fi
+          dispatch_validated_post_build_board() {
+            local board_dispatch_url board_run_id candidate_sha merge_base
+            for dispatch_attempt in $(seq 1 4); do
+              board_dispatch_url="$(gh workflow run unified-upcoming.yml --ref main -f promotion_child=true)"
+              board_run_id="${board_dispatch_url##*/}"
+              if ! [[ "$board_run_id" =~ ^[0-9]+$ ]]; then
+                echo "Could not parse post-build Unified Upcoming run ID from: $board_dispatch_url" >&2
+                return 1
+              fi
+              echo "Dispatched post-build Unified Upcoming run $board_run_id." >&2
+              candidate_sha="$(get_workflow_run_field "$board_run_id" head_sha)"
+              if [ "$candidate_sha" = "$source_sha" ]; then
+                printf '%s\n' "$board_run_id"
+                return 0
+              fi
+              merge_base="$(gh api "repos/$GITHUB_REPOSITORY/compare/$source_sha...$candidate_sha" --jq '.merge_base_commit.sha' 2>/dev/null || true)"
+              if [ "$merge_base" = "$source_sha" ]; then
+                printf '%s\n' "$board_run_id"
+                return 0
+              fi
+              echo "Post-build board run $board_run_id resolved to stale main SHA $candidate_sha (expected $source_sha or a descendant); retrying." >&2
+              sleep 3
+            done
+            echo "Unable to dispatch a post-build board run based on source main $source_sha after four attempts." >&2
+            return 1
+          }
+          board_run_id="$(dispatch_validated_post_build_board)"
           for attempt in $(seq 1 180); do
-            board_status="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$board_run_id" --jq '.status')"
+            board_status="$(get_workflow_run_field "$board_run_id" status)"
             if [ "$board_status" = "completed" ]; then
-              board_conclusion="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$board_run_id" --jq '.conclusion')"
+              board_conclusion="$(get_workflow_run_field "$board_run_id" conclusion)"
               if [ "$board_conclusion" != "success" ]; then
                 echo "Post-build Unified Upcoming run $board_run_id failed: $board_conclusion" >&2
                 exit 1
@@ -360,15 +384,8 @@ jobs:
             echo "Main is not descended from the post-build board publication; refusing to deploy." >&2
             exit 1
           fi
-          deploy_dispatch_url="$(gh workflow run cloudflare-pages.yml --ref main)"
-          echo "Dispatched Cloudflare Pages workflow run ${deploy_dispatch_url##*/}." >&2
-          deploy_run_id="${deploy_dispatch_url##*/}"
-          if ! [[ "$deploy_run_id" =~ ^[0-9]+$ ]]; then
-            echo "Could not parse Cloudflare Pages run ID from: $deploy_dispatch_url" >&2
-            exit 1
-          fi
           get_workflow_run_field() {
-            local run_id="$1" field="$2" value=""
+            local run_id="$1" field="$2" value="" response=""
             for attempt in $(seq 1 12); do
               response="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id" 2>/dev/null || true)"
               value="$(printf '%s\n' "$response" | jq -r --arg field "$field" '.[$field] // empty' 2>/dev/null || true)"
@@ -381,14 +398,33 @@ jobs:
             echo "Timed out waiting for GitHub Actions run record $run_id to appear." >&2
             return 1
           }
-          candidate_sha="$(get_workflow_run_field "$deploy_run_id" head_sha)"
-          if [ "$candidate_sha" != "$deployment_source_sha" ]; then
-            merge_base="$(gh api "repos/$GITHUB_REPOSITORY/compare/$deployment_source_sha...$candidate_sha" --jq '.merge_base_commit.sha' 2>/dev/null || true)"
-            if [ "$merge_base" != "$deployment_source_sha" ]; then
-              echo "Cloudflare Pages run $deploy_run_id is not based on deployment source $deployment_source_sha (head $candidate_sha)." >&2
-              exit 1
-            fi
-          fi
+          dispatch_validated_pages() {
+            local deploy_dispatch_url deploy_run_id candidate_sha merge_base
+            for dispatch_attempt in $(seq 1 4); do
+              deploy_dispatch_url="$(gh workflow run cloudflare-pages.yml --ref main)"
+              deploy_run_id="${deploy_dispatch_url##*/}"
+              if ! [[ "$deploy_run_id" =~ ^[0-9]+$ ]]; then
+                echo "Could not parse Cloudflare Pages run ID from: $deploy_dispatch_url" >&2
+                return 1
+              fi
+              echo "Dispatched Cloudflare Pages workflow run $deploy_run_id." >&2
+              candidate_sha="$(get_workflow_run_field "$deploy_run_id" head_sha)"
+              if [ "$candidate_sha" = "$deployment_source_sha" ]; then
+                printf '%s\n' "$deploy_run_id"
+                return 0
+              fi
+              merge_base="$(gh api "repos/$GITHUB_REPOSITORY/compare/$deployment_source_sha...$candidate_sha" --jq '.merge_base_commit.sha' 2>/dev/null || true)"
+              if [ "$merge_base" = "$deployment_source_sha" ]; then
+                printf '%s\n' "$deploy_run_id"
+                return 0
+              fi
+              echo "Cloudflare Pages run $deploy_run_id resolved to stale main SHA $candidate_sha (expected $deployment_source_sha or a descendant); retrying." >&2
+              sleep 3
+            done
+            echo "Unable to dispatch a Cloudflare Pages run based on deployment source $deployment_source_sha after four attempts." >&2
+            return 1
+          }
+          deploy_run_id="$(dispatch_validated_pages)"
           for attempt in $(seq 1 180); do
             deploy_status="$(get_workflow_run_field "$deploy_run_id" status)"
             if [ "$deploy_status" = "completed" ]; then
