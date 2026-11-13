@@ -117,7 +117,7 @@ test('the probability sample counts unique settled fixtures separately from 100 
       }))
     }
   };
-  assert.equal(nbaTotalsReleaseQualified(qualifiedEvidence, qualifiedProbability), true);
+  assert.equal(nbaTotalsReleaseQualified(qualifiedEvidence, qualifiedProbability, true), true);
   const mismatchedSnapshot = {
     ...qualifiedProbability,
     prospective_clv_diagnostics: {
@@ -127,7 +127,7 @@ test('the probability sample counts unique settled fixtures separately from 100 
       )
     }
   };
-  assert.equal(nbaTotalsReleaseQualified(qualifiedEvidence, mismatchedSnapshot), false);
+  assert.equal(nbaTotalsReleaseQualified(qualifiedEvidence, mismatchedSnapshot, true), false);
   const underSampled = {
     ...qualifiedProbability,
     prospective_probability_validation_sample_met: false,
@@ -139,7 +139,7 @@ test('the probability sample counts unique settled fixtures separately from 100 
       sample_threshold_met: false
     }
   };
-  assert.equal(nbaTotalsReleaseQualified(qualifiedEvidence, underSampled), false);
+  assert.equal(nbaTotalsReleaseQualified(qualifiedEvidence, underSampled, true), false);
 });
 
 test('basketball-specific booking POST refuses to bypass the research-only NBA release gate', async () => {
@@ -149,7 +149,11 @@ test('basketball-specific booking POST refuses to bypass the research-only NBA r
     'nba_totals_oos_value_test.json': oos,
     'nba_totals_probability_value_experiment.json': probability,
     'nba_predictions.json': [],
-    'nba_totals_publication_snapshots.json': []
+    'nba_totals_publication_snapshots.json': [],
+    'nba_history.json': [],
+    'nba_totals_ledger.json': { updated_at: '2026-11-13T00:00:00+00:00', records: [] },
+    'nba_totals_probability_settlements.json': { updated_at: '2026-11-13T00:00:00+00:00', records: [] },
+    'nba_totals_price_capture_status.json': { checked_at: '2026-11-13T00:00:00+00:00' }
   };
 
   globalThis.fetch = async input => {

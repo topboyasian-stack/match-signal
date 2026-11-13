@@ -134,7 +134,7 @@ export async function onRequestPost(context){
     } catch(error) {
       return json({ok:false,error:'NBA_RELEASE_EVIDENCE_UNAVAILABLE',booking_code_withheld:true,message:'NBA release evidence could not be verified. No booking code was generated.'},503);
     }
-    if(!nbaTotalsReleaseQualified(releaseContext.evidence,releaseContext.probability)) {
+    if(!nbaTotalsReleaseQualified(releaseContext.evidence,releaseContext.probability,releaseContext.sourceEvidenceFresh===true)) {
       return json({ok:false,error:'NBA_RELEASE_GATE_LOCKED',booking_code_withheld:true,message:'NBA totals ticket generation remains locked until fixed-cutoff forecasting, prospective market ROI, snapshot coverage, probability validation and closing-line-value gates all pass. No booking code was generated.'},423);
     }
     const events=await liveEvents(context.request);

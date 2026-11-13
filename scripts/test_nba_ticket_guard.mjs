@@ -1,6 +1,7 @@
 import test from 'node:test';
+import { createHash } from 'node:crypto';
 import assert from 'node:assert/strict';
-import { onRequest, nbaTotalsReleaseQualified } from '../functions/api/sportybet-booking.js';
+import { onRequest, nbaTotalsReleaseQualified, loadNbaReleaseContext } from '../functions/api/sportybet-booking.js';
 
 const MODEL = 'nba-total-v5.1-pace-efficiency-calibrated';
 const CUTOFF = '2026-11-02T02:00:00+00:00';
@@ -65,6 +66,7 @@ function buildEvidence(fixtures) {
   }
 
   const evidence = {
+    generated_at: new Date(now - 20_000).toISOString(),
     paper_only: true,
     evaluation_type: 'NBA_TOTALS_FIXED_CUTOFF_V2',
     holdout_protocol: { fixed_cutoff_utc: CUTOFF },
@@ -144,7 +146,24 @@ function buildEvidence(fixtures) {
     },
     upcoming_exact_fresh_market_225_value_diagnostics: diagnostics
   };
-  return { evidence, probability, predictions, snapshots };
+  const ledger = { updated_at: new Date(now - 30_000).toISOString(), records: [] };
+  const captureStatus = { checked_at: new Date(now - 25_000).toISOString() };
+  const history = [];
+  const probabilitySettlements = { updated_at: new Date(now - 30_000).toISOString(), records: [] };
+  const fingerprintSources = {
+    'data/nba_history.json': history,
+    'data/nba_predictions.json': predictions,
+    'data/nba_totals_ledger.json': ledger,
+    'data/nba_totals_publication_snapshots.json': snapshots,
+    'data/nba_totals_probability_settlements.json': probabilitySettlements,
+    'data/nba_totals_price_capture_status.json': captureStatus,
+    'data/nba_totals_oos_value_test.json': evidence
+  };
+  probability.source_data_fingerprint = Object.fromEntries(Object.entries(fingerprintSources).map(([path, value]) => [
+    path,
+    createHash('sha256').update(JSON.stringify(value)).digest('hex')
+  ]));
+  return { evidence, probability, predictions, snapshots, history, ledger, probabilitySettlements, captureStatus };
 }
 
 function fixture(espnId, sportybetId, home, away, offsetMinutes = 0) {
@@ -159,7 +178,7 @@ function fixture(espnId, sportybetId, home, away, offsetMinutes = 0) {
 
 test('NBA release gate rejects mismatched ROI and CLV snapshot linkage', () => {
   const bundle = buildEvidence([fixture('audit-check', 'sr:match:audit-check', 'Boston Celtics', 'New York Knicks')]);
-  assert.equal(nbaTotalsReleaseQualified(bundle.evidence, bundle.probability), true);
+  assert.equal(nbaTotalsReleaseQualified(bundle.evidence, bundle.probability, true), true);
   const clvRow = bundle.probability.prospective_clv_diagnostics.fixtures[0];
   const originalSnapshotId = clvRow.opening.snapshot_id;
   clvRow.opening.snapshot_id = 'nba-total-pub:wrong-snapshot';
@@ -169,6 +188,22 @@ test('NBA release gate rejects mismatched ROI and CLV snapshot linkage', () => {
   clvRow.opening.over_odds = 1.92;
   assert.equal(nbaTotalsReleaseQualified(bundle.evidence, bundle.probability), false);
   clvRow.opening.over_odds = originalOdds;
+});
+
+test('NBA release context fails closed when the current ledger changes after the report fingerprint', async () => {
+  const bundle = buildEvidence([fixture('fingerprint-check', 'sr:match:fingerprint-check', 'Boston Celtics', 'New York Knicks')]);
+  const restore = installFetchMock({ bundle, events: [], shareResponse: {} });
+  try {
+    const current = await loadNbaReleaseContext();
+    assert.equal(current.sourceEvidenceFresh, true);
+    assert.equal(nbaTotalsReleaseQualified(current.evidence, current.probability, current.sourceEvidenceFresh), true);
+    bundle.ledger.updated_at = new Date(Date.now() + 1000).toISOString();
+    const stale = await loadNbaReleaseContext();
+    assert.equal(stale.sourceEvidenceFresh, false);
+    assert.equal(nbaTotalsReleaseQualified(stale.evidence, stale.probability, stale.sourceEvidenceFresh), false);
+  } finally {
+    restore();
+  }
 });
 
 function manualLeg(row) {
@@ -254,7 +289,11 @@ function installFetchMock({ bundle, events, shareResponse }) {
         'nba_totals_oos_value_test.json': bundle.evidence,
         'nba_totals_probability_value_experiment.json': bundle.probability,
         'nba_predictions.json': bundle.predictions,
-        'nba_totals_publication_snapshots.json': bundle.snapshots
+        'nba_totals_publication_snapshots.json': bundle.snapshots,
+        'nba_history.json': bundle.history,
+        'nba_totals_ledger.json': bundle.ledger,
+        'nba_totals_probability_settlements.json': bundle.probabilitySettlements,
+        'nba_totals_price_capture_status.json': bundle.captureStatus
       };
       assert.ok(Object.hasOwn(files, name), 'unexpected release evidence request: ' + name);
       return new Response(JSON.stringify(files[name]), {

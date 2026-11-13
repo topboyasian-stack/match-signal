@@ -79,6 +79,7 @@ const qualifiedAudit = Array.from({ length: 120 }, (_, index) => {
   };
 });
 const qualifiedTotalsEvidence = {
+  generated_at: reportAt,
   paper_only: true, evaluation_type: "NBA_TOTALS_FIXED_CUTOFF_V2", market_id: "225",
   market_definition: "full_game_total_including_overtime", model_version: modelVersion,
   holdout_protocol: { fixed_cutoff_utc: cutoff }, release_decision: "QUALIFIED",
@@ -155,6 +156,20 @@ const currentMarket = {
 };
 assert.equal(api.nbaTotalsReleaseQualified({ release_decision: "APPROVED", holdout: { n: 161, roi: 0.03 } }, qualifiedProbabilityEvidence), false, "moneyline evidence cannot qualify totals");
 assert.equal(api.nbaTotalsReleaseQualified(qualifiedTotalsEvidence, qualifiedProbabilityEvidence), true);
+assert.equal(api.nbaTotalsReleaseQualified(qualifiedTotalsEvidence, {
+  ...qualifiedProbabilityEvidence,
+  prospective_clv_diagnostics: {
+    ...qualifiedProbabilityEvidence.prospective_clv_diagnostics,
+    fixtures: qualifiedProbabilityEvidence.prospective_clv_diagnostics.fixtures.map((row, index) =>
+      index === 0 ? { ...row, opening: { ...row.opening, snapshot_id: "nba-total-pub:wrong-snapshot" } } : row
+    )
+  }
+}), false, "the Basketball UI must reject mismatched ROI/CLV snapshot cohorts");
+assert.equal(api.nbaTotalsReleaseQualified(qualifiedTotalsEvidence, qualifiedProbabilityEvidence, {
+  updated_at: new Date(now).toISOString()
+}, {
+  checked_at: new Date(now).toISOString()
+}), false, "the Basketball UI must reject reports older than the latest ledger/capture state");
 assert.equal(api.nbaTotalsReleaseQualified(qualifiedTotalsEvidence), false, "probability and CLV evidence are mandatory");
 assert.equal(api.nbaTotalsReleaseQualified({ ...qualifiedTotalsEvidence, evaluation_type: "NBA_TOTALS_WALK_FORWARD_V1" }, qualifiedProbabilityEvidence), false);
 assert.equal(api.nbaTotalsReleaseQualified({ ...qualifiedTotalsEvidence, holdout_protocol: { fixed_cutoff_utc: "2026-11-03T02:00:00+00:00" } }, qualifiedProbabilityEvidence), false);
@@ -169,15 +184,15 @@ assert.equal(api.nbaTotalRowQualified(prediction, qualifiedTotalsEvidence, quali
 assert.equal(api.nbaTotalRowQualified(prediction, qualifiedTotalsEvidence, { ...qualifiedProbabilityEvidence, upcoming_exact_fresh_market_225_value_diagnostics: [{ ...diagnostic, decision: "UNDER VALUE" }] }, [snapshot], currentMarket), false, "the side must match the value decision");
 const ticketLeg = { event_id: "nba-1", sportybet_event_id: "sr:match:test", sport: "basketball", market: "total", pick: "over", line: 220.5, market_id: "225", model_qualified: true, start_time: startTime };
 const liveSelection = { eventId: "sr:match:test", marketId: "225", line: 220.5, overOdds: 1.91, underOdds: 1.89, odds: 1.91, fetchedAt: new Date(now - 30000).toISOString() };
-const releaseContext = { evidence: qualifiedTotalsEvidence, probability: qualifiedProbabilityEvidence, predictions: [prediction], snapshots: [snapshot] };
-assert.equal(serverNbaTotalsReleaseQualified(qualifiedTotalsEvidence, qualifiedProbabilityEvidence), true);
+const releaseContext = { evidence: qualifiedTotalsEvidence, probability: qualifiedProbabilityEvidence, predictions: [prediction], snapshots: [snapshot], sourceEvidenceFresh: true };
+assert.equal(serverNbaTotalsReleaseQualified(qualifiedTotalsEvidence, qualifiedProbabilityEvidence, true), true);
 assert.equal(serverNbaTotalsReleaseQualified(qualifiedTotalsEvidence, {
   ...qualifiedProbabilityEvidence,
   prospective_probability_fixture_coverage: {
     ...qualifiedProbabilityEvidence.prospective_probability_fixture_coverage,
     cutoff_utc: "2026-11-03T02:00:00+00:00"
   }
-}), false, "probability fixtures from another cutoff must not qualify the frozen holdout");
+}, true), false, "probability fixtures from another cutoff must not qualify the frozen holdout");
 assert.equal(serverNbaTotalTicketLegQualified(ticketLeg, liveSelection, releaseContext, now).ok, true);
 assert.equal(serverNbaTotalTicketLegQualified({ ...ticketLeg, sportybet_event_id: "sr:match:wrong" }, liveSelection, releaseContext, now).ok, false, "the provider event ID must match the immutable SportyBet quote");
 assert.equal(serverNbaTotalTicketLegQualified(ticketLeg, { ...liveSelection, overOdds: 1.90 }, releaseContext, now).ok, false, "the server must reject a changed current price pair");
