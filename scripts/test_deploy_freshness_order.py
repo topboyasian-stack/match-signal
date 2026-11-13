@@ -229,6 +229,15 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         self.assertNotIn("\nconcurrency:", before_jobs, "workflow-level locking lets an ineligible skipped workflow_run replace a pending deployment")
         self.assertIn("github.event.workflow_run.conclusion == 'success'", deploy_job)
         self.assertIn("    concurrency:\n      group: cloudflare-pages-v3\n      cancel-in-progress: false", deploy_job, "only an eligible deploy job should enter the shared production promotion queue")
+        nba_probe = re.search(r"(?ms)^      - name: Verify NBA manual ticket gate on production and immutable artifact\n(.*?)(?=^      - name: )", PAGES_WORKFLOW)
+        self.assertIsNotNone(nba_probe, "production deployment must probe the independent NBA release gate")
+        self.assertIn("id: nba-production-gate", nba_probe.group(0))
+        self.assertIn("if: always()", nba_probe.group(0),
+                      "the NBA gate probe must still run when unrelated page smoke checks fail")
+        recorder = re.search(r"(?ms)^      - name: Record Cloudflare production verification\n(.*?)(?=^      - name: |\Z)", PAGES_WORKFLOW)
+        self.assertIsNotNone(recorder)
+        self.assertIn("if: always()", recorder.group(0),
+                      "persist production gate evidence even when a separate smoke check fails")
 
     def test_pages_deploy_is_promotion_driven_with_guarded_cache_only_promotion(self):
         events_end = PAGES_WORKFLOW.find("\npermissions:")
@@ -253,6 +262,12 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
                          "contract-test edits must not deploy Pages without production-code changes")
         self.assertNotIn(".github/workflows/ticket-drawer-contract.yml", direct_paths,
                          "test-workflow edits must not deploy Pages by themselves")
+        self.assertNotIn("scripts/test_nba_production_gate.mjs", direct_paths,
+                         "production-gate test edits must not trigger a deployment by themselves")
+        self.assertNotIn("scripts/test_deploy_freshness_order.py", workflow_push_paths(BOARD_WORKFLOW),
+                         "deployment-order test edits must not trigger an unrelated board rebuild")
+        self.assertIn("node scripts/test_nba_production_gate.mjs", PAGES_WORKFLOW,
+                      "the NBA gate probe must remain part of every Pages deployment")
         self.assertIn('      - "functions/api/sportybet-booking.js"', PROMOTION_WORKFLOW,
                       "shared ticket-handler changes must still reach production through ordered promotion")
         self.assertIn("data/club-logo-registry.json", direct_paths)
@@ -308,7 +323,6 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             "qualified-alternatives.js",
             "ticket-drawer.js",
             "ticket-drawer.css",
-            "scripts/test_nba_production_gate.mjs",
             "ms-design-system.css",
             "core-workspaces-design.css",
             "league-logos.js",
@@ -338,6 +352,8 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
                          "contract-test-only edits are not direct deployment inputs")
         self.assertNotIn("|.github/workflows/ticket-drawer-contract.yml|", allowed_line,
                          "test-workflow-only edits are not direct deployment inputs")
+        self.assertNotIn("|scripts/test_nba_production_gate.mjs|", allowed_line,
+                         "production-gate test-only edits are not direct deployment inputs")
         self.assertIn("|scripts/test_nba_production_gate.mjs|", allowed_line,
                       "The production gate smoke is a safe direct-deployment test path and must be admitted by the cache-only promotion guard.")
         self.assertIn("if: github.event_name == 'push'", PAGES_WORKFLOW)
