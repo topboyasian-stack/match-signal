@@ -77,6 +77,7 @@ function nbaMarketCohortMatchesSnapshotEvidence(e,p){
  }
  return clvEvents.size===expected&&clvSnapshotIds.size===expected;
 }
+// A release report is valid only while its exact source cohort and capture/ledger timestamps still match main.
 function nbaReleaseSourceFingerprintMatches(probability,actual){
  const recorded=probability?.source_data_fingerprint;
  if(!recorded||typeof recorded!=='object'||Array.isArray(recorded))return false;

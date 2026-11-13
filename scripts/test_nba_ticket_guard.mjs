@@ -192,7 +192,7 @@ test('NBA release gate rejects mismatched ROI and CLV snapshot linkage', () => {
 
 test('NBA release context fails closed when the current ledger changes after the report fingerprint', async () => {
   const bundle = buildEvidence([fixture('fingerprint-check', 'sr:match:fingerprint-check', 'Boston Celtics', 'New York Knicks')]);
-  const restore = installFetchMock({ bundle, events: [], shareResponse: {} });
+  const mock = installFetchMock({ bundle, events: [], shareResponse: {} });
   try {
     const current = await loadNbaReleaseContext();
     assert.equal(current.sourceEvidenceFresh, true);
@@ -202,7 +202,7 @@ test('NBA release context fails closed when the current ledger changes after the
     assert.equal(stale.sourceEvidenceFresh, false);
     assert.equal(nbaTotalsReleaseQualified(stale.evidence, stale.probability, stale.sourceEvidenceFresh), false);
   } finally {
-    restore();
+    mock.restore();
   }
 });
 
