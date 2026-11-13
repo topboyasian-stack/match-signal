@@ -354,8 +354,6 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
                          "test-workflow-only edits are not direct deployment inputs")
         self.assertNotIn("|scripts/test_nba_production_gate.mjs|", allowed_line,
                          "production-gate test-only edits are not direct deployment inputs")
-        self.assertIn("|scripts/test_nba_production_gate.mjs|", allowed_line,
-                      "The production gate smoke is a safe direct-deployment test path and must be admitted by the cache-only promotion guard.")
         self.assertIn("if: github.event_name == 'push'", PAGES_WORKFLOW)
         self.assertIn("compare/${BEFORE_SHA}...${PUSH_SHA}", PAGES_WORKFLOW)
         self.assertIn("const forcedRevalidation=cacheControl.includes('max-age=0')&&cacheControl.includes('must-revalidate')", PAGES_WORKFLOW)
