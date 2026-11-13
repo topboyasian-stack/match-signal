@@ -132,7 +132,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         self.assertIn('deploy_run_id="${deploy_dispatch_url##*/}"', PROMOTION_WORKFLOW)
         self.assertEqual(
             PROMOTION_WORKFLOW.count("select(.event =="),
-            4,
+            2,
             "only the two Builder waits should scan workflow runs; direct dispatches must be polled by exact run ID",
         )
 
