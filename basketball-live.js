@@ -150,6 +150,7 @@ function liveTotalProjection(record,prediction){if(!prediction||!Number.isFinite
 const NBA_TOTALS_RELEASE_CUTOFF_UTC = "2026-11-02T02:00:00+00:00";
 const NBA_TOTALS_RELEASE_MODEL_VERSION = "nba-total-v5.1-pace-efficiency-calibrated";
 function closeNumber(a,b){return Number.isFinite(Number(a))&&Number.isFinite(Number(b))&&Math.abs(Number(a)-Number(b))<=1e-9;}
+// Qualification stays fail-closed unless the same immutable event/snapshot cohort and current source timestamps are verified.
 function nbaMarketCohortMatchesSnapshotEvidence(evidence,probability){
  const m=evidence&&evidence.market_holdout||{},rows=evidence&&evidence.market_record_audit,c=probability&&probability.prospective_pregame_snapshot_coverage||{},v=probability&&probability.prospective_clv_diagnostics||{},clvRows=v.fixtures,expected=Number(m.n);
  if(!Number.isInteger(expected)||expected<1||!Array.isArray(rows)||!Array.isArray(clvRows)||rows.length!==expected||clvRows.length!==expected)return false;
