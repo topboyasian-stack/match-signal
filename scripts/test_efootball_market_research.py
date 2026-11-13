@@ -302,7 +302,7 @@ def test_result_scope_watermark_advances_when_cursor_scope_is_settled_and_remove
  remaining=[row for row in samples if row["event_id"]!="gt-11"]
  second_queries,next_cursor=run_batch(remaining,cursor)
  assert second_queries[0]["categoryId"]=="gt-cat-12",second_queries
- assert next_cursor["efootball_gt"]["label"].endswith("gt-cat-15|gt-tour-15"),next_cursor
+ assert next_cursor["efootball_gt"]["label"].endswith("gt-cat-07|gt-tour-07"),next_cursor
 
 
 def test_settlement_coverage_reports_partial_and_overdue_results():
