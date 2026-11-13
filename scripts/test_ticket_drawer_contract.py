@@ -115,8 +115,11 @@ def main():
 
     require("data-ms-ticket-add" in nba and 'data-ticket-market="total"' in nba and "data-ticket-sportybet-event" in nba and "predictionId=String(p.event_id||'')" in nba and "sportybetId=String(event.event_id||'')" in nba,
             "NBA current totals must be selectable into the same ticket")
-    require("nbaTotalsReleaseQualified(S.totalsOos,S.totalsProbability)" in nba and "nbaTotalRowQualified(p,S.totalsOos,S.totalsProbability,S.totalSnapshots,fresh)" in nba,
-            "NBA ticket generation must retain the independent release and per-row gates")
+    require("function nbaTotalsReleaseQualified(evidence,probability,ledger,captureStatus)" in nba and
+            "function nbaTotalRowQualified(prediction,evidence,probability,snapshots,currentMarket,ledger,captureStatus)" in nba and
+            "nbaTotalsReleaseQualified(S.totalsOos,S.totalsProbability,S.totalLedger,S.priceCaptureStatus)" in nba and
+            "nbaTotalRowQualified(p,S.totalsOos,S.totalsProbability,S.totalSnapshots,fresh,S.totalLedger,S.priceCaptureStatus)" in nba,
+            "NBA ticket generation must retain independent release/per-row gates and live ledger/capture freshness evidence")
     require("../ticket-drawer.css?v=20261102-efootball-shared-ticket1" in lab_html and "../ticket-drawer.js?v=20261110-tennis-set-winner2" in lab_html,
             "Virtual Lab must load the shared floating ticket from its nested route")
     require("data-ms-ticket-add" in lab_app and 'data-ticket-sport="efootball"' in lab_app and "data-ticket-product" in lab_app and "efootballTicketReady" in lab_app,
