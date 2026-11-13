@@ -41,9 +41,9 @@ permissions:
   actions: write
   contents: read
 
-# Fresh v13 promotion namespace releases stale queued runs after the v12 child-board retry fix; preserve the ordered board -> Builder -> Pages sequence.
+# Fresh v14 namespace releases stale queued promotion runs; direct dispatch run IDs prevent polling the wrong child or timing out on list scans.
 concurrency:
-  group: builder-production-promotion-v13
+  group: builder-production-promotion-v14
   cancel-in-progress: false
 
 jobs:
@@ -67,51 +67,54 @@ jobs:
           echo "source_sha=$source_sha" >> "$GITHUB_OUTPUT"
           echo "dispatched_at=$dispatched_at" >> "$GITHUB_OUTPUT"
           dispatch_count=0
-          last_cancelled_board_run_id=""
           dispatch_promotion_child_board() {
-            gh workflow run unified-upcoming.yml --ref main -f promotion_child=true
+            local dispatch_url run_id
+            dispatch_url="$(gh workflow run unified-upcoming.yml --ref main -f promotion_child=true)"
+            run_id="${dispatch_url##*/}"
+            if ! [[ "$run_id" =~ ^[0-9]+$ ]]; then
+              echo "Could not parse promotion-child Unified Upcoming run ID from: $dispatch_url" >&2
+              return 1
+            fi
+            echo "Dispatched promotion-child Unified Upcoming run $run_id." >&2
+            printf '%s\\n' "$run_id"
           }
-          dispatch_promotion_child_board
-          board_run_id=""
+          validate_board_run_source() {
+            local run_id="$1" candidate_sha merge_base
+            candidate_sha="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id" --jq '.head_sha')"
+            if [ "$candidate_sha" = "$source_sha" ]; then
+              return 0
+            fi
+            merge_base="$(gh api "repos/$GITHUB_REPOSITORY/compare/$source_sha...$candidate_sha" --jq '.merge_base_commit.sha' 2>/dev/null || true)"
+            if [ "$merge_base" != "$source_sha" ]; then
+              echo "Promotion-child board run $run_id is not based on source main $source_sha (head $candidate_sha)." >&2
+              return 1
+            fi
+          }
+          board_run_id="$(dispatch_promotion_child_board)"
+          validate_board_run_source "$board_run_id"
           for attempt in $(seq 1 180); do
-            board_candidates="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/unified-upcoming.yml/runs?branch=main&per_page=100" --jq '.workflow_runs[] | select(.event == "workflow_dispatch" and .head_branch == "main" and .created_at >= "'"$dispatched_at"'") | [.id, .head_sha] | @tsv')"
-            while IFS=$'\\t' read -r candidate_id candidate_sha; do
-              [ -n "$candidate_id" ] || continue
-              [ "$candidate_id" != "$last_cancelled_board_run_id" ] || continue
-              merge_base="$(gh api "repos/$GITHUB_REPOSITORY/compare/$source_sha...$candidate_sha" --jq '.merge_base_commit.sha' 2>/dev/null || true)"
-              [ "$merge_base" = "$source_sha" ] || continue
-              board_status="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$candidate_id" --jq '.status')"
-              if [ "$board_status" = "completed" ]; then
-                board_conclusion="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$candidate_id" --jq '.conclusion')"
-                if [ "$board_conclusion" = "success" ]; then
-                  board_run_id="$candidate_id"
-                  break
-                fi
-                if [ "$board_conclusion" = "cancelled" ] || [ "$board_conclusion" = "skipped" ]; then
-                  echo "Pre-build Unified Upcoming run $candidate_id was superseded ($board_conclusion); dispatching a fresh promotion-child board run."
-                  last_cancelled_board_run_id="$candidate_id"
-                  dispatch_count=$((dispatch_count + 1))
-                  if [ "$dispatch_count" -gt 5 ]; then
-                    echo "Unified Upcoming promotion child was superseded more than five times." >&2
-                    exit 1
-                  fi
-                  sleep 2
-                  dispatch_promotion_child_board
-                  break
-                fi
-                echo "Pre-build Unified Upcoming run $candidate_id failed: $board_conclusion" >&2
-                exit 1
+            board_status="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$board_run_id" --jq '.status')"
+            if [ "$board_status" = "completed" ]; then
+              board_conclusion="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$board_run_id" --jq '.conclusion')"
+              if [ "$board_conclusion" = "success" ]; then
+                break
               fi
-              # Keep waiting for queued/in-progress candidates. A newer promotion
-              # child may supersede this one; the latest eligible run is checked
-              # again on the next loop pass.
-              break
-            done <<< "$board_candidates"
-            if [ -n "$board_run_id" ]; then
-              break
+              if [ "$board_conclusion" = "cancelled" ] || [ "$board_conclusion" = "skipped" ]; then
+                echo "Pre-build Unified Upcoming run $board_run_id was superseded ($board_conclusion); dispatching a fresh promotion-child board run."
+                dispatch_count=$((dispatch_count + 1))
+                if [ "$dispatch_count" -gt 5 ]; then
+                  echo "Unified Upcoming promotion child was superseded more than five times." >&2
+                  exit 1
+                fi
+                board_run_id="$(dispatch_promotion_child_board)"
+                validate_board_run_source "$board_run_id"
+                continue
+              fi
+              echo "Pre-build Unified Upcoming run $board_run_id failed: $board_conclusion" >&2
+              exit 1
             fi
             if [ "$attempt" -eq 180 ]; then
-              echo "Timed out waiting for a successful pre-build Unified Upcoming refresh." >&2
+              echo "Timed out waiting for successful pre-build Unified Upcoming run $board_run_id." >&2
               exit 1
             fi
             sleep 5
@@ -203,29 +206,33 @@ jobs:
           dispatched_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           echo "source_sha=$source_sha" >> "$GITHUB_OUTPUT"
           echo "dispatched_at=$dispatched_at" >> "$GITHUB_OUTPUT"
-          gh workflow run unified-upcoming.yml --ref main -f promotion_child=true
-          board_run_id=""
+          board_dispatch_url="$(gh workflow run unified-upcoming.yml --ref main -f promotion_child=true)"
+          echo "Dispatched post-build Unified Upcoming run ${board_dispatch_url##*/}." >&2
+          board_run_id="${board_dispatch_url##*/}"
+          if ! [[ "$board_run_id" =~ ^[0-9]+$ ]]; then
+            echo "Could not parse post-build Unified Upcoming run ID from: $board_dispatch_url" >&2
+            exit 1
+          fi
+          candidate_sha="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$board_run_id" --jq '.head_sha')"
+          if [ "$candidate_sha" != "$source_sha" ]; then
+            merge_base="$(gh api "repos/$GITHUB_REPOSITORY/compare/$source_sha...$candidate_sha" --jq '.merge_base_commit.sha' 2>/dev/null || true)"
+            if [ "$merge_base" != "$source_sha" ]; then
+              echo "Post-build board run $board_run_id is not based on source main $source_sha (head $candidate_sha)." >&2
+              exit 1
+            fi
+          fi
           for attempt in $(seq 1 180); do
-            board_candidate="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/unified-upcoming.yml/runs?branch=main&event=workflow_dispatch&per_page=30" --jq ".workflow_runs[] | select(.event == \"workflow_dispatch\" and .head_branch == \"main\" and .created_at >= \"$dispatched_at\") | [.id, .head_sha] | @tsv" | head -n 1)"
-            if [ -n "$board_candidate" ]; then
-              candidate_id="$(printf '%s\n' "$board_candidate" | cut -f1)"
-              candidate_sha="$(printf '%s\n' "$board_candidate" | cut -f2)"
-              merge_base="$(gh api "repos/$GITHUB_REPOSITORY/compare/$source_sha...$candidate_sha" --jq '.merge_base_commit.sha' 2>/dev/null || true)"
-              if [ "$merge_base" = "$source_sha" ]; then
-                board_status="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$candidate_id" --jq '.status')"
-                if [ "$board_status" = "completed" ]; then
-                  board_conclusion="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$candidate_id" --jq '.conclusion')"
-                  if [ "$board_conclusion" != "success" ]; then
-                    echo "Post-build Unified Upcoming run $candidate_id failed: $board_conclusion" >&2
-                    exit 1
-                  fi
-                  board_run_id="$candidate_id"
-                  break
-                fi
+            board_status="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$board_run_id" --jq '.status')"
+            if [ "$board_status" = "completed" ]; then
+              board_conclusion="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$board_run_id" --jq '.conclusion')"
+              if [ "$board_conclusion" != "success" ]; then
+                echo "Post-build Unified Upcoming run $board_run_id failed: $board_conclusion" >&2
+                exit 1
               fi
+              break
             fi
             if [ "$attempt" -eq 180 ]; then
-              echo "Timed out waiting for the post-build Unified Upcoming publication." >&2
+              echo "Timed out waiting for post-build Unified Upcoming run $board_run_id." >&2
               exit 1
             fi
             sleep 5
@@ -325,29 +332,33 @@ jobs:
             echo "Main is not descended from the post-build board publication; refusing to deploy." >&2
             exit 1
           fi
-          gh workflow run cloudflare-pages.yml --ref main
-          deploy_run_id=""
+          deploy_dispatch_url="$(gh workflow run cloudflare-pages.yml --ref main)"
+          echo "Dispatched Cloudflare Pages workflow run ${deploy_dispatch_url##*/}." >&2
+          deploy_run_id="${deploy_dispatch_url##*/}"
+          if ! [[ "$deploy_run_id" =~ ^[0-9]+$ ]]; then
+            echo "Could not parse Cloudflare Pages run ID from: $deploy_dispatch_url" >&2
+            exit 1
+          fi
+          candidate_sha="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$deploy_run_id" --jq '.head_sha')"
+          if [ "$candidate_sha" != "$deployment_source_sha" ]; then
+            merge_base="$(gh api "repos/$GITHUB_REPOSITORY/compare/$deployment_source_sha...$candidate_sha" --jq '.merge_base_commit.sha' 2>/dev/null || true)"
+            if [ "$merge_base" != "$deployment_source_sha" ]; then
+              echo "Cloudflare Pages run $deploy_run_id is not based on deployment source $deployment_source_sha (head $candidate_sha)." >&2
+              exit 1
+            fi
+          fi
           for attempt in $(seq 1 180); do
-            deploy_candidate="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/cloudflare-pages.yml/runs?branch=main&event=workflow_dispatch&per_page=30" --jq ".workflow_runs[] | select(.event == \"workflow_dispatch\" and .head_branch == \"main\" and .created_at >= \"$dispatched_at\") | [.id, .head_sha] | @tsv" | head -n 1)"
-            if [ -n "$deploy_candidate" ]; then
-              candidate_id="$(printf '%s\n' "$deploy_candidate" | cut -f1)"
-              candidate_sha="$(printf '%s\n' "$deploy_candidate" | cut -f2)"
-              merge_base="$(gh api "repos/$GITHUB_REPOSITORY/compare/$deployment_source_sha...$candidate_sha" --jq '.merge_base_commit.sha' 2>/dev/null || true)"
-              if [ "$merge_base" = "$deployment_source_sha" ]; then
-                deploy_status="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$candidate_id" --jq '.status')"
-                if [ "$deploy_status" = "completed" ]; then
-                  deploy_conclusion="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$candidate_id" --jq '.conclusion')"
-                  if [ "$deploy_conclusion" != "success" ]; then
-                    echo "Cloudflare Pages run $candidate_id failed: $deploy_conclusion" >&2
-                    exit 1
-                  fi
-                  deploy_run_id="$candidate_id"
-                  break
-                fi
+            deploy_status="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$deploy_run_id" --jq '.status')"
+            if [ "$deploy_status" = "completed" ]; then
+              deploy_conclusion="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$deploy_run_id" --jq '.conclusion')"
+              if [ "$deploy_conclusion" != "success" ]; then
+                echo "Cloudflare Pages run $deploy_run_id failed: $deploy_conclusion" >&2
+                exit 1
               fi
+              break
             fi
             if [ "$attempt" -eq 180 ]; then
-              echo "Timed out waiting for a successful Cloudflare Pages deployment." >&2
+              echo "Timed out waiting for Cloudflare Pages run $deploy_run_id." >&2
               exit 1
             fi
             sleep 5

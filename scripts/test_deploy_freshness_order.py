@@ -124,16 +124,16 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         self.assertIn("github.event.workflow_run.name", BOARD_WORKFLOW)
         self.assertIn("inputs.promotion_child", BOARD_WORKFLOW)
         self.assertIn("cancel-in-progress: false", BOARD_WORKFLOW)
-        self.assertIn(
-            r'select(.event == \"workflow_dispatch\" and .head_branch == \"main\" and .created_at >= \"$dispatched_at\")',
-            PROMOTION_WORKFLOW,
-            "the promotion wait must never accept a cancelled scheduled/push board run as its dispatched child",
-        )
-
-        self.assertGreaterEqual(
+        self.assertIn('dispatch_url="$(gh workflow run unified-upcoming.yml --ref main -f promotion_child=true)"', PROMOTION_WORKFLOW)
+        self.assertIn('board_run_id="$(dispatch_promotion_child_board)"', PROMOTION_WORKFLOW)
+        self.assertIn('board_dispatch_url="$(gh workflow run unified-upcoming.yml --ref main -f promotion_child=true)"', PROMOTION_WORKFLOW)
+        self.assertIn('board_run_id="${board_dispatch_url##*/}"', PROMOTION_WORKFLOW)
+        self.assertIn('deploy_dispatch_url="$(gh workflow run cloudflare-pages.yml --ref main)"', PROMOTION_WORKFLOW)
+        self.assertIn('deploy_run_id="${deploy_dispatch_url##*/}"', PROMOTION_WORKFLOW)
+        self.assertEqual(
             PROMOTION_WORKFLOW.count("select(.event =="),
-            5,
-            "every pre/post board, Builder and deployment wait must filter the exact dispatched child run",
+            4,
+            "only the two Builder waits should scan workflow runs; direct dispatches must be polled by exact run ID",
         )
 
         self.assertNotIn(
