@@ -117,7 +117,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         # GitHub replaces older pending runs within one concurrency group. The Builder's
         # pre/post refresh must therefore use a dedicated group and exact dispatch filtering.
         self.assertIn(
-            "group: match-signal-unified-upcoming-v9-${{ github.event_name }}-",
+            "group: match-signal-unified-upcoming-v10-${{ github.event_name }}-",
             BOARD_WORKFLOW,
             "push/schedule/dispatch/upstream events must not compete for one pending board slot",
         )
@@ -541,9 +541,9 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
 
     def test_publishing_refresh_is_not_cancelled_or_dispatched_twice(self):
         self.assertIn("cancel-in-progress: false", BOARD_WORKFLOW, "scheduled board refreshes must be allowed to publish before the next run")
-        self.assertIn("group: match-signal-unified-board-publisher-v9", BOARD_WORKFLOW)
+        self.assertIn("group: match-signal-unified-board-publisher-v10", BOARD_WORKFLOW)
         self.assertIn(
-            "    concurrency:\n      group: match-signal-unified-board-publisher-v9\n      cancel-in-progress: false",
+            "    concurrency:\n      group: match-signal-unified-board-publisher-v10\n      cancel-in-progress: false",
             BOARD_WORKFLOW,
         )
         self.assertNotIn("gh workflow run cloudflare-pages.yml", BOARD_WORKFLOW)

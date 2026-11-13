@@ -50,7 +50,7 @@ def main():
     collector_paths = push_paths("virtual-lab-collector.yml")
     autopilot_paths = push_paths("autopilot-refresh.yml")
     board_concurrency = board.split("\nconcurrency:\n", 1)[1].split("\njobs:\n", 1)[0]
-    assert "group: match-signal-unified-upcoming-v9-${{ github.event_name }}-" in board_concurrency, (
+    assert "group: match-signal-unified-upcoming-v10-${{ github.event_name }}-" in board_concurrency, (
         "Bump the board queue generation to release stale runs after publisher lock changes."
     )
     assert "github.event_name" in board_concurrency, (
@@ -69,7 +69,7 @@ def main():
         "The five-minute Upcoming schedule must not cancel an active slow board build before publication."
     )
     unified_job = board.split("\n  unified:\n", 1)[1]
-    assert "group: match-signal-unified-board-publisher-v9" in unified_job and "cancel-in-progress: false" in unified_job, (
+    assert "group: match-signal-unified-board-publisher-v10" in unified_job and "cancel-in-progress: false" in unified_job, (
         "All trigger types must serialize board publication to prevent competing generated-data pushes."
     )
     assert "cancel-in-progress: false" in unified_job, (

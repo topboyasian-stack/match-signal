@@ -41,9 +41,9 @@ permissions:
   actions: write
   contents: read
 
-# Fresh v14 namespace releases stale queued promotion runs; direct dispatch run IDs prevent polling the wrong child or timing out on list scans.
+# Fresh v15 namespace releases stale queued promotion runs after the exact-run polling change.
 concurrency:
-  group: builder-production-promotion-v14
+  group: builder-production-promotion-v15
   cancel-in-progress: false
 
 jobs:

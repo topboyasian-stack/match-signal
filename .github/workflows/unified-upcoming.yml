@@ -137,8 +137,8 @@ concurrency:
   # Let a board build finish. Cancelling an active refresh every five minutes prevented
   # the slower model + publication steps from ever updating the canonical board.
   # Promotion-child refreshes remain isolated from the normal schedule.
-  # Queue generation 9 releases stale pending generation-8 board/publisher locks. Keep push, scheduled, manual-promotion, and each upstream completion in separate pending queues. GitHub retains only one pending run per concurrency group; shared normal groups silently replaced the prediction-pipeline board run with unrelated completion events.
-  group: match-signal-unified-upcoming-v9-${{ github.event_name }}-${{ github.event_name == 'workflow_run' && github.event.workflow_run.name || github.event_name == 'workflow_dispatch' && inputs.promotion_child && 'promotion' || 'normal' }}
+  # Queue generation 10 releases stale pending generation-9 board/publisher locks. Keep push, scheduled, manual-promotion, and each upstream completion in separate pending queues. GitHub retains only one pending run per concurrency group; shared normal groups silently replaced the prediction-pipeline board run with unrelated completion events.
+  group: match-signal-unified-upcoming-v10-${{ github.event_name }}-${{ github.event_name == 'workflow_run' && github.event.workflow_run.name || github.event_name == 'workflow_dispatch' && inputs.promotion_child && 'promotion' || 'normal' }}
   cancel-in-progress: false
 
 jobs:
@@ -150,7 +150,7 @@ jobs:
     # must not push generated artifacts concurrently. The outer workflow queues remain
     # event-specific; this job-level lock serializes the actual build/publish phase.
     concurrency:
-      group: match-signal-unified-board-publisher-v9
+      group: match-signal-unified-board-publisher-v10
       cancel-in-progress: false
     steps:
       - name: Checkout latest main
@@ -193,7 +193,7 @@ jobs:
           assert "group: match-signal-unified-upcoming-" in concurrency and "'promotion'" in concurrency
           assert "github.event.workflow_run.name" in concurrency
           unified_job = source.split("\n  unified:\n", 1)[1]
-          assert "    concurrency:\n      group: match-signal-unified-board-publisher-v9\n      cancel-in-progress: false" in unified_job
+          assert "    concurrency:\n      group: match-signal-unified-board-publisher-v10\n      cancel-in-progress: false" in unified_job
           publish = source.rsplit('      - name: Publish unified board and health', 1)[1]
           assert 'Newer unified board already published; skipping stale candidate.' in publish
           assert publish.index('if ! git rebase origin/main; then') < publish.index('Newer unified board already published; skipping stale candidate.')
