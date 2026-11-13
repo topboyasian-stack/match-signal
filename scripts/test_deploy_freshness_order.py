@@ -242,12 +242,19 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
                          "production deployment must be triggered by scoped static pushes or the ordered Builder Production Promotion dispatch, not unrelated completed workflows")
         self.assertIn("  workflow_dispatch:", events)
 
-        # Direct promotion is limited to UI/static assets and the scoped booking API.
-        # Board-driven data updates are handed to Builder Production Promotion,
-        # which waits for a fresh board and matching Builder artifact before Pages deployment.
+        # Direct promotion is limited to UI/static assets and scoped APIs that do not depend on fresh board/Builder data.
+        # The shared ticket handler and its contract-test workflow must not bypass ordered promotion or trigger a Pages deploy by themselves.
         direct_paths = workflow_push_paths(PAGES_WORKFLOW)
         self.assertNotIn(".github/workflows/efootball-market-research-tests.yml", direct_paths,
                          "CI-only test workflow changes must not trigger a production Pages deployment")
+        self.assertNotIn("functions/api/sportybet-booking.js", direct_paths,
+                         "the shared ticket handler must use ordered board/Builder promotion")
+        self.assertNotIn("scripts/test_ticket_drawer_contract.py", direct_paths,
+                         "contract-test edits must not deploy Pages without production-code changes")
+        self.assertNotIn(".github/workflows/ticket-drawer-contract.yml", direct_paths,
+                         "test-workflow edits must not deploy Pages by themselves")
+        self.assertIn('      - "functions/api/sportybet-booking.js"', PROMOTION_WORKFLOW,
+                      "shared ticket-handler changes must still reach production through ordered promotion")
         self.assertIn("data/club-logo-registry.json", direct_paths)
         self.assertIn("assets/club-logos/**", direct_paths)
         expected_direct_paths = {
@@ -263,7 +270,6 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             "table-tennis.html",
             "odds-builder.html",
             "expansion-odds-builder.js",
-            "functions/api/sportybet-booking.js",
             "functions/api/odds-builder-data.js",
             "functions/api/analyst/market-evidence.js",
             "functions/api/analyst/chat.js",
@@ -302,9 +308,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             "qualified-alternatives.js",
             "ticket-drawer.js",
             "ticket-drawer.css",
-            "scripts/test_ticket_drawer_contract.py",
             "scripts/test_nba_production_gate.mjs",
-            ".github/workflows/ticket-drawer-contract.yml",
             "ms-design-system.css",
             "core-workspaces-design.css",
             "league-logos.js",
@@ -327,6 +331,12 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
                         "Builder data/code and Pages workflow changes must deploy only after a fresh Unified Upcoming board")
         self.assertIn("name: Guard cache-only direct promotion", PAGES_WORKFLOW)
         allowed_line = next(line for line in PAGES_WORKFLOW.splitlines() if "allowed='|" in line)
+        self.assertNotIn("|functions/api/sportybet-booking.js|", allowed_line,
+                         "the shared ticket handler is not eligible for direct promotion")
+        self.assertNotIn("|scripts/test_ticket_drawer_contract.py|", allowed_line,
+                         "contract-test-only edits are not direct deployment inputs")
+        self.assertNotIn("|.github/workflows/ticket-drawer-contract.yml|", allowed_line,
+                         "test-workflow-only edits are not direct deployment inputs")
         self.assertIn("|scripts/test_nba_production_gate.mjs|", allowed_line,
                       "The production gate smoke is a safe direct-deployment test path and must be admitted by the cache-only promotion guard.")
         self.assertIn("if: github.event_name == 'push'", PAGES_WORKFLOW)

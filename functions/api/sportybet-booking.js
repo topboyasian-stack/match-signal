@@ -1358,40 +1358,10 @@ async function handlePost(context) {
     const allVirtualLegs = [...unresolvedVirtualLegs, ...unresolvedEfootballLegs];
     const fastVirtualFeedDeadline = Math.min(catalogueDeadlineAt, Date.now() + 8000);
 
-    const [
-      vfootballEvents,
-      efootballEvents,
-      liveFeedEvents,
-      footballEvents,
-      tennisEvents,
-      basketballEvents
-    ] = await Promise.all([
-      unresolvedVirtualLegs.length
-        ? collectEvents({
-            sportId: 'sr:sport:202120001',
-            marketId: '1,18,10,29,11,26,36,14,60100,186,189,202,204,210',
-            timeline: catalogueTimeline,
-            primaryPath: '/api/ng/factsCenter/wapConfigurableUpcomingEvents',
-            fallbackPath: '/api/ng/factsCenter/pcUpcomingEvents',
-            maxPages: manualMode ? 20 : 5,
-            deadlineAt: catalogueDeadlineAt,
-            requestTimeoutMs: manualMode ? 3000 : 6000,
-            pageBatchSize: manualMode ? 10 : 5,
-            sharedMatchedLegs
-          }, unresolvedVirtualIds, unresolvedVirtualLegs)
-        : Promise.resolve(new Map()),
-      unresolvedEfootballLegs.length
-        ? collectEvents({
-            sportId: 'sr:sport:137',
-            marketId: '1,18,10,29,11,26,36,14,60100,186,189,202,204,210',
-            timeline: catalogueTimeline,
-            maxPages: manualMode ? 20 : 5,
-            deadlineAt: catalogueDeadlineAt,
-            requestTimeoutMs: manualMode ? 3000 : 6000,
-            pageBatchSize: manualMode ? 10 : 5,
-            sharedMatchedLegs
-          }, unresolvedEfootballIds, unresolvedEfootballLegs)
-        : Promise.resolve(new Map()),
+    // The compact live feed is the primary source for eFootball GT/eAdriatic quotes.
+    // Run it alongside independent sport lookups, then scan the broader catalogue only
+    // for virtual legs that remain unresolved by exact event/market/line/side evidence.
+    const [liveFeedEvents, footballEvents, tennisEvents, basketballEvents] = await Promise.all([
       allVirtualLegs.length
         ? collectVirtualEventsFromLiveFeed(
             context, allVirtualIds, 'efootball,vfootball',
@@ -1427,6 +1397,41 @@ async function handlePost(context) {
         : Promise.resolve(new Map()),
       unresolvedBasketballLegs.length
         ? collectBasketballEvents(context, unresolvedBasketballIds, catalogueTimeline, unresolvedBasketballLegs, catalogueDeadlineAt)
+        : Promise.resolve(new Map())
+    ]);
+
+    // Avoid running a second full catalogue crawl in parallel with the live-feed
+    // request. Only exact current-market misses fall back to the wider catalogue.
+    const remainingVirtualLegs = unresolvedVirtualLegs.filter(leg => !sharedMatchedLegs.has(leg));
+    const remainingEfootballLegs = unresolvedEfootballLegs.filter(leg => !sharedMatchedLegs.has(leg));
+    const remainingVirtualIds = new Set(remainingVirtualLegs.map(leg => String(leg.event_id || '')).filter(Boolean));
+    const remainingEfootballIds = new Set(remainingEfootballLegs.flatMap(leg => [leg.sportybet_event_id, leg.event_id]).map(String).filter(Boolean));
+    const [vfootballEvents, efootballEvents] = await Promise.all([
+      remainingVirtualLegs.length
+        ? collectEvents({
+            sportId: 'sr:sport:202120001',
+            marketId: '1,18,10,29,11,26,36,14,60100,186,189,202,204,210',
+            timeline: catalogueTimeline,
+            primaryPath: '/api/ng/factsCenter/wapConfigurableUpcomingEvents',
+            fallbackPath: '/api/ng/factsCenter/pcUpcomingEvents',
+            maxPages: manualMode ? 20 : 5,
+            deadlineAt: catalogueDeadlineAt,
+            requestTimeoutMs: manualMode ? 3000 : 6000,
+            pageBatchSize: manualMode ? 10 : 5,
+            sharedMatchedLegs
+          }, remainingVirtualIds, remainingVirtualLegs)
+        : Promise.resolve(new Map()),
+      remainingEfootballLegs.length
+        ? collectEvents({
+            sportId: 'sr:sport:137',
+            marketId: '1,18,10,29,11,26,36,14,60100,186,189,202,204,210',
+            timeline: catalogueTimeline,
+            maxPages: manualMode ? 20 : 5,
+            deadlineAt: catalogueDeadlineAt,
+            requestTimeoutMs: manualMode ? 3000 : 6000,
+            pageBatchSize: manualMode ? 10 : 5,
+            sharedMatchedLegs
+          }, remainingEfootballIds, remainingEfootballLegs)
         : Promise.resolve(new Map())
     ]);
 

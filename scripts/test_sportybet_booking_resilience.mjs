@@ -1168,5 +1168,65 @@ try {
     'the Set 2 leg must not validate against a Set 1-only catalogue; actual validation: ' + JSON.stringify(mismatchedSetPayload.validation));
   assert.equal(mismatchedSetShareCalls,0,'a missing exact Set 2 market must withhold the entire ticket without a share request');
 
+  // When the exact live virtual feed resolves every eFootball leg, do not
+  // launch a duplicate broad catalogue crawl that can exceed Pages Worker CPU.
+  const feedFirstStart = Date.now() + 6 * 60 * 60 * 1000;
+  const feedFirstLegs = [
+    {
+      event_id:'sr:match:efootball-feed-alpha', sportybet_event_id:'sr:match:efootball-feed-alpha',
+      sport:'virtual', product:'efootball_gt', market:'virtual_total', pick:'over', line:1.5, market_id:'18',
+      player_1:'Alpha FC', player_2:'Beta FC', match:'Alpha FC vs Beta FC',
+      start_time:new Date(feedFirstStart).toISOString(), odds:1.82, odds_fresh:true
+    },
+    {
+      event_id:'sr:match:efootball-feed-gamma', sportybet_event_id:'sr:match:efootball-feed-gamma',
+      sport:'virtual', product:'efootball_gt', market:'virtual_total', pick:'under', line:2.5, market_id:'18',
+      player_1:'Gamma FC', player_2:'Delta FC', match:'Gamma FC vs Delta FC',
+      start_time:new Date(feedFirstStart + 60 * 60 * 1000).toISOString(), odds:1.89, odds_fresh:true
+    }
+  ];
+  const feedFirstBuilder = {mode:'PAPER_ONLY',batches:[{batch_id:'DESK-BATCH-01',legs:feedFirstLegs}]};
+  const feedFirstEvents = feedFirstLegs.map((leg,index)=>({
+    event_id:leg.sportybet_event_id,
+    team_1:leg.player_1,
+    team_2:leg.player_2,
+    start_time_ms:Date.parse(leg.start_time),
+    match_status:'Not start',
+    markets:[{
+      id:'18',desc:'Total Goals Over/Under',specifier:'total='+leg.line,status:'0',
+      outcomes:[
+        {id:'feed-over-'+index,desc:'Over '+leg.line,odds:index===0?1.82:1.88,isActive:1},
+        {id:'feed-under-'+index,desc:'Under '+leg.line,odds:index===0?1.92:1.89,isActive:1}
+      ]
+    }]
+  }));
+  let feedFirstCatalogueRequests=0;
+  let feedFirstShareRequests=0;
+  globalThis.fetch=async(input,options={})=>{
+    const url=new URL(typeof input==='string'?input:input.url);
+    if(url.pathname==='/data/odds_builder.json') return jsonResponse(feedFirstBuilder);
+    if(url.pathname==='/api/ng/factsCenter/event') return jsonResponse({bizCode:10000,data:{}});
+    if(url.pathname==='/api/sportybet-virtual') return jsonResponse({ok:true,events:feedFirstEvents,upcoming_events_count:feedFirstEvents.length});
+    if(/\/(?:pcUpcomingEvents|wapConfigurableUpcomingEvents)$/.test(url.pathname)){
+      feedFirstCatalogueRequests++;
+      return jsonResponse({bizCode:10000,data:{tournaments:[]}});
+    }
+    if(url.pathname==='/api/ng/orders/share'){
+      feedFirstShareRequests++;
+      return jsonResponse({bizCode:10000,data:{shareCode:'EFOOTBALL-FEED-FIRST',outcomes:[{odds:1.82},{odds:1.89}]}});
+    }
+    throw new Error('Unexpected feed-first booking request: '+url.toString());
+  };
+  const feedFirstResponse=await onRequest({request:new Request('https://match-signal.pages.dev/api/sportybet-booking',{
+    method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({batch_id:'DESK-BATCH-01'})
+  })});
+  const feedFirstPayload=await feedFirstResponse.json();
+  assert.equal(feedFirstResponse.status,200,JSON.stringify(feedFirstPayload));
+  assert.equal(feedFirstPayload.ok,true,JSON.stringify(feedFirstPayload));
+  assert.equal(feedFirstPayload.booking_code,'EFOOTBALL-FEED-FIRST');
+  assert.equal(feedFirstPayload.selection_count,2);
+  assert.equal(feedFirstCatalogueRequests,0,'exact live-feed matches must bypass the broad catalogue crawl');
+  assert.equal(feedFirstShareRequests,1,'the resolved two-leg paper batch must request exactly one share code');
+
   console.log('SportyBet booking resilience: PASS (bounded paging, stale-ID recovery, football and basketball aliases, exact Tennis Set 1/Set 2 market-202 scopes, virtual eFootball aliases, and full-ticket safeguards).');
 } finally { globalThis.fetch=originalFetch; }
