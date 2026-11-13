@@ -111,7 +111,7 @@ def test_legacy_missing_scope_uses_bounded_discovery():
   def raise_for_status(self): pass
   def json(self): return payload
  with patch.object(mod.requests,"get",return_value=FakeResponse()) as get:
-  events,errors=mod.fetch_results([{"event_id":"legacy-e","start_time":"2026-10-11T10:00:00+00:00"}],now)
+  events,errors,_=mod.fetch_results([{"event_id":"legacy-e","start_time":"2026-10-11T10:00:00+00:00"}],now)
   assert events==payload["events"] and not errors
   args,kwargs=get.call_args
   assert args[0].endswith("/api/sportybet-virtual-results")
@@ -147,7 +147,7 @@ def test_scoped_result_lookup_uses_bounded_time_window():
   def raise_for_status(self):pass
   def json(self):return {"events":[event]}
  with patch.object(mod.requests,"get",return_value=FakeResponse()) as get:
-  rows,errors=mod.fetch_results([{"event_id":"scoped-event","category_id":"cat-1","tournament_id":"tour-1","start_time":"2026-10-11T10:00:00+00:00"}],now)
+  rows,errors,_=mod.fetch_results([{"event_id":"scoped-event","category_id":"cat-1","tournament_id":"tour-1","start_time":"2026-10-11T10:00:00+00:00"}],now)
   assert rows==[event] and not errors,(rows,errors)
   assert get.call_count==1,get.call_count
   params=get.call_args.kwargs["params"]
@@ -164,7 +164,7 @@ def test_legacy_scope_discovery_uses_bounded_time_window():
   def raise_for_status(self):pass
   def json(self):return {"events":[event]}
  with patch.object(mod.requests,"get",return_value=FakeResponse()) as get:
-  rows,errors=mod.fetch_results([{"event_id":"legacy-event","start_time":"2026-10-11T09:30:00+00:00"}],now)
+  rows,errors,_=mod.fetch_results([{"event_id":"legacy-event","start_time":"2026-10-11T09:30:00+00:00"}],now)
   assert rows==[event] and not errors,(rows,errors)
   assert get.call_count==1,get.call_count
   params=get.call_args.kwargs["params"]
@@ -194,7 +194,7 @@ def test_result_queries_bucket_stale_observations_with_three_hour_windows():
   matching=[{"eventId":s["event_id"]} for s in samples if start<=datetime.fromisoformat(s["start_time"].replace("Z","+00:00"))<=end]
   return FakeResponse(matching)
  with patch.object(mod.requests,"get",side_effect=fake_get):
-  rows,errors=mod.fetch_results(samples,now)
+  rows,errors,_=mod.fetch_results(samples,now)
  assert {r["eventId"] for r in rows}=={"old-a","old-b","old-c"},rows
  assert not errors,errors
  assert len(calls)==2,len(calls)
@@ -223,11 +223,50 @@ def test_result_scope_budget_always_includes_eadriatic_when_gt_has_more_than_twe
   queried.append(params.copy())
   return FakeResponse()
  with patch.object(mod.requests,"get",side_effect=fake_get):
-  rows,errors=mod.fetch_results(samples,now)
+  rows,errors,_=mod.fetch_results(samples,now)
  assert not rows and not errors,(rows,errors)
  scopes={(x.get("categoryId"),x.get("tournamentId")) for x in queried}
  assert ("adriatic-cat","adriatic-tour") in scopes,scopes
  assert len(scopes)<=12,len(scopes)
+
+
+def test_result_scope_rotation_prevents_old_competitions_from_starving_later_scopes():
+ now=datetime(2026,11,2,19,0,tzinfo=timezone.utc)
+ samples=[]
+ for i in range(16):
+  samples.append({
+   "event_id":f"gt-{i}","product":"efootball_gt",
+   "category_id":f"gt-cat-{i}","tournament_id":f"gt-tour-{i}",
+   "start_time":(now-timedelta(hours=2,minutes=i)).isoformat(),
+  })
+ for i in range(4):
+  samples.append({
+   "event_id":f"adriatic-{i}","product":"efootball_adriatic",
+   "category_id":f"adriatic-cat-{i}","tournament_id":f"adriatic-tour-{i}",
+   "start_time":(now-timedelta(hours=1,minutes=i)).isoformat(),
+  })
+
+ def run_batch(cursor):
+  queried=[]
+  class FakeResponse:
+   def raise_for_status(self):pass
+   def json(self):return {"events":[]}
+  def fake_get(url,params,timeout):
+   queried.append(params.copy())
+   return FakeResponse()
+  with patch.object(mod.requests,"get",side_effect=fake_get):
+   rows,errors,next_cursor=mod.fetch_results(samples,now,cursor)
+  assert not rows and not errors,(rows,errors)
+  scopes={(x["categoryId"],x["tournamentId"]) for x in queried}
+  assert len(scopes)==12,len(scopes)
+  return scopes,next_cursor
+
+ first,first_cursor=run_batch(None)
+ second,second_cursor=run_batch(first_cursor)
+ all_scopes={(x["category_id"],x["tournament_id"]) for x in samples}
+ assert first_cursor and second_cursor and first_cursor!=second_cursor,(first_cursor,second_cursor)
+ assert first|second==all_scopes,(first,second,all_scopes)
+ assert first & second, "the cursor rotates fairly and may wrap after the active queue"
 
 
 def test_settlement_coverage_reports_partial_and_overdue_results():
@@ -257,7 +296,7 @@ def test_result_proxy_upstream_errors_are_preserved():
   def raise_for_status(self):pass
   def json(self):return {"ok":True,"events":[],"errors":[{"page":1,"error":"upstream HTTP 503"}]}
  with patch.object(mod.requests,"get",return_value=FakeResponse()) as get:
-  rows,errors=mod.fetch_results([{"event_id":"legacy-event","start_time":"2026-10-11T09:30:00+00:00"}],now)
+  rows,errors,_=mod.fetch_results([{"event_id":"legacy-event","start_time":"2026-10-11T09:30:00+00:00"}],now)
   assert rows==[],rows
   assert errors and any("upstream HTTP 503" in err for err in errors),errors
   assert get.call_count==1,get.call_count
@@ -301,5 +340,5 @@ def test_efootball_display_calibration_is_applied():
  assert 'if(["efootball_gt","efootball_adriatic"].includes(product)&&isOverUnderPrediction(x))return null;' in source
 
 if __name__=="__main__":
- test_live_feed_compaction_preserves_scope_ids();test_markets();test_capture();test_live_snapshot_freshness_gate();test_live_market_coverage_reports_actual_btts_availability();test_settlement_and_summary();test_settlement_accepts_provider_final_set_score();test_legacy_missing_scope_uses_bounded_discovery();test_draw_and_append_only_merge();test_settlement_due_uses_elapsed_time_not_exact_minute();test_scoped_result_lookup_uses_bounded_time_window();test_legacy_scope_discovery_uses_bounded_time_window();test_result_queries_bucket_stale_observations_with_three_hour_windows();test_result_scope_budget_always_includes_eadriatic_when_gt_has_more_than_twelve_scopes();test_settlement_coverage_reports_partial_and_overdue_results();test_result_proxy_upstream_errors_are_preserved();test_efootball_display_calibration_is_applied()
- print("eFootball winner/BTTS research tests: PASS (15 groups)")
+ test_live_feed_compaction_preserves_scope_ids();test_markets();test_capture();test_live_snapshot_freshness_gate();test_live_market_coverage_reports_actual_btts_availability();test_settlement_and_summary();test_settlement_accepts_provider_final_set_score();test_legacy_missing_scope_uses_bounded_discovery();test_draw_and_append_only_merge();test_settlement_due_uses_elapsed_time_not_exact_minute();test_scoped_result_lookup_uses_bounded_time_window();test_legacy_scope_discovery_uses_bounded_time_window();test_result_queries_bucket_stale_observations_with_three_hour_windows();test_result_scope_budget_always_includes_eadriatic_when_gt_has_more_than_twelve_scopes();test_result_scope_rotation_prevents_old_competitions_from_starving_later_scopes();test_settlement_coverage_reports_partial_and_overdue_results();test_result_proxy_upstream_errors_are_preserved();test_efootball_display_calibration_is_applied()
+ print("eFootball winner/BTTS research tests: PASS (18 groups)")

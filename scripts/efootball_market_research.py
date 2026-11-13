@@ -371,7 +371,54 @@ def result_windows(samples,now):
     return sorted(windows,key=lambda item:item[0])
 
 
-def fetch_results(pending,now):
+def select_result_scopes(scopes,previous_cursor=None,limit=12):
+    """Choose a fair, rotating batch of exact result scopes.
+
+    Old unresolved competitions must not monopolize the bounded per-run query
+    budget. Keep each product represented in round-robin order, then resume
+    immediately after the last scope attempted on the previous run.
+    """
+    by_product=defaultdict(list)
+    for scope_key,samples in scopes.items():
+        counts=defaultdict(int)
+        for sample in samples:
+            product=str(sample.get("product") or "")
+            if product in {"efootball_gt","efootball_adriatic"}:
+                counts[product]+=1
+        product=max(("efootball_adriatic","efootball_gt"),key=lambda p:counts.get(p,0)) if counts else "efootball_gt"
+        label=f"{product}|{scope_key[0]}|{scope_key[1]}"
+        earliest=min(
+            (dt(s.get("start_time")) or datetime.max.replace(tzinfo=timezone.utc) for s in samples),
+            default=datetime.max.replace(tzinfo=timezone.utc)
+        )
+        by_product[product].append((label,scope_key,samples,earliest))
+
+    for product in by_product:
+        by_product[product].sort(key=lambda item:(item[3],item[0]))
+
+    ordered=[]
+    while any(by_product.values()):
+        progressed=False
+        for product in ("efootball_adriatic","efootball_gt"):
+            if by_product.get(product):
+                ordered.append(by_product[product].pop(0))
+                progressed=True
+        if not progressed:
+            break
+
+    # Rotate after the last attempted scope. A removed cursor (because its
+    # backlog was settled) safely falls back to the oldest remaining scope.
+    if previous_cursor:
+        cursor_index=next((i for i,item in enumerate(ordered) if item[0]==previous_cursor),None)
+        if cursor_index is not None:
+            ordered=ordered[cursor_index+1:]+ordered[:cursor_index+1]
+
+    selected=ordered[:max(0,int(limit))]
+    next_cursor=selected[-1][0] if selected else previous_cursor
+    return selected,next_cursor
+
+
+def fetch_results(pending,now,previous_scope_cursor=None):
     scopes=defaultdict(list); missing=[]
     for s in pending:
         cat,tour=str(s.get("category_id") or ""),str(s.get("tournament_id") or "")
@@ -405,26 +452,11 @@ def fetch_results(pending,now):
             if err:errors.append(err)
             if rows:events.extend(rows)
 
-    # Keep the result-query budget bounded, but never let older GT scopes
-    # consume all 12 slots before eAdriatic is queried. Interleave scopes by
-    # product, oldest first within each product, so both feeds get settlements.
-    by_product=defaultdict(list)
-    for scope_key,samples in scopes.items():
-        counts=defaultdict(int)
-        for sample in samples:
-            product=str(sample.get("product") or "")
-            if product in {"efootball_gt","efootball_adriatic"}:
-                counts[product]+=1
-        product=max(("efootball_adriatic","efootball_gt"),key=lambda p:counts.get(p,0)) if counts else "efootball_gt"
-        by_product[product].append((scope_key,samples))
-    for product in by_product:
-        by_product[product].sort(key=lambda x:min(dt(s.get("start_time")) or now for s in x[1]))
-    ordered=[]
-    while len(ordered)<12 and any(by_product.values()):
-        for product in ("efootball_adriatic","efootball_gt"):
-            if by_product.get(product) and len(ordered)<12:
-                ordered.append(by_product[product].pop(0))
-    for (cat,tour),samples in ordered:
+    # Rotate a bounded, product-balanced scope batch on every settlement pass.
+    # The cursor is persisted in last_run so permanently unresolved old scopes
+    # cannot starve later GT or eAdriatic competitions.
+    selected,next_scope_cursor=select_result_scopes(scopes,previous_scope_cursor,limit=12)
+    for _scope_label,(cat,tour),samples,_earliest in selected:
         base={"source":"efootball","categoryId":cat,"tournamentId":tour,"pageSize":100,"pageNum":1}
         for index,(start,end,bucket) in enumerate(result_windows(samples,now),1):
             filtered={**base,"startTime":int(start.timestamp()*1000),"endTime":int(end.timestamp()*1000)}
@@ -436,7 +468,7 @@ def fetch_results(pending,now):
     for e in events:
         event_id=str(e.get("eventId") or e.get("event_id") or "")
         if event_id:dedup[event_id]=e
-    return list(dedup.values()),errors
+    return list(dedup.values()),errors,next_scope_cursor
 def read_archive(path):
     try:
         v=json.loads(path.read_text(encoding="utf-8"))
@@ -486,11 +518,12 @@ def main():
     result_events_seen=0;exact_result_ids_matched=0;settlement_diagnostics=None
     previous_run=a.get("last_run") or {}
     settlement_checked_at=previous_run.get("settlement_checked_at")
+    settlement_scope_cursor=previous_run.get("settlement_scope_cursor")
     attempted_settlement=settlement_due(a,now)
     if attempted_settlement:
         settlement_checked_at=now.isoformat()
         try:
-            events,errs=fetch_results(pending,now)
+            events,errs,settlement_scope_cursor=fetch_results(pending,now,settlement_scope_cursor)
             result_events_seen=len(events)
             settled=settle(a,events,now)
             still_pending_ids={str(s.get("event_id") or "") for s in pending
@@ -519,6 +552,7 @@ def main():
     a["last_run"]={"captured_at":now.isoformat(),"captured_new":added,"settled_new":settled,
       "settlement_errors":errors,"settlement_warnings":warnings,"settlement_diagnostics":settlement_diagnostics,
       "settlement_checked_at":settlement_checked_at,
+      "settlement_scope_cursor":settlement_scope_cursor,
       "settlement_attempted":attempted_settlement,"pending_due_settlement_check":len(pending),
       "result_events_seen":result_events_seen,"exact_result_ids_matched":exact_result_ids_matched,
       "feed_snapshot_fresh":feed_snapshot_fresh,
