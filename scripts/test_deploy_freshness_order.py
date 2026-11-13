@@ -325,6 +325,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             "scripts/test_odds_builder_score_replay.py",
             "scripts/test_odds_builder_upcoming_desk_recent_losses.py",
             ".github/workflows/odds_builder.yml",
+            "functions/api/sportybet-booking.js",
             ".github/workflows/cloudflare-pages.yml",
         }
         self.assertTrue(builder_owned_paths.isdisjoint(direct_paths),

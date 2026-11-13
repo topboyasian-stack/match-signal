@@ -171,7 +171,10 @@ def main():
             "const unresolvedTennisLegs = unresolvedLegs.filter" in api and
             "}, unresolvedFootballIds, unresolvedFootballLegs)" in api and
             "}, unresolvedTennisIds, unresolvedTennisLegs)" in api and
-            "const [\n      vfootballEvents" in api and "footballEvents,\n      tennisEvents" in api,
+            "const [liveFeedEvents, footballEvents, tennisEvents, basketballEvents] = await Promise.all" in api and
+            "const [vfootballEvents, efootballEvents] = await Promise.all" in api and
+            "const remainingVirtualLegs = unresolvedVirtualLegs.filter(leg => !sharedMatchedLegs.has(leg))" in api and
+            "const remainingEfootballLegs = unresolvedEfootballLegs.filter(leg => !sharedMatchedLegs.has(leg))" in api,
             "Parallel Football and Tennis alias scans must only process legs not resolved by the direct event-details lookup")
     require("leg?.model_qualified!==true" in api and "leg?.market_id!=='225'" in api and
             "leg.market === 'winner'" in api and "leg.market_id !== '219'" in api and
