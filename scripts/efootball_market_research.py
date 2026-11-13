@@ -372,11 +372,11 @@ def result_windows(samples,now):
 
 
 def select_result_scopes(scopes,previous_cursor=None,limit=12):
-    """Choose a fair, rotating batch of exact result scopes.
+    """Choose a fair, rotating batch and resume after removed/settled scopes.
 
-    Old unresolved competitions must not monopolize the bounded per-run query
-    budget. Keep each product represented in round-robin order, then resume
-    immediately after the last scope attempted on the previous run.
+    Per-product kickoff/scope watermarks survive after the last queried
+    competition is settled and drops out of the pending set. This prevents a
+    resolved cursor row from resetting the scheduler to the oldest backlog.
     """
     by_product=defaultdict(list)
     for scope_key,samples in scopes.items():
@@ -393,28 +393,38 @@ def select_result_scopes(scopes,previous_cursor=None,limit=12):
         )
         by_product[product].append((label,scope_key,samples,earliest))
 
-    for product in by_product:
-        by_product[product].sort(key=lambda item:(item[3],item[0]))
+    next_cursor=dict(previous_cursor) if isinstance(previous_cursor,dict) else {}
+    for product,lane in by_product.items():
+        lane.sort(key=lambda item:(item[3],item[0]))
+        saved=next_cursor.get(product)
+        if isinstance(saved,dict):
+            saved_time=dt(saved.get("start_time")) or datetime.min.replace(tzinfo=timezone.utc)
+            saved_label=str(saved.get("label") or "")
+            saved_key=(saved_time,saved_label)
+            # Find the first pending scope after the saved watermark even when
+            # the exact saved scope itself has already been settled and removed.
+            next_index=next(
+                (i for i,item in enumerate(lane) if (item[3],item[0])>saved_key),
+                0
+            )
+            lane[:]=lane[next_index:]+lane[:next_index]
 
-    ordered=[]
-    while any(by_product.values()):
+    selected=[]
+    product_order=("efootball_adriatic","efootball_gt")
+    while len(selected)<max(0,int(limit)) and any(by_product.values()):
         progressed=False
-        for product in ("efootball_adriatic","efootball_gt"):
-            if by_product.get(product):
-                ordered.append(by_product[product].pop(0))
+        for product in product_order:
+            lane=by_product.get(product) or []
+            if lane and len(selected)<max(0,int(limit)):
+                item=lane.pop(0)
+                selected.append(item)
+                next_cursor[product]={
+                    "label":item[0],
+                    "start_time":item[3].isoformat() if item[3]!=datetime.max.replace(tzinfo=timezone.utc) else None
+                }
                 progressed=True
         if not progressed:
             break
-
-    # Rotate after the last attempted scope. A removed cursor (because its
-    # backlog was settled) safely falls back to the oldest remaining scope.
-    if previous_cursor:
-        cursor_index=next((i for i,item in enumerate(ordered) if item[0]==previous_cursor),None)
-        if cursor_index is not None:
-            ordered=ordered[cursor_index+1:]+ordered[:cursor_index+1]
-
-    selected=ordered[:max(0,int(limit))]
-    next_cursor=selected[-1][0] if selected else previous_cursor
     return selected,next_cursor
 
 
