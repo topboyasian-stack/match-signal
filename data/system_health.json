@@ -1,26 +1,26 @@
 {
-  "generated_at": "2026-11-14T08:19:43.631117+00:00",
-  "status": "DEGRADED",
+  "generated_at": "2026-11-14T08:26:43.824289+00:00",
+  "status": "HEALTHY",
   "critical_issues": 0,
-  "warning_issues": 1,
+  "warning_issues": 0,
   "info_issues": 1,
   "checks": [
     {
       "engine": "core_prediction_pipeline",
       "status": "PASS",
-      "age_hours": 1.3,
+      "age_hours": 1.42,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.04,
+      "age_hours": 0.09,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
       "status": "PASS",
-      "age_hours": 1.31,
+      "age_hours": 0.03,
       "threshold_hours": 4
     },
     {
@@ -32,35 +32,35 @@
     {
       "engine": "prediction_desk_health",
       "status": "PASS",
-      "age_hours": 0.06,
+      "age_hours": 0.03,
       "threshold_hours": 2
     },
     {
       "engine": "virtual_participant_history",
       "status": "PASS",
-      "max_input_age_minutes": 8.7,
-      "virtual_lab_status_age_minutes": 12.0,
+      "max_input_age_minutes": 16.9,
+      "virtual_lab_status_age_minutes": 19.0,
       "threshold_minutes": 30.0,
       "stale_inputs": []
     },
     {
       "engine": "tennis_forward_discovery",
       "status": "PASS",
-      "age_hours": 1.4,
+      "age_hours": 1.52,
       "threshold_hours": 8
     },
     {
       "engine": "virtual_live_feed",
-      "status": "STALE",
-      "age_hours": 0.64,
+      "status": "PASS",
+      "age_hours": 0.11,
       "threshold_hours": 0.5,
       "heartbeat_source": "virtual_lab_live.json",
-      "events_count": 678
+      "events_count": 653
     },
     {
       "engine": "nba_live_observation_recorder",
       "status": "PASS",
-      "age_hours": 0.05,
+      "age_hours": 0.16,
       "threshold_hours": 0.25,
       "heartbeat_source": "nba_live_observations.json.gz",
       "games_tracked": 112,
@@ -94,19 +94,14 @@
           "historical_rows_last_success": 73,
           "upcoming_rows_last_success": 3,
           "published_prediction_rows": 3,
-          "last_attempt_at": "2026-11-14T01:47:07.112338+00:00",
-          "last_successful_update_at": "2026-11-14T01:47:07.112338+00:00",
+          "last_attempt_at": "2026-11-14T08:25:22.567590+00:00",
+          "last_successful_update_at": "2026-11-14T08:25:22.567590+00:00",
           "last_error": null
         }
       }
     }
   ],
   "issues": [
-    {
-      "code": "VIRTUAL_LIVE_FEED_STALE",
-      "severity": "warning",
-      "detail": "virtual_lab_live.json age 0.64h exceeds 0.50h; a downstream Unified Upcoming refresh cannot substitute for a fresh source snapshot"
-    },
     {
       "code": "SELECTION_GATE_EMPTY",
       "severity": "info",
@@ -116,10 +111,10 @@
   "policy": "Proactive operational guard. Visibility is never reduced to zero just because an evidence gate is unmet.",
   "paper_only": true,
   "prediction_desk_filters": {
-    "past_kickoff_rows_hidden": 0,
+    "past_kickoff_rows_hidden": 119,
     "stale_live_flags_hidden": 0,
     "expired_settled_rows_hidden": 0,
-    "virtual_market_rows_held_for_kickoff_window": 252,
+    "virtual_market_rows_held_for_kickoff_window": 260,
     "virtual_rows_held_for_stale_participant_history": 0,
     "virtual_rows_held_for_recent_product_drawdown": 78
   }
