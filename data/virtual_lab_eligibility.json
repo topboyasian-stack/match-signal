@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-14T22:53:47.939098+00:00",
+  "generated_at": "2026-11-14T23:27:04.261211+00:00",
   "mode": "PAPER_RESEARCH_ONLY",
   "policy": {
     "minimum_competition_observations": 12,
@@ -23,7 +23,6 @@
     "A-League",
     "Bundesliga",
     "Champions League A",
-    "Esoccer H2H GG League",
     "Virtual",
     "Volta Champions League A",
     "World Cup B"
@@ -43,6 +42,7 @@
     "Copa America",
     "EFL Championship",
     "Eredivisie",
+    "Esoccer H2H GG League",
     "Europa League",
     "FA Cup",
     "GT Leagues",
@@ -69,13 +69,13 @@
   ],
   "raw_eligible_competitions": [
     "A-League",
+    "Argentina Super League 2x6",
     "Bundesliga",
     "Bundesliga (Virtual eComp)",
     "CSL",
     "Champions League A",
     "Champions League AFC",
     "Eredivisie",
-    "Esoccer H2H GG League",
     "Portugal Primera",
     "Premier League 2x6",
     "Seria A (Virtual eComp)",
@@ -84,6 +84,7 @@
     "Volta BundesLiga",
     "Volta Champions League A",
     "Volta FA Cup",
+    "Volta World Cup B",
     "World Cup B"
   ],
   "model_qualified_competitions": [
@@ -112,7 +113,6 @@
       "A-League",
       "Bundesliga",
       "Champions League A",
-      "Esoccer H2H GG League",
       "Volta Champions League A",
       "World Cup B"
     ],
@@ -123,13 +123,13 @@
   "raw_eligible_competitions_by_product": {
     "efootball_gt": [
       "A-League",
+      "Argentina Super League 2x6",
       "Bundesliga",
       "Bundesliga (Virtual eComp)",
       "CSL",
       "Champions League A",
       "Champions League AFC",
       "Eredivisie",
-      "Esoccer H2H GG League",
       "Portugal Primera",
       "Premier League 2x6",
       "Seria A (Virtual eComp)",
@@ -137,6 +137,7 @@
       "Volta BundesLiga",
       "Volta Champions League A",
       "Volta FA Cup",
+      "Volta World Cup B",
       "World Cup B"
     ],
     "vfootball": [
@@ -180,6 +181,7 @@
   "eligible_ou_lines_by_product": {
     "efootball_gt": [
       1.5,
+      5.5,
       7.5
     ],
     "vfootball": [
@@ -193,6 +195,7 @@
       1.5,
       4.0,
       5.0,
+      5.5,
       7.5
     ],
     "vfootball": [
@@ -263,61 +266,16 @@
     "Virtual": {
       "raw_eligible": true,
       "all": {
-        "n": 20918,
-        "wins": 15875,
-        "win_rate": 0.7589157663256525,
-        "roi": -0.02548283774739457
+        "n": 20884,
+        "wins": 15845,
+        "win_rate": 0.7587148055927984,
+        "roi": -0.025645949051905745
       },
       "oos": {
-        "n": 6276,
-        "wins": 4754,
-        "win_rate": 0.7574888463989803,
-        "roi": -0.025326641172721463
-      }
-    },
-    "GT Leagues": {
-      "raw_eligible": false,
-      "all": {
-        "n": 1188,
-        "wins": 558,
-        "win_rate": 0.4696969696969697,
-        "roi": -0.14006734006734006
-      },
-      "oos": {
-        "n": 357,
-        "wins": 169,
-        "win_rate": 0.4733893557422969,
-        "roi": -0.14058823529411762
-      }
-    },
-    "Champions League A": {
-      "raw_eligible": true,
-      "all": {
-        "n": 133,
-        "wins": 80,
-        "win_rate": 0.6015037593984962,
-        "roi": 0.009774436090225552
-      },
-      "oos": {
-        "n": 40,
-        "wins": 24,
-        "win_rate": 0.6,
-        "roi": 0.006000000000000005
-      }
-    },
-    "Esoccer H2H GG League": {
-      "raw_eligible": true,
-      "all": {
-        "n": 2364,
-        "wins": 1457,
-        "win_rate": 0.6163282571912013,
-        "roi": -0.051438240270727575
-      },
-      "oos": {
-        "n": 710,
-        "wins": 444,
-        "win_rate": 0.6253521126760564,
-        "roi": -0.045633802816901416
+        "n": 6266,
+        "wins": 4751,
+        "win_rate": 0.7582189594637727,
+        "roi": -0.024053622725821892
       }
     },
     "Champions League B": {
@@ -348,6 +306,36 @@
         "wins": 24,
         "win_rate": 0.6153846153846154,
         "roi": 0.004102564102564112
+      }
+    },
+    "Esoccer H2H GG League": {
+      "raw_eligible": false,
+      "all": {
+        "n": 2384,
+        "wins": 1469,
+        "win_rate": 0.6161912751677853,
+        "roi": -0.05188338926174496
+      },
+      "oos": {
+        "n": 716,
+        "wins": 446,
+        "win_rate": 0.6229050279329609,
+        "roi": -0.05013966480446925
+      }
+    },
+    "GT Leagues": {
+      "raw_eligible": false,
+      "all": {
+        "n": 1192,
+        "wins": 562,
+        "win_rate": 0.4714765100671141,
+        "roi": -0.13696308724832215
+      },
+      "oos": {
+        "n": 358,
+        "wins": 169,
+        "win_rate": 0.4720670391061452,
+        "roi": -0.1449441340782123
       }
     },
     "Club World Cup": {
@@ -546,18 +534,18 @@
       }
     },
     "Volta World Cup B": {
-      "raw_eligible": false,
+      "raw_eligible": true,
       "all": {
-        "n": 111,
-        "wins": 66,
-        "win_rate": 0.5945945945945946,
-        "roi": -0.07216216216216216
+        "n": 123,
+        "wins": 75,
+        "win_rate": 0.6097560975609756,
+        "roi": -0.04455284552845529
       },
       "oos": {
-        "n": 34,
-        "wins": 20,
-        "win_rate": 0.5882352941176471,
-        "roi": -0.06999999999999999
+        "n": 37,
+        "wins": 23,
+        "win_rate": 0.6216216216216216,
+        "roi": -0.005675675675675692
       }
     },
     "CONMEBOL Libertadores (Virtual eComp)": {
@@ -740,6 +728,21 @@
         "roi": 0.171875
       }
     },
+    "Champions League A": {
+      "raw_eligible": true,
+      "all": {
+        "n": 127,
+        "wins": 76,
+        "win_rate": 0.5984251968503937,
+        "roi": 0.0005511811023621982
+      },
+      "oos": {
+        "n": 39,
+        "wins": 24,
+        "win_rate": 0.6153846153846154,
+        "roi": 0.0317948717948718
+      }
+    },
     "Champions League B 2x6": {
       "raw_eligible": false,
       "all": {
@@ -876,18 +879,18 @@
       }
     },
     "Argentina Super League 2x6": {
-      "raw_eligible": false,
+      "raw_eligible": true,
       "all": {
-        "n": 69,
-        "wins": 44,
-        "win_rate": 0.6376811594202898,
-        "roi": -0.00101449275362317
+        "n": 72,
+        "wins": 46,
+        "win_rate": 0.6388888888888888,
+        "roi": 0.003194444444444463
       },
       "oos": {
-        "n": 21,
-        "wins": 13,
-        "win_rate": 0.6190476190476191,
-        "roi": -0.05666666666666666
+        "n": 22,
+        "wins": 14,
+        "win_rate": 0.6363636363636364,
+        "roi": -0.009545454545454534
       }
     },
     "Volta Club World Cup": {
@@ -922,139 +925,124 @@
     }
   },
   "ou_lines": {
-    "3.5": {
-      "raw_eligible": false,
-      "all": {
-        "n": 4017,
-        "wins": 2889,
-        "win_rate": 0.719193427931292,
-        "roi": -0.027005227781926818
-      },
-      "oos": {
-        "n": 1206,
-        "wins": 866,
-        "win_rate": 0.7180762852404643,
-        "roi": -0.028673300165837478
-      }
-    },
-    "4.5": {
-      "raw_eligible": false,
-      "all": {
-        "n": 3793,
-        "wins": 3109,
-        "win_rate": 0.8196678091220669,
-        "roi": -0.02712892169786447
-      },
-      "oos": {
-        "n": 1138,
-        "wins": 929,
-        "win_rate": 0.8163444639718805,
-        "roi": -0.04214411247803162
-      }
-    },
-    "5.5": {
-      "raw_eligible": false,
-      "all": {
-        "n": 3659,
-        "wins": 3159,
-        "win_rate": 0.8633506422519814,
-        "roi": -0.01640338890407213
-      },
-      "oos": {
-        "n": 1098,
-        "wins": 946,
-        "win_rate": 0.8615664845173042,
-        "roi": -0.025792349726775934
-      }
-    },
-    "0.5": {
-      "raw_eligible": true,
-      "all": {
-        "n": 2831,
-        "wins": 2611,
-        "win_rate": 0.9222889438361003,
-        "roi": -0.015475097138820159
-      },
-      "oos": {
-        "n": 850,
-        "wins": 796,
-        "win_rate": 0.9364705882352942,
-        "roi": 0.0006352941176471059
-      }
-    },
     "1.5": {
       "raw_eligible": false,
       "all": {
-        "n": 3259,
-        "wins": 2343,
-        "win_rate": 0.7189321877876649,
-        "roi": -0.03278613071494324
+        "n": 3257,
+        "wins": 2336,
+        "win_rate": 0.7172244396684065,
+        "roi": -0.03549585508136322
       },
       "oos": {
         "n": 978,
-        "wins": 698,
-        "win_rate": 0.7137014314928425,
-        "roi": -0.03981595092024541
+        "wins": 693,
+        "win_rate": 0.7085889570552147,
+        "roi": -0.0462474437627812
       }
     },
     "2.5": {
       "raw_eligible": false,
       "all": {
         "n": 3839,
-        "wins": 2221,
-        "win_rate": 0.5785360771034124,
-        "roi": -0.05181557697317009
+        "wins": 2219,
+        "win_rate": 0.5780151081010679,
+        "roi": -0.05278978900755405
       },
       "oos": {
         "n": 1152,
-        "wins": 672,
-        "win_rate": 0.5833333333333334,
-        "roi": -0.04309895833333335
+        "wins": 674,
+        "win_rate": 0.5850694444444444,
+        "roi": -0.040364583333333336
+      }
+    },
+    "3.5": {
+      "raw_eligible": false,
+      "all": {
+        "n": 4016,
+        "wins": 2891,
+        "win_rate": 0.7198705179282868,
+        "roi": -0.02530378486055778
+      },
+      "oos": {
+        "n": 1205,
+        "wins": 870,
+        "win_rate": 0.7219917012448133,
+        "roi": -0.022954356846473047
+      }
+    },
+    "4.5": {
+      "raw_eligible": false,
+      "all": {
+        "n": 3791,
+        "wins": 3106,
+        "win_rate": 0.8193088894750725,
+        "roi": -0.026934845687153767
+      },
+      "oos": {
+        "n": 1138,
+        "wins": 929,
+        "win_rate": 0.8163444639718805,
+        "roi": -0.040992970123022825
+      }
+    },
+    "5.5": {
+      "raw_eligible": false,
+      "all": {
+        "n": 3655,
+        "wins": 3155,
+        "win_rate": 0.8632010943912448,
+        "roi": -0.01605471956224348
+      },
+      "oos": {
+        "n": 1097,
+        "wins": 945,
+        "win_rate": 0.8614402917046491,
+        "roi": -0.02430264357338193
       }
     },
     "6.5": {
       "raw_eligible": false,
       "all": {
-        "n": 1664,
-        "wins": 1389,
-        "win_rate": 0.8347355769230769,
-        "roi": -0.04277644230769229
+        "n": 1668,
+        "wins": 1393,
+        "win_rate": 0.8351318944844125,
+        "roi": -0.0423621103117506
       },
       "oos": {
-        "n": 500,
-        "wins": 417,
-        "win_rate": 0.834,
-        "roi": -0.045579999999999996
-      }
-    },
-    "4.0": {
-      "raw_eligible": true,
-      "all": {
-        "n": 46,
-        "wins": 28,
-        "win_rate": 0.6086956521739131,
-        "roi": 0.017608695652173895
-      },
-      "oos": {
-        "n": 14,
-        "wins": 11,
-        "win_rate": 0.7857142857142857,
-        "roi": 0.31499999999999995
+        "n": 501,
+        "wins": 418,
+        "win_rate": 0.8343313373253493,
+        "roi": -0.04826347305389221
       }
     },
     "7.5": {
       "raw_eligible": true,
       "all": {
-        "n": 418,
-        "wins": 308,
-        "win_rate": 0.7368421052631579,
-        "roi": -0.027918660287081343
+        "n": 420,
+        "wins": 310,
+        "win_rate": 0.7380952380952381,
+        "roi": -0.02773809523809524
       },
       "oos": {
         "n": 126,
         "wins": 96,
         "win_rate": 0.7619047619047619,
-        "roi": -0.010793650793650788
+        "roi": -0.014047619047619041
+      }
+    },
+    "0.5": {
+      "raw_eligible": true,
+      "all": {
+        "n": 2825,
+        "wins": 2604,
+        "win_rate": 0.9217699115044248,
+        "roi": -0.016162831858407032
+      },
+      "oos": {
+        "n": 848,
+        "wins": 794,
+        "win_rate": 0.9363207547169812,
+        "roi": 0.00010613207547174508
       }
     },
     "5.0": {
@@ -1087,49 +1075,64 @@
         "roi": -0.316
       }
     },
+    "4.0": {
+      "raw_eligible": true,
+      "all": {
+        "n": 45,
+        "wins": 27,
+        "win_rate": 0.6,
+        "roi": 0.003999999999999979
+      },
+      "oos": {
+        "n": 14,
+        "wins": 11,
+        "win_rate": 0.7857142857142857,
+        "roi": 0.31499999999999995
+      }
+    },
     "8.5": {
       "raw_eligible": false,
       "all": {
-        "n": 250,
-        "wins": 138,
-        "win_rate": 0.552,
-        "roi": -0.09291999999999997
+        "n": 251,
+        "wins": 139,
+        "win_rate": 0.5537848605577689,
+        "roi": -0.09043824701195216
       },
       "oos": {
-        "n": 75,
-        "wins": 43,
-        "win_rate": 0.5733333333333334,
-        "roi": -0.07346666666666665
+        "n": 76,
+        "wins": 44,
+        "win_rate": 0.5789473684210527,
+        "roi": -0.06552631578947367
       }
     },
     "9.5": {
       "raw_eligible": false,
       "all": {
-        "n": 148,
+        "n": 149,
         "wins": 76,
-        "win_rate": 0.5135135135135135,
-        "roi": -0.16452702702702707
+        "win_rate": 0.5100671140939598,
+        "roi": -0.17013422818791948
       },
       "oos": {
         "n": 45,
-        "wins": 27,
-        "win_rate": 0.6,
-        "roi": -0.019555555555555538
+        "wins": 26,
+        "win_rate": 0.5777777777777777,
+        "roi": -0.05622222222222221
       }
     },
     "3.0": {
       "raw_eligible": false,
       "all": {
-        "n": 112,
-        "wins": 52,
-        "win_rate": 0.4642857142857143,
-        "roi": -0.22848214285714286
+        "n": 114,
+        "wins": 54,
+        "win_rate": 0.47368421052631576,
+        "roi": -0.21324561403508774
       },
       "oos": {
-        "n": 34,
-        "wins": 17,
-        "win_rate": 0.5,
-        "roi": -0.1647058823529412
+        "n": 35,
+        "wins": 18,
+        "win_rate": 0.5142857142857142,
+        "roi": -0.1422857142857143
       }
     },
     "10.5": {
@@ -1201,16 +1204,16 @@
     "pass": false,
     "baseline_variant": "poisson",
     "baseline_metrics": {
-      "n": 7251,
-      "brier": 0.15402518108019175,
-      "log_loss": 0.4675043974853811,
-      "ece": 0.004816103248778025
+      "n": 7262,
+      "brier": 0.1542933587445871,
+      "log_loss": 0.468164770595218,
+      "ece": 0.005498532287900556
     },
     "participant_metrics": {
-      "n": 7251,
-      "brier": 0.1564446372289139,
-      "log_loss": 0.4732920407036123,
-      "ece": 0.017088336864281215
+      "n": 7262,
+      "brier": 0.15679618922823044,
+      "log_loss": 0.47410789364006156,
+      "ece": 0.017819232392940015
     },
     "thresholds": {
       "brier_must_improve": true,
@@ -1237,16 +1240,16 @@
       "pass": false,
       "baseline_variant": "poisson",
       "baseline_metrics": {
-        "n": 7251,
-        "brier": 0.15402518108019175,
-        "log_loss": 0.4675043974853811,
-        "ece": 0.004816103248778025
+        "n": 7262,
+        "brier": 0.1542933587445871,
+        "log_loss": 0.468164770595218,
+        "ece": 0.005498532287900556
       },
       "participant_metrics": {
-        "n": 7251,
-        "brier": 0.1564446372289139,
-        "log_loss": 0.4732920407036123,
-        "ece": 0.017088336864281215
+        "n": 7262,
+        "brier": 0.15679618922823044,
+        "log_loss": 0.47410789364006156,
+        "ece": 0.017819232392940015
       },
       "thresholds": {
         "brier_must_improve": true,
