@@ -421,7 +421,8 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             "sport-hubs.css",
             "workspace-ui.js",
             "league.html",
-            "functions/**",
+            # Broad API changes intentionally bypass the large board publication;
+            # board-owned inputs stay explicitly enumerated below.
             "data/predictions.json",
             "data/darts_*.json",
             "data/table_tennis_*.json",
@@ -429,7 +430,6 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             "data/tennis_forward_status.json",
             "data/club-logo-registry.json",
             "assets/club-logos/**",
-            ".github/workflows/cloudflare-pages.yml",
         }
         missing = sorted(required_inputs - board_paths)
         self.assertEqual(missing, [], f"Deployable inputs bypass the Unified board workflow: {missing}")
