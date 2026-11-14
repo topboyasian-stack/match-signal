@@ -21,6 +21,9 @@ on:
       - 'basketball-live.js'
       - 'basketball.html'
       - 'scripts/test_basketball_desk_contract.mjs'
+      - 'scripts/test_nba_ticket_guard.mjs'
+      - 'scripts/test_odds_builder_ui_freshness.mjs'
+      - 'scripts/test_ticket_drawer_contract.py'
       - 'scripts/test_nba_live_projection.mjs'
       - 'scripts/record_nba_live_behavior.py'
       - 'scripts/test_record_nba_live_behavior.py'
@@ -49,8 +52,12 @@ on:
       - 'basketball-live.js'
       - 'basketball.html'
       - 'scripts/test_basketball_desk_contract.mjs'
+      - 'scripts/test_nba_ticket_guard.mjs'
+      - 'scripts/test_odds_builder_ui_freshness.mjs'
+      - 'scripts/test_ticket_drawer_contract.py'
       - 'scripts/test_nba_live_projection.mjs'
       - '.github/workflows/nba-source-tests.yml'
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -75,6 +82,12 @@ jobs:
         run: node scripts/test_basketball_desk_contract.mjs
       - name: Run NBA live projection and evidence-gate tests
         run: node scripts/test_nba_live_projection.mjs
+      - name: Run all-or-nothing NBA totals ticket guard
+        run: node scripts/test_nba_ticket_guard.mjs
+      - name: Run odds-builder freshness and price-display regression
+        run: node scripts/test_odds_builder_ui_freshness.mjs
+      - name: Run shared ticket-drawer contract
+        run: python scripts/test_ticket_drawer_contract.py
       - name: Run NBA source and season-isolation tests
         run: |
           python scripts/test_expansion_sources.py
