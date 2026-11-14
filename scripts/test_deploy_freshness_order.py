@@ -50,17 +50,19 @@ def workflow_schedule_crons(source: str) -> list[str]:
 
 
 class FreshnessDeployOrderingTests(unittest.TestCase):
-    def test_nba_source_test_workflow_is_allowed_with_safe_basketball_page_promotion(self):
+    def test_nba_source_tests_do_not_bypass_ordered_basketball_promotion(self):
         match = re.search(r"allowed='([^']+)'", PAGES_WORKFLOW)
         self.assertIsNotNone(match, "Pages direct-promotion guard must expose its explicit allowlist")
         self.assertIn(
             "|.github/workflows/nba-source-tests.yml|",
             match.group(1),
-            "the NBA source-test workflow may accompany an already-allowlisted basketball UI update",
+            "NBA source tests may accompany a separately allowlisted safe static update",
         )
         paths = workflow_push_paths(PAGES_WORKFLOW)
-        self.assertIn("basketball-live.js", paths)
-        self.assertIn("basketball.html", paths)
+        self.assertNotIn("basketball-live.js", paths)
+        self.assertNotIn("basketball.html", paths)
+        self.assertNotIn("|basketball-live.js|", match.group(1))
+        self.assertNotIn("|basketball.html|", match.group(1))
 
     def test_single_selection_gate_regression_files_are_allowed_with_safe_ui_promotion(self):
         match = re.search(r"allowed='([^']+)'", PAGES_WORKFLOW)
