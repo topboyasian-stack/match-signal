@@ -120,17 +120,7 @@ Latest inspected artifacts were generated around **2026-11-02 02:00 UTC**:
 - No release gate has been relaxed: `RESEARCH_ONLY` and the Basketball ticket gate remain locked. Priority 14's minimum 30-fixture probability sample is met (40 uniquely settled prospective market-225 fixtures); Priority 15 is first unchecked until at least 100 unique prospective settled market-225 selections are available (target 200), each with exact immutable snapshot linkage and official ESPN settlement.
 - Release is still `RESEARCH_ONLY`; Basketball ticket selection/code generation remains locked. Do not treat historical synthetic-line metrics or fresh but unsettled snapshots as betting proof.
 
-## Next execution priorities
-
-15. [ ] Collect at least 100 unique prospective settled market-225 selections; target 200. Every bet needs a fresh exact snapshot and official ESPN result.
-16. [ ] Require positive ROI, positive bootstrapped 95% lower bound, ROI above the market-favourite baseline, and positive closing-line value where a later real quote exists.
-17. [ ] Require at least 100 post-cutoff forecast games with lower MAE than the development baseline and absolute bias no greater than 3 points.
-18. [ ] Keep `RESEARCH_ONLY` until every forecast and market gate passes.
-19. [ ] Run Basketball page, live feed, settled results, odds display, and ticket-builder regression tests against latest main.
-20. [ ] Revalidate every NBA ticket leg against exact fresh SportyBet 225 event/line/side/price immediately before code generation; reject the whole slip if any leg is invalid.
-21. [ ] Unlock NBA ticket selection/code generation only after all prospective gates and production smoke tests pass.
-
-**## Latest verified continuation checkpoint — 2026-11-02 03:58 UTC
+## Archived checkpoint — 2026-11-02 03:58 UTC (superseded)
 
 This checkpoint supersedes the earlier “Next action on resume” paragraph. The frozen prospective cutoff remains 2026-11-02T02:00:00+00:00. No release threshold was relaxed.
 
@@ -155,13 +145,13 @@ This checkpoint supersedes the earlier “Next action on resume” paragraph. Th
 - The persisted production verification record at main HEAD cd5072173b941bafb6cd1a29ffe79bb752cd8918 is VERIFIED_WITH_DIAGNOSTIC_INCOMPLETE: core pages are verified, but Qualified Best has VALID_ZERO coverage with 0 model-qualified rows and the booking API POST check is NO_FUTURE_BATCH (no fully future 2+ leg batch was available, so no booking code was requested). The deployment is current for site/data source e98d5f4; the only later main changes observed so far are verification/checkpoint records. Builder Production Promotion run [41384741905](https://github.com/topboyasian-stack/match-signal/actions/runs/41384741905) completed successfully, while [41385043586](https://github.com/topboyasian-stack/match-signal/actions/runs/41385043586) remains in progress and may publish another Builder artifact. Recheck production after that run; do not treat the deployment state as final until any resulting deployment also passes smoke tests.
 - Basketball release qualification and ticket-code generation remain fail-closed. No auto-betting was enabled, and no release gate was unlocked.
 
-### Next action on resume
+### Superseded next action (historical)
 
 1. Re-read this file, current main, the latest probability/value and OOS reports, the settlement ledger, fresh market-225 snapshots, and current Actions/deployment state.
 2. Confirm the queued deployment and Builder Promotion statuses; verify any subsequent capture-triggered settlement/report runs and confirm the report timestamp is newer than the latest capture and ledger timestamps.
 3. Continue Priority 14 only: collect genuinely prospective, exact-market-225 selections and settle them only from official ESPN results. Do not start Priority 15 until at least 30 unique prospective market-225 fixtures have settled and every other release condition is independently proven. Keep RESEARCH_ONLY and the Basketball ticket gate locked.
 
-## Latest verified continuation checkpoint — 2026-11-02 04:30 UTC
+## Archived checkpoint — 2026-11-02 04:30 UTC (superseded)
 
 This checkpoint supersedes the earlier 03:58 UTC production/ticket notes above. The fixed prospective cutoff remains `2026-11-02T02:00:00+00:00`. No release threshold was relaxed.
 
@@ -216,9 +206,9 @@ This checkpoint supersedes the earlier 03:58 UTC production/ticket notes above. 
 - Added regressions for the live forecast defaults, fixed-cutoff evaluator parameters, residual-calibration parameter identity, and the matching client/server release model version.
 - The frozen prospective cutoff remains `2026-11-02T02:00:00+00:00`; no sample-size or performance gate was relaxed. NBA remains `RESEARCH_ONLY` until the prospective model, probability, ROI, CLV, settlement and booking release gates pass.
 
-## Latest continuation checkpoint — 2026-11-02 08:32 UTC
+## Archived checkpoint — 2026-11-02 08:32 UTC (superseded)
 
-This is the active resume point. The frozen prospective cutoff remains `2026-11-02T02:00:00+00:00`. No sample-size, odds-freshness, ROI, CLV, forecast, or release threshold was relaxed. The latest main HEAD observed before this checkpoint edit is `4f2bccd5c711e1c33d21eae40804a7ac8fb94748`; the NBA work remains confined to `topboyasian-stack/match-signal`.
+This was the active resume point at the time; it is superseded by the current checkpoint at the end of this file. The frozen prospective cutoff remains `2026-11-02T02:00:00+00:00`. No sample-size, odds-freshness, ROI, CLV, forecast, or release threshold was relaxed. The latest main HEAD observed before this checkpoint edit is `4f2bccd5c711e1c33d21eae40804a7ac8fb94748`; the NBA work remains confined to `topboyasian-stack/match-signal`.
 
 ### First unchecked priority: 14 — prospective probability validation
 
@@ -245,7 +235,7 @@ This is the active resume point. The frozen prospective cutoff remains `2026-11-
 - The capture-triggered settlement and probability workflows have both completed successfully: [41411898561](https://github.com/topboyasian-stack/match-signal/actions/runs/41411898561) and [41411898949](https://github.com/topboyasian-stack/match-signal/actions/runs/41411898949). The report is newer than the capture and ledger timestamps and remains `RESEARCH_ONLY`.
 - Builder Production Promotion run [41411497799](https://github.com/topboyasian-stack/match-signal/actions/runs/41411497799) remained in progress and later promotion run [41411976023](https://github.com/topboyasian-stack/match-signal/actions/runs/41411976023) was pending at the last check. The latest completed deployment remains [run 41409803237](https://github.com/topboyasian-stack/match-signal/actions/runs/41409803237), source `11a3dd395e1f0aee36a2d42b364e1d03cd13bd64`, artifact [dc34d7d3.match-signal.pages.dev](https://dc34d7d3.match-signal.pages.dev). Recheck both promotions and any resulting deployment before treating that as the newest production state.
 
-### Next action on resume
+### Superseded next action (historical)
 
 1. Re-read this checklist and inspect the current main SHA, reports, ledger, capture status, Actions runs, and latest production verification.
 2. Recheck promotion runs 41411497799 and 41411976023 and any newer deployment/artifact.
@@ -255,7 +245,7 @@ This is the active resume point. The frozen prospective cutoff remains `2026-11-
 4. Continue priority 14 until at least 30 uniquely settled prospective market-225 fixtures have exact immutable snapshot linkage. Then continue the 100-selection/200-target, positive ROI/positive 95% lower bound/favourite benchmark, authentic later-quote CLV, and 100-game post-cutoff MAE/bias gates. Keep the model unchanged unless a separately preregistered development-only experiment proves an upgrade.
 5. Keep `RESEARCH_ONLY` and the Basketball ticket gate locked. No auto-betting; every future NBA ticket leg must still be freshly revalidated against exact market 225 immediately before code generation.
 
-## Latest continuation checkpoint — 2026-11-02 13:46 UTC — shared ticket SportyBet proxy failure fixed
+## Archived checkpoint — 2026-11-02 13:46 UTC — shared ticket SportyBet proxy failure fixed (superseded)
 
 The active NBA readiness priority is still **Priority 14: prospective probability validation**. The frozen prospective cutoff remains `2026-11-02T02:00:00+00:00`. This ticket-code-generation repair does not qualify NBA for betting and does not change any sample, ROI, CLV, forecast, or freshness threshold.
 
@@ -282,7 +272,7 @@ The active NBA readiness priority is still **Priority 14: prospective probabilit
 - Settlement ledger `data/nba_totals_ledger.json` (blob `75734552a681a52ca241a6877318dabe2fe6e203`) has 70 settled historical records, but the current prospective report has zero post-cutoff settled selections. That historical count does not satisfy the prospective thresholds.
 - The most recently persisted `DEPLOY-VERIFY-CLOUDFLARE.json` is still `VERIFIED_WITH_DIAGNOSTIC_INCOMPLETE` (source `8b56a1cfd340d9267e426b15241697e91882f126`) and says the generic booking POST check is `NO_FUTURE_BATCH`; do not treat it as evidence that a real valid multi-leg SportyBet share-code creation was verified.
 
-### Next action on resume
+### Superseded next action (historical)
 
 1. Recheck run 41455583821's final production HTTP/asset smoke result and the newest production verification JSON.
 2. Verify a real, nonempty shared ticket is revalidated against the current provider catalogue immediately before code generation; the Worker now serves valid football and tennis catalogues, but no actual user-selected multi-leg share code was requested or fabricated by these tests.
@@ -290,7 +280,7 @@ The active NBA readiness priority is still **Priority 14: prospective probabilit
 4. Keep NBA `RESEARCH_ONLY` and the Basketball ticket gate locked until every prospective sample, ROI/confidence-bound/favourite-benchmark, genuine later-quote CLV, forecast MAE/bias, and production regression condition independently passes. No auto-betting.
 
 
-## Latest continuation checkpoint — 2026-11-02 14:00 UTC — NBA model freshness recovered
+## Archived checkpoint — 2026-11-02 14:00 UTC — NBA model freshness recovered (superseded)
 
 This checkpoint updates production freshness and workflow evidence only. The frozen prospective cutoff remains `2026-11-02T02:00:00+00:00`. First unchecked research priority remains **14 — prospective probability validation**; no release threshold was lowered.
 
