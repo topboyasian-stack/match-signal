@@ -4,11 +4,11 @@
   "qualified_best_quote_coverage_status": "INCOMPLETE",
   "qualified_best_candidate_pool_rows": 0,
   "qualified_best_model_qualified_rows": 0,
-  "booking_api_status": "VERIFIED",
+  "booking_api_status": "NO_FUTURE_BATCH",
   "qualified_alternatives_status": "ERROR",
   "qualified_alternatives_count": 0,
   "qualified_alternatives": {
-    "verified_at": "2026-11-15T16:03:14.814Z",
+    "verified_at": "2026-11-15T17:10:43.977Z",
     "endpoint": "/api/public/market-alternatives",
     "status": "ERROR",
     "alternative_count": 0,
@@ -18,11 +18,11 @@
   },
   "shared_ticket_drawer_status": "NOT_VERIFIED",
   "provider": "Cloudflare Pages",
-  "source_commit": "c25b32d02299c9187343f1752e4d2ed0c4ac3231",
-  "verified_at": "2026-11-15T16:04:26.793042+00:00",
+  "source_commit": "7edd12863ad1cf0dd5e348f858b8de3f5945a19b",
+  "verified_at": "2026-11-15T17:11:21.864895+00:00",
   "live_virtual_feed": {
     "endpoint": "/api/sportybet-virtual",
-    "verified_at": "2026-11-15T16:04:10.854Z",
+    "verified_at": "2026-11-15T17:11:13.016Z",
     "status": "LIVE",
     "events_count": 200,
     "product_counts": {
@@ -33,13 +33,13 @@
       "efootball_live": {
         "status": "EMPTY",
         "events": 0,
-        "latency_ms": 500,
+        "latency_ms": 277,
         "endpoint": "/api/ng/factsCenter/wapConfigurableIndexLiveEvents"
       },
       "vfootball_live": {
         "status": "EMPTY",
         "events": 0,
-        "latency_ms": 1215,
+        "latency_ms": 1140,
         "endpoint": "/api/ng/factsCenter/wapConfigurableIndexLiveEvents"
       },
       "efootball": {
@@ -47,57 +47,32 @@
         "events": 100,
         "attempts": 1,
         "retried": false,
-        "latency_ms": 1935,
+        "latency_ms": 1599,
         "endpoint": "/api/ng/factsCenter/pcUpcomingEvents",
         "primary_endpoint": "/api/ng/factsCenter/pcUpcomingEvents"
       },
       "vfootball": {
         "status": "LIVE",
         "events": 100,
-        "latency_ms": 3436
+        "latency_ms": 2839
       }
     },
     "errors": []
   },
   "booking_api": {
-    "verified_at": "2026-11-15T16:03:55.692Z",
-    "status": "VOLATILE_MARKET",
-    "http_status": 409,
-    "ok": true,
-    "batch_id": "DESK-BATCH-01",
-    "selection_count": 2,
+    "verified_at": "2026-11-15T17:11:10.128Z",
+    "status": "NO_FUTURE_BATCH",
+    "http_status": null,
+    "ok": false,
+    "batch_id": null,
+    "selection_count": 0,
     "booking_code_available": false,
-    "error": "EFOOTBALL_SLIP_REJECTED_PARTIAL",
-    "message": "At least one eFootball leg failed current SportyBet validation. No share code was created. Refresh the whole ticket and add the current qualified selections again.",
-    "volatile_market": true,
-    "validation": [
-      {
-        "event_id": "sr:match:BAaHcxIoOecS1SfqNNomIPA",
-        "sport": "virtual",
-        "match": "Sporting CP (chevare) vs Man City (Glumac)",
-        "market": "virtual_total",
-        "pick": "Sporting CP (chevare) vs Man City (Glumac) \u2014 O/U under 6.5",
-        "line": 6.5,
-        "ok": false,
-        "excluded": true,
-        "reason": "Event is no longer present in SportyBet current catalogue."
-      },
-      {
-        "event_id": "sr:match:BAaHUCYEEdaCXlRBHIL2Tlw",
-        "sport": "virtual",
-        "match": "Botafogo (Virtual_12) vs Estudiantes (Virtual_13)",
-        "market": "virtual_total",
-        "pick": "Botafogo (Virtual_12) vs Estudiantes (Virtual_13) \u2014 O/U over 1.5",
-        "line": 1.5,
-        "ok": false,
-        "excluded": true,
-        "reason": "Event is no longer present in SportyBet current catalogue."
-      }
-    ]
+    "error": null,
+    "message": null
   },
   "nba_ticket_gate_probe_status": "PASS",
   "nba_ticket_gate_probe": {
-    "verified_at": "2026-11-15T16:04:23.677Z",
+    "verified_at": "2026-11-15T17:11:21.632Z",
     "status": "PASS",
     "probe_type": "manual_live_validation_plus_automated_nba_release_gate",
     "current_main_release_qualified": false,
@@ -121,7 +96,7 @@
         "booking_code_present": false
       },
       {
-        "base": "https://7c955af8.match-signal.pages.dev",
+        "base": "https://c7e42f6c.match-signal.pages.dev",
         "endpoint_type": "manual_shared_ticket",
         "http_status": 409,
         "error": "MANUAL_TICKET_REJECTED_PARTIAL",
@@ -129,7 +104,7 @@
         "booking_code_present": false
       },
       {
-        "base": "https://7c955af8.match-signal.pages.dev",
+        "base": "https://c7e42f6c.match-signal.pages.dev",
         "endpoint_type": "automated_basketball_builder",
         "http_status": 423,
         "error": "NBA_RELEASE_GATE_LOCKED",
@@ -146,7 +121,7 @@
     "live_virtual_proxy",
     "virtual_lab_live_snapshot",
     "live_production_data",
-    "booking_api_post",
+    "booking_api_post_not_verified",
     "qualified_best_live_quote_diagnostic_incomplete",
     "nba_ticket_gate_fail_closed",
     "qualified_alternatives_not_verified"
