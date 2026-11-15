@@ -1,14 +1,14 @@
 {
-  "status": "VERIFIED_WITH_DIAGNOSTIC_INCOMPLETE",
+  "status": "VERIFIED",
   "core_pages_status": "VERIFIED",
   "qualified_best_quote_coverage_status": "VALID_ZERO",
-  "qualified_best_candidate_pool_rows": 206,
+  "qualified_best_candidate_pool_rows": 200,
   "qualified_best_model_qualified_rows": 0,
-  "booking_api_status": "NO_FUTURE_BATCH",
+  "booking_api_status": "VERIFIED",
   "qualified_alternatives_status": "READY",
   "qualified_alternatives_count": 109,
   "qualified_alternatives": {
-    "verified_at": "2026-11-15T19:21:31.191Z",
+    "verified_at": "2026-11-15T19:26:59.077Z",
     "endpoint": "/api/public/market-alternatives",
     "api_status": "OK",
     "status": "READY",
@@ -96,19 +96,19 @@
   },
   "shared_ticket_drawer_status": "READY",
   "provider": "Cloudflare Pages",
-  "source_commit": "35a9cbf87fd39db14134d0eeb5438248e12a060b",
-  "verified_at": "2026-11-15T19:22:20.667693+00:00",
+  "source_commit": "f1847e9e12b5574df529e643e1725d93ad59cb68",
+  "verified_at": "2026-11-15T19:27:51.958704+00:00",
   "live_virtual_feed": {
-    "verified_at": "2026-11-15T19:22:19.731Z",
+    "verified_at": "2026-11-15T19:27:49.203Z",
     "status": "VALID_ZERO_QUALIFIED_CANDIDATES",
     "coverage_state": "VALID_ZERO",
     "scan_complete": true,
     "scan_stop_reason": "no_model_qualified_candidates",
     "no_model_qualified_candidates": true,
     "paper_only": true,
-    "candidate_artifact_rows": 240,
-    "candidate_pool_rows_in_next_7_days": 206,
-    "candidate_pool_unique_events_in_next_7_days": 114,
+    "candidate_artifact_rows": 232,
+    "candidate_pool_rows_in_next_7_days": 200,
+    "candidate_pool_unique_events_in_next_7_days": 111,
     "model_qualified_candidate_rows_in_next_7_days": 0,
     "virtual_candidate_rows_in_next_7_days": 0,
     "snapshot_gate_qualified_fixtures": 0,
@@ -125,7 +125,7 @@
       {
         "page": 1,
         "count": 100,
-        "fetched_at": "2026-11-15T19:22:19.710Z",
+        "fetched_at": "2026-11-15T19:27:49.182Z",
         "status": "LIVE"
       }
     ],
@@ -155,19 +155,44 @@
     "qualified_examples": []
   },
   "booking_api": {
-    "verified_at": "2026-11-15T19:22:03.085Z",
-    "status": "NO_FUTURE_BATCH",
-    "http_status": null,
-    "ok": false,
-    "batch_id": null,
-    "selection_count": 0,
+    "verified_at": "2026-11-15T19:27:24.701Z",
+    "status": "VOLATILE_MARKET",
+    "http_status": 409,
+    "ok": true,
+    "batch_id": "DESK-BATCH-01",
+    "selection_count": 2,
     "booking_code_available": false,
-    "error": null,
-    "message": null
+    "error": "EFOOTBALL_SLIP_REJECTED_PARTIAL",
+    "message": "At least one eFootball leg failed current SportyBet validation. No share code was created. Refresh the whole ticket and add the current qualified selections again.",
+    "volatile_market": true,
+    "validation": [
+      {
+        "event_id": "sr:match:BAaHf6DzxeU2XhiFKxvBpUQ",
+        "sport": "virtual",
+        "match": "France (A1ose) vs Argentina (v1nn)",
+        "market": "virtual_total",
+        "pick": "France (A1ose) vs Argentina (v1nn) \u2014 O/U under 6.5",
+        "line": 6.5,
+        "ok": false,
+        "excluded": true,
+        "reason": "Event is no longer present in SportyBet current catalogue."
+      },
+      {
+        "event_id": "sr:match:BAaHf6EkPd6-GlKG0JmfbSQ",
+        "sport": "virtual",
+        "match": "England (RuBIX) vs Spain (cl1vlind)",
+        "market": "virtual_total",
+        "pick": "England (RuBIX) vs Spain (cl1vlind) \u2014 O/U under 6.5",
+        "line": 6.5,
+        "ok": false,
+        "excluded": true,
+        "reason": "Event is no longer present in SportyBet current catalogue."
+      }
+    ]
   },
   "nba_ticket_gate_probe_status": "PASS",
   "nba_ticket_gate_probe": {
-    "verified_at": "2026-11-15T19:22:17.139Z",
+    "verified_at": "2026-11-15T19:27:47.440Z",
     "status": "PASS",
     "probe_type": "manual_live_validation_plus_automated_nba_release_gate",
     "current_main_release_qualified": false,
@@ -191,7 +216,7 @@
         "booking_code_present": false
       },
       {
-        "base": "https://b179e74d.match-signal.pages.dev",
+        "base": "https://a656d7c7.match-signal.pages.dev",
         "endpoint_type": "manual_shared_ticket",
         "http_status": 409,
         "error": "MANUAL_TICKET_REJECTED_PARTIAL",
@@ -199,7 +224,7 @@
         "booking_code_present": false
       },
       {
-        "base": "https://b179e74d.match-signal.pages.dev",
+        "base": "https://a656d7c7.match-signal.pages.dev",
         "endpoint_type": "automated_basketball_builder",
         "http_status": 423,
         "error": "NBA_RELEASE_GATE_LOCKED",
@@ -216,7 +241,7 @@
     "live_virtual_proxy",
     "virtual_lab_live_snapshot",
     "live_production_data",
-    "booking_api_post_not_verified",
+    "booking_api_post",
     "qualified_best_valid_zero",
     "nba_ticket_gate_fail_closed",
     "qualified_alternatives_live"
