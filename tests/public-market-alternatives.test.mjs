@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { gzipSync } from "node:zlib";
 import { onRequestGet } from "../functions/api/public/market-alternatives.js";
 
 const future = new Date(Date.now() + 60 * 60 * 1000).toISOString();
@@ -320,4 +321,82 @@ test("tennis set-winner research stays visible but mismatched set specifiers are
   assert.equal(payload.alternatives[0].set_number, 2);
   assert.equal(payload.alternatives[0].ticket_selectable, false);
   assert.equal(payload.alternatives[0].builder_qualified, false);
+});
+
+
+test("compressed private KV evidence remains readable after the ledger crosses the KV value limit", async () => {
+  const document = {
+    record_type: "cross_sport_market_reassessment",
+    updated_at: fresh,
+    records: [candidate()]
+  };
+  const compressed = gzipSync(Buffer.from(JSON.stringify(document), "utf8"));
+  const arrayBuffer = compressed.buffer.slice(
+    compressed.byteOffset,
+    compressed.byteOffset + compressed.byteLength
+  );
+  let requestedType = null;
+  const response = await onRequestGet({
+    request: new Request("https://example.test/api/public/market-alternatives"),
+    env: {
+      MATCH_SIGNAL_ANALYST_STORE: {
+        get: async (key, type) => {
+          assert.equal(key, "private-cross-sport-market-reassessment-v1");
+          requestedType = type;
+          return arrayBuffer;
+        }
+      }
+    }
+  });
+  const payload = await response.json();
+  assert.equal(requestedType, "arrayBuffer");
+  assert.equal(response.status, 200);
+  assert.equal(payload.status, "OK");
+  assert.equal(payload.alternatives.length, 1);
+  assert.equal(payload.alternatives[0].event_id, "fixture-1");
+});
+
+test("private KV failures expose a safe stable reason for production diagnostics", async () => {
+  const missingBinding = await onRequestGet({
+    request: new Request("https://example.test/api/public/market-alternatives"),
+    env: {}
+  });
+  assert.equal(missingBinding.status, 503);
+  assert.deepEqual(await missingBinding.json(), {
+    error: "PUBLIC_ALTERNATIVES_UNAVAILABLE",
+    reason: "KV_BINDING_UNAVAILABLE"
+  });
+
+  const failedRead = await onRequestGet({
+    request: new Request("https://example.test/api/public/market-alternatives"),
+    env: { MATCH_SIGNAL_ANALYST_STORE: { get: async () => { throw new Error("private value omitted"); } } }
+  });
+  assert.equal(failedRead.status, 503);
+  assert.deepEqual(await failedRead.json(), {
+    error: "PUBLIC_ALTERNATIVES_UNAVAILABLE",
+    reason: "KV_READ_FAILED"
+  });
+});
+
+test("invalid and corrupted private evidence fail closed with distinct diagnostic reasons", async () => {
+  const invalidJson = await onRequestGet({
+    request: new Request("https://example.test/api/public/market-alternatives"),
+    env: { MATCH_SIGNAL_ANALYST_STORE: { get: async () => new TextEncoder().encode("not-json").buffer } }
+  });
+  assert.equal(invalidJson.status, 503);
+  assert.deepEqual(await invalidJson.json(), {
+    error: "PUBLIC_ALTERNATIVES_UNAVAILABLE",
+    reason: "EVIDENCE_INVALID_JSON"
+  });
+
+  const corruptGzip = new Uint8Array([0x1f, 0x8b, 0x00, 0x01]).buffer;
+  const corrupt = await onRequestGet({
+    request: new Request("https://example.test/api/public/market-alternatives"),
+    env: { MATCH_SIGNAL_ANALYST_STORE: { get: async () => corruptGzip } }
+  });
+  assert.equal(corrupt.status, 503);
+  assert.deepEqual(await corrupt.json(), {
+    error: "PUBLIC_ALTERNATIVES_UNAVAILABLE",
+    reason: "EVIDENCE_DECODE_FAILED"
+  });
 });

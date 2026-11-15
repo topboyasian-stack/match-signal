@@ -333,17 +333,137 @@ export function buildPublicAlternatives(document, nowMs = Date.now()) {
   };
 }
 
+const MAX_PRIVATE_KV_VALUE_BYTES = 24 * 1024 * 1024;
+const MAX_DECODED_EVIDENCE_BYTES = 128 * 1024 * 1024;
+
+function unavailable(reason) {
+  // Keep the evidence private: return a stable diagnostic code, never the exception
+  // or any stored payload. The monitor can now distinguish a missing binding,
+  // a transient KV read failure, and a compressed/corrupt stored value.
+  return json({ error: "PUBLIC_ALTERNATIVES_UNAVAILABLE", reason }, 503);
+}
+
+async function boundedStreamText(stream) {
+  if (!stream) throw new Error("EVIDENCE_STREAM_UNAVAILABLE");
+  const reader = stream.getReader();
+  const chunks = [];
+  let total = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > MAX_DECODED_EVIDENCE_BYTES) {
+        await reader.cancel().catch(() => {});
+        throw new Error("EVIDENCE_DECODED_SIZE_LIMIT");
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+}
+
+async function privateEvidenceText(value) {
+  // Keep compatibility with existing tests and any legacy uncompressed text
+  // values, but request ArrayBuffer from KV so gzip bytes are not mojibaked.
+  if (typeof value === "string") {
+    if (new TextEncoder().encode(value).byteLength > MAX_PRIVATE_KV_VALUE_BYTES) {
+      throw new Error("EVIDENCE_PRIVATE_VALUE_SIZE_LIMIT");
+    }
+    return value;
+  }
+
+  let bytes;
+  if (value instanceof ArrayBuffer) {
+    bytes = new Uint8Array(value);
+  } else if (ArrayBuffer.isView(value)) {
+    bytes = new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+  } else {
+    throw new Error("EVIDENCE_PRIVATE_VALUE_TYPE_INVALID");
+  }
+
+  if (bytes.byteLength > MAX_PRIVATE_KV_VALUE_BYTES) {
+    throw new Error("EVIDENCE_PRIVATE_VALUE_SIZE_LIMIT");
+  }
+
+  // scripts/sync_cross_sport_private_evidence.py stores gzip when the JSON
+  // document exceeds Cloudflare KV's per-value limit. The old reader used the
+  // default text mode and fed these bytes directly to JSON.parse; as the
+  // history grew, that converted a valid private evidence record into a 503.
+  if (bytes.byteLength >= 2 && bytes[0] === 0x1f && bytes[1] === 0x8b) {
+    if (typeof DecompressionStream !== "function") {
+      throw new Error("EVIDENCE_GZIP_UNSUPPORTED");
+    }
+    const compressedStream = new Response(bytes).body;
+    const decompressedStream = compressedStream.pipeThrough(new DecompressionStream("gzip"));
+    return boundedStreamText(decompressedStream);
+  }
+
+  return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+}
+
+function emptyAlternatives() {
+  return json({
+    status: "EMPTY",
+    publication_policy_version: "research-visible-v2",
+    min_probability: 0,
+    research_display_baseline: RESEARCH_DISPLAY_BASELINE,
+    builder_min_probability: MIN_RECOMMENDED_PROBABILITY,
+    max_per_fixture: 4,
+    default_max_per_fixture: 2,
+    alternatives: []
+  });
+}
+
 export async function onRequestGet({ request, env }) {
   if (request.method !== "GET") return json({ error: "METHOD_NOT_ALLOWED" }, 405);
+
+  const store = env?.MATCH_SIGNAL_ANALYST_STORE;
+  if (!store || typeof store.get !== "function") {
+    return unavailable("KV_BINDING_UNAVAILABLE");
+  }
+
+  let raw;
   try {
-    const raw = await env.MATCH_SIGNAL_ANALYST_STORE.get(EVIDENCE_KEY);
-    if (!raw) return json({ status: "EMPTY", publication_policy_version: "research-visible-v2", min_probability: 0, research_display_baseline: RESEARCH_DISPLAY_BASELINE, builder_min_probability: MIN_RECOMMENDED_PROBABILITY, max_per_fixture: 4, default_max_per_fixture: 2, alternatives: [] });
-    const document = JSON.parse(raw);
-    if (!document || document.record_type !== "cross_sport_market_reassessment" || !Array.isArray(document.records)) {
-      return json({ error: "EVIDENCE_UNAVAILABLE" }, 503);
-    }
+    // The private sync writer supports both JSON and gzip values. Asking for
+    // arrayBuffer lets us identify and decompress either form correctly.
+    raw = await store.get(EVIDENCE_KEY, "arrayBuffer");
+  } catch {
+    return unavailable("KV_READ_FAILED");
+  }
+
+  if (raw === null || raw === undefined) return emptyAlternatives();
+
+  let source;
+  try {
+    source = await privateEvidenceText(raw);
+  } catch {
+    return unavailable("EVIDENCE_DECODE_FAILED");
+  }
+
+  let document;
+  try {
+    document = JSON.parse(source);
+  } catch {
+    return unavailable("EVIDENCE_INVALID_JSON");
+  }
+
+  if (!document || document.record_type !== "cross_sport_market_reassessment" ||
+      !Array.isArray(document.records)) {
+    return unavailable("EVIDENCE_SHAPE_INVALID");
+  }
+
+  try {
     return json(buildPublicAlternatives(document));
   } catch {
-    return json({ error: "PUBLIC_ALTERNATIVES_UNAVAILABLE" }, 503);
+    return unavailable("ALTERNATIVES_BUILD_FAILED");
   }
 }
