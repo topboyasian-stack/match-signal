@@ -7,6 +7,8 @@ committed to Git or published as static assets.
 """
 from __future__ import annotations
 
+import gzip
+import io
 import json
 import os
 import sys
@@ -27,6 +29,7 @@ EVIDENCE_KEY = "private-cross-sport-market-reassessment-v1"
 CF_API = "https://api.cloudflare.com/client/v4"
 PROJECT_NAME = "match-signal"
 MAX_BYTES = 24 * 1024 * 1024  # Stay below Cloudflare KV's 25 MiB per-value ceiling.
+MAX_DOCUMENT_BYTES = 128 * 1024 * 1024  # Bound decompression while allowing compacted private history.
 
 
 def _warning(message: str) -> None:
@@ -72,7 +75,7 @@ def _api_json(method: str, path: str, body: dict[str, Any] | None = None) -> dic
         with urllib.request.urlopen(req, timeout=20) as response:
             raw = response.read(MAX_BYTES + 1)
             if len(raw) > MAX_BYTES:
-                raise RuntimeError("Cloudflare API response exceeded the 12 MiB cap")
+                raise RuntimeError("Cloudflare API response exceeded the 24 MiB cap")
             value = json.loads(raw.decode("utf-8"))
     except urllib.error.HTTPError as exc:
         detail = exc.read(1000).decode("utf-8", "replace")
@@ -159,6 +162,53 @@ def _resolve_namespace_id() -> str:
     raise RuntimeError("Could not uniquely resolve MATCH_SIGNAL_ANALYST_STORE. Give the workflow the namespace id via MATCH_SIGNAL_EVIDENCE_KV_NAMESPACE_ID or grant the existing Cloudflare API token read access to Pages bindings and KV namespaces.")
 
 
+def _encode_kv_document(document: dict[str, Any]) -> tuple[bytes, str]:
+    """Keep legacy JSON values readable; gzip only when raw JSON exceeds KV's value limit."""
+    data = json.dumps(document, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    if len(data) > MAX_DOCUMENT_BYTES:
+        raise RuntimeError(
+            f"private evidence document exceeds the {MAX_DOCUMENT_BYTES // (1024 * 1024)} MiB decoded-document cap"
+        )
+    if len(data) <= MAX_BYTES:
+        return data, "application/json"
+
+    compressed = gzip.compress(data, compresslevel=6, mtime=0)
+    if len(compressed) > MAX_BYTES:
+        raise RuntimeError(
+            "private evidence ledger exceeds the 24 MiB Cloudflare KV value cap even after gzip "
+            f"(raw={len(data)} bytes, gzip={len(compressed)} bytes)"
+        )
+    return compressed, "application/gzip"
+
+
+def _decode_kv_document(raw: bytes) -> dict[str, Any]:
+    """Decode current JSON values and backward-compatible gzip values from the same KV key."""
+    if len(raw) > MAX_BYTES:
+        raise RuntimeError("private KV value exceeds the 24 MiB Cloudflare KV value cap")
+    if raw.startswith(b"\\x1f\\x8b"):
+        try:
+            with gzip.GzipFile(fileobj=io.BytesIO(raw), mode="rb") as stream:
+                decoded = stream.read(MAX_DOCUMENT_BYTES + 1)
+        except (OSError, EOFError) as exc:
+            raise RuntimeError("private KV gzip value is corrupt") from exc
+        if len(decoded) > MAX_DOCUMENT_BYTES:
+            raise RuntimeError(
+                f"private evidence document exceeds the {MAX_DOCUMENT_BYTES // (1024 * 1024)} MiB decoded-document cap"
+            )
+        raw = decoded
+    try:
+        value = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise RuntimeError("private KV document is invalid JSON") from exc
+    if (
+        not isinstance(value, dict)
+        or value.get("record_type") != "cross_sport_market_reassessment"
+        or not isinstance(value.get("records"), list)
+    ):
+        raise RuntimeError("private KV document has an invalid shape")
+    return value
+
+
 def _kv_url(namespace_id: str) -> str:
     _, account = _credentials()
     return (
@@ -187,13 +237,7 @@ def _kv_get(namespace_id: str) -> dict[str, Any] | None:
         raise RuntimeError(f"Cloudflare KV read returned HTTP {exc.code}: {detail[:240]}") from exc
     except (urllib.error.URLError, TimeoutError) as exc:
         raise RuntimeError(f"Cloudflare KV read failed: {str(exc)[:240]}") from exc
-    try:
-        value = json.loads(raw.decode("utf-8"))
-    except json.JSONDecodeError as exc:
-        raise RuntimeError("private KV document is invalid JSON") from exc
-    if not isinstance(value, dict) or value.get("record_type") != "cross_sport_market_reassessment" or not isinstance(value.get("records"), list):
-        raise RuntimeError("private KV document has an invalid shape")
-    return value
+    return _decode_kv_document(raw)
 
 
 
@@ -262,13 +306,11 @@ def _load_current_research_candidates() -> tuple[list[dict[str, Any]], str]:
 
 def _kv_put(namespace_id: str, document: dict[str, Any]) -> None:
     token, _ = _credentials()
-    data = json.dumps(document, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
-    if len(data) > MAX_BYTES:
-        raise RuntimeError("private evidence ledger exceeds the 12 MiB write cap")
+    data, content_type = _encode_kv_document(document)
     req = urllib.request.Request(
         _kv_url(namespace_id),
         data=data,
-        headers={"Authorization": "Bearer " + token, "Content-Type": "application/json"},
+        headers={"Authorization": "Bearer " + token, "Content-Type": content_type},
         method="PUT",
     )
     try:
