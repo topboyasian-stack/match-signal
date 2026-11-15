@@ -1,70 +1,70 @@
 {
-  "generated_at": "2026-11-15T08:08:24.752705+00:00",
-  "status": "DEGRADED",
+  "generated_at": "2026-11-15T08:17:40.265145+00:00",
+  "status": "HEALTHY",
   "critical_issues": 0,
-  "warning_issues": 1,
+  "warning_issues": 0,
   "info_issues": 1,
   "checks": [
     {
       "engine": "core_prediction_pipeline",
       "status": "PASS",
-      "age_hours": 1.78,
+      "age_hours": 1.93,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.09,
+      "age_hours": 0.1,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
       "status": "PASS",
-      "age_hours": 0.33,
+      "age_hours": 0.49,
       "threshold_hours": 4
     },
     {
       "engine": "unified_upcoming",
       "status": "PASS",
-      "age_hours": 0.0,
+      "age_hours": 0.01,
       "threshold_hours": 2
     },
     {
       "engine": "prediction_desk_health",
       "status": "PASS",
-      "age_hours": 0.04,
+      "age_hours": 0.05,
       "threshold_hours": 2
     },
     {
       "engine": "virtual_participant_history",
       "status": "PASS",
-      "max_input_age_minutes": 14.0,
-      "virtual_lab_status_age_minutes": 16.1,
+      "max_input_age_minutes": 22.6,
+      "virtual_lab_status_age_minutes": 25.4,
       "threshold_minutes": 30.0,
       "stale_inputs": []
     },
     {
       "engine": "tennis_forward_discovery",
       "status": "PASS",
-      "age_hours": 1.11,
+      "age_hours": 1.27,
       "threshold_hours": 8
     },
     {
       "engine": "virtual_live_feed",
       "status": "PASS",
-      "age_hours": 0.28,
+      "age_hours": 0.43,
       "threshold_hours": 0.5,
       "heartbeat_source": "virtual_lab_live.json",
       "events_count": 656
     },
     {
       "engine": "nba_live_observation_recorder",
-      "status": "STALE",
-      "age_hours": 0.28,
+      "status": "PASS",
+      "age_hours": 0.1,
       "threshold_hours": 0.25,
       "heartbeat_source": "nba_live_observations.json.gz",
       "games_tracked": 117,
-      "snapshots_recorded": 14467
+      "snapshots_recorded": 14477
     },
     {
       "engine": "engine_lifecycle",
@@ -103,11 +103,6 @@
   ],
   "issues": [
     {
-      "code": "NBA_LIVE_OBSERVATION_STALE",
-      "severity": "warning",
-      "detail": "nba_live_observations.json.gz age 0.28h exceeds 0.25h; the in-game observation recorder has not published a recent heartbeat"
-    },
-    {
       "code": "SELECTION_GATE_EMPTY",
       "severity": "info",
       "detail": "Current prediction feed exists but the selected-candidate layer returned zero qualified selections; no gate was weakened"
@@ -119,8 +114,8 @@
     "past_kickoff_rows_hidden": 0,
     "stale_live_flags_hidden": 0,
     "expired_settled_rows_hidden": 0,
-    "virtual_market_rows_held_for_kickoff_window": 271,
+    "virtual_market_rows_held_for_kickoff_window": 270,
     "virtual_rows_held_for_stale_participant_history": 0,
-    "virtual_rows_held_for_recent_product_drawdown": 75
+    "virtual_rows_held_for_recent_product_drawdown": 72
   }
 }
