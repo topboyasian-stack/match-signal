@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import math
+import random
+import string
 import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -706,6 +708,66 @@ class CrossSportReassessmentTests(unittest.TestCase):
                         "current_research_candidates_generated_at": "2026-11-10T04:00:00+00:00",
                         "current_research_candidates": [bad_row],
                     })
+
+
+class PrivateEvidenceKVEncodingTests(unittest.TestCase):
+    @staticmethod
+    def document(payload: str) -> dict:
+        return {
+            "record_type": "cross_sport_market_reassessment",
+            "generated_at": "2026-11-15T07:00:00+00:00",
+            "mode": "PAPER_ONLY",
+            "record_count": 1,
+            "records": [{"event_id": "private-test-event", "payload": payload}],
+        }
+
+    def test_small_legacy_json_stays_json_and_decodes(self):
+        document = self.document("small")
+        with patch.object(evidence_sync, "MAX_BYTES", 4096):
+            encoded, content_type = evidence_sync._encode_kv_document(document)
+            self.assertEqual(content_type, "application/json")
+            self.assertEqual(evidence_sync._decode_kv_document(encoded), document)
+
+    def test_oversized_history_is_gzipped_and_round_trips(self):
+        document = self.document("repeatable-history-row:" * 1500)
+        with patch.object(evidence_sync, "MAX_BYTES", 1024), patch.object(
+            evidence_sync, "MAX_DOCUMENT_BYTES", 50000
+        ):
+            encoded, content_type = evidence_sync._encode_kv_document(document)
+            self.assertEqual(content_type, "application/gzip")
+            self.assertLess(len(encoded), 1024)
+            self.assertTrue(encoded.startswith(bytes((0x1F, 0x8B))))
+            self.assertEqual(evidence_sync._decode_kv_document(encoded), document)
+
+    def test_uncompressible_history_still_over_limit_fails_closed(self):
+        rng = random.Random(4315)
+        noise = "".join(rng.choices(string.ascii_letters + string.digits, k=6000))
+        document = self.document(noise)
+        with patch.object(evidence_sync, "MAX_BYTES", 512), patch.object(
+            evidence_sync, "MAX_DOCUMENT_BYTES", 10000
+        ):
+            with self.assertRaisesRegex(RuntimeError, "even after gzip"):
+                evidence_sync._encode_kv_document(document)
+
+    def test_gzip_expansion_is_bounded(self):
+        document = self.document("large-but-compressible:" * 1000)
+        with patch.object(evidence_sync, "MAX_BYTES", 1024), patch.object(
+            evidence_sync, "MAX_DOCUMENT_BYTES", 40000
+        ):
+            encoded, content_type = evidence_sync._encode_kv_document(document)
+        self.assertEqual(content_type, "application/gzip")
+        with patch.object(evidence_sync, "MAX_BYTES", 1024), patch.object(
+            evidence_sync, "MAX_DOCUMENT_BYTES", 100
+        ):
+            with self.assertRaisesRegex(RuntimeError, "decoded-document cap"):
+                evidence_sync._decode_kv_document(encoded)
+
+    def test_corrupt_gzip_is_rejected(self):
+        with patch.object(evidence_sync, "MAX_BYTES", 1024), patch.object(
+            evidence_sync, "MAX_DOCUMENT_BYTES", 4096
+        ):
+            with self.assertRaisesRegex(RuntimeError, "gzip value is corrupt"):
+                evidence_sync._decode_kv_document(bytes((0x1F, 0x8B)) + b"not-a-valid-gzip")
 
 
 if __name__ == "__main__":
