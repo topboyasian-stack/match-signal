@@ -1,26 +1,26 @@
 {
-  "generated_at": "2026-11-15T20:17:25.952730+00:00",
-  "status": "HEALTHY",
+  "generated_at": "2026-11-15T20:23:08.177280+00:00",
+  "status": "DEGRADED",
   "critical_issues": 0,
-  "warning_issues": 0,
+  "warning_issues": 1,
   "info_issues": 1,
   "checks": [
     {
       "engine": "core_prediction_pipeline",
       "status": "PASS",
-      "age_hours": 0.38,
+      "age_hours": 0.48,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.09,
+      "age_hours": 0.07,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
       "status": "PASS",
-      "age_hours": 0.11,
+      "age_hours": 0.2,
       "threshold_hours": 4
     },
     {
@@ -38,29 +38,29 @@
     {
       "engine": "virtual_participant_history",
       "status": "PASS",
-      "max_input_age_minutes": 21.1,
-      "virtual_lab_status_age_minutes": 23.4,
+      "max_input_age_minutes": 26.7,
+      "virtual_lab_status_age_minutes": 29.1,
       "threshold_minutes": 30.0,
       "stale_inputs": []
     },
     {
       "engine": "tennis_forward_discovery",
       "status": "PASS",
-      "age_hours": 1.24,
+      "age_hours": 1.34,
       "threshold_hours": 8
     },
     {
       "engine": "virtual_live_feed",
       "status": "PASS",
-      "age_hours": 0.4,
+      "age_hours": 0.49,
       "threshold_hours": 0.5,
       "heartbeat_source": "virtual_lab_live.json",
       "events_count": 586
     },
     {
       "engine": "nba_live_observation_recorder",
-      "status": "PASS",
-      "age_hours": 0.18,
+      "status": "STALE",
+      "age_hours": 0.27,
       "threshold_hours": 0.25,
       "heartbeat_source": "nba_live_observations.json.gz",
       "games_tracked": 118,
@@ -102,6 +102,11 @@
     }
   ],
   "issues": [
+    {
+      "code": "NBA_LIVE_OBSERVATION_STALE",
+      "severity": "warning",
+      "detail": "nba_live_observations.json.gz age 0.27h exceeds 0.25h; the in-game observation recorder has not published a recent heartbeat"
+    },
     {
       "code": "SELECTION_GATE_EMPTY",
       "severity": "info",
