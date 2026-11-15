@@ -185,7 +185,7 @@ def _decode_kv_document(raw: bytes) -> dict[str, Any]:
     """Decode current JSON values and backward-compatible gzip values from the same KV key."""
     if len(raw) > MAX_BYTES:
         raise RuntimeError("private KV value exceeds the 24 MiB Cloudflare KV value cap")
-    if raw.startswith(b"\\x1f\\x8b"):
+    if raw.startswith(bytes((0x1F, 0x8B))):
         try:
             with gzip.GzipFile(fileobj=io.BytesIO(raw), mode="rb") as stream:
                 decoded = stream.read(MAX_DOCUMENT_BYTES + 1)
