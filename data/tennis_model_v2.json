@@ -1,10 +1,10 @@
 {
-  "updated_at": "2026-11-15T21:04:27.596321+00:00",
+  "updated_at": "2026-11-16T06:24:19.360612+00:00",
   "model_version": "2026-11-10-atp-prequential-set-win-sync",
   "status": "PAPER_RESEARCH_ONLY",
   "active_scope": "ATP",
-  "training_records": 202,
-  "archived_valid_records_all_tours": 359,
+  "training_records": 204,
+  "archived_valid_records_all_tours": 361,
   "inactive_tours_retained_as_research": [
     "WTA"
   ],
@@ -16,32 +16,32 @@
         "elo_weight": 0.0,
         "n": 80,
         "accuracy": 0.375,
-        "brier": 0.2977
+        "brier": 0.30032
       },
       {
         "elo_weight": 0.25,
         "n": 80,
-        "accuracy": 0.4125,
-        "brier": 0.28227
+        "accuracy": 0.4,
+        "brier": 0.28421
       },
       {
         "elo_weight": 0.5,
         "n": 80,
         "accuracy": 0.4125,
-        "brier": 0.26873
+        "brier": 0.27008
       },
       {
         "elo_weight": 0.75,
         "n": 80,
-        "accuracy": 0.45,
-        "brier": 0.25709
+        "accuracy": 0.4375,
+        "brier": 0.25792
       }
     ],
     "selected": {
       "elo_weight": 0.75,
       "n": 80,
-      "accuracy": 0.45,
-      "brier": 0.25709
+      "accuracy": 0.4375,
+      "brier": 0.25792
     },
     "objective": "minimum chronological-window Brier; accuracy tie-breaker",
     "current_candidate_weight": 0.75,
@@ -52,14 +52,14 @@
   "prequential_walkforward": {
     "active_scope": "ATP",
     "prequential_model": {
-      "n": 202,
-      "accuracy": 0.5,
-      "brier": 0.25605
+      "n": 204,
+      "accuracy": 0.4951,
+      "brier": 0.25629
     },
     "raw_base_model": {
-      "n": 202,
-      "accuracy": 0.4307,
-      "brier": 0.28934
+      "n": 204,
+      "accuracy": 0.4314,
+      "brier": 0.2899
     },
     "brier_improved": true,
     "evaluation": "each fixture is forecast using only earlier ATP results; ELO weight is reselected from prior results only"
@@ -1478,21 +1478,35 @@
       "prior_records": 201,
       "elo_weight": 0.75,
       "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "186547",
+      "start_time": "2026-11-13T16:00Z",
+      "prior_records": 202,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
+    },
+    {
+      "event_id": "187505",
+      "start_time": "2026-11-15T13:00Z",
+      "prior_records": 203,
+      "elo_weight": 0.75,
+      "selection_reason": "prior_only_chronological_selection"
     }
   ],
   "players_in_elo": 150,
   "ranking_coverage": {
     "ATP": 150
   },
-  "current_predictions_with_rank_enrichment": 11,
-  "current_active_predictions_rewritten": 11,
+  "current_predictions_with_rank_enrichment": 10,
+  "current_active_predictions_rewritten": 10,
   "walkforward_probability_calibration": [
     {
       "low": 0.5,
       "high": 0.55,
-      "n": 150,
-      "accuracy": 0.52,
-      "calibrated_confidence": 0.52
+      "n": 152,
+      "accuracy": 0.5132,
+      "calibrated_confidence": 0.5133
     },
     {
       "low": 0.55,
