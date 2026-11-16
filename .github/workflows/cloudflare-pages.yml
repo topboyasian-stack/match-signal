@@ -400,6 +400,29 @@ jobs:
           if deployed_bytes >= limit:
               raise SystemExit(f'Minified unified Upcoming board still exceeds the Pages per-file limit ({deployed_bytes} >= {limit}).')
           PY
+
+          # The immutable NBA snapshot archive is also used by the Basketball
+          # desk for exact publication-linkage checks. Keep the full archive and
+          # its original bytes in Git, but minify only the Pages staging copy so
+          # it remains valid JSON at the same public URL and under the 25 MiB
+          # single-file upload limit as the archive grows.
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          path=Path('.pages-deploy/data/nba_totals_publication_snapshots.json')
+          if not path.is_file():
+              raise SystemExit('Missing immutable NBA publication snapshot archive in Pages staging directory.')
+          source_bytes=path.stat().st_size
+          payload=json.loads(path.read_text(encoding='utf-8'))
+          if not isinstance(payload, list):
+              raise SystemExit('NBA publication snapshot archive must be a JSON array.')
+          path.write_text(json.dumps(payload,ensure_ascii=False,separators=(',',':'))+'\\n',encoding='utf-8')
+          deployed_bytes=path.stat().st_size
+          limit=int(os.environ['MAX_PAGES_FILE_BYTES'])
+          print(f'NBA immutable publication snapshots: {source_bytes} bytes source -> {deployed_bytes} bytes minified; {len(payload)} records.')
+          if deployed_bytes >= limit:
+              raise SystemExit(f'Minified NBA publication snapshots still exceed the Pages per-file limit ({deployed_bytes} >= {limit}).')
+          PY
           build_tag="$(date -u +%Y%m%d)-${SOURCE_SHA:0:12}"
           build_id="MS-UNIFIED-${build_tag}"
           BUILD_ID="$build_id" BUILD_TAG="$build_tag" python - <<'PY'
