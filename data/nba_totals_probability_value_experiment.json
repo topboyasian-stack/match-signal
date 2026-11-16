@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-16T00:06:52.045811+00:00",
+  "generated_at": "2026-11-16T00:08:45.537566+00:00",
   "paper_only": true,
   "experiment": "NBA_TOTALS_EMPIRICAL_RESIDUAL_VALUE_V3",
   "model_version": "nba-total-v5.1-pace-efficiency-calibrated",
@@ -2895,18 +2895,61 @@
       "calibration_check": "PASS",
       "decision": "OVER VALUE",
       "decision_is_authorized_for_betting": false
+    },
+    {
+      "event_id": "401909987",
+      "matchup": "LA Clippers vs Charlotte Hornets",
+      "published_at": "2026-11-15T14:07:33.963517+00:00",
+      "settled_result": "over",
+      "won_by_original_point_edge_pick": true,
+      "research_value_signal_outcome": "WIN",
+      "forecast_total": 218.4128,
+      "sportybet_line": 214.5,
+      "over_odds": 1.91,
+      "under_odds": 1.9,
+      "model_probability": {
+        "over": 0.6254,
+        "under": 0.3746,
+        "push": 0.0
+      },
+      "market_no_vig_probability": {
+        "over": 0.4987,
+        "under": 0.5013
+      },
+      "model_probability_conditional_on_no_push": {
+        "over": 0.6254,
+        "under": 0.3746
+      },
+      "model_probability_edge": {
+        "over": 0.1267,
+        "under": -0.1267
+      },
+      "expected_value_per_unit": {
+        "over": 0.1946,
+        "under": -0.2883
+      },
+      "bootstrap_95_lower_bound": {
+        "over_probability_edge": 0.0718,
+        "under_probability_edge": -0.1817,
+        "over_expected_value": 0.0896,
+        "under_expected_value": -0.3928,
+        "method": "deterministic paired empirical-residual bootstrap; 4,000 resamples"
+      },
+      "calibration_check": "PASS",
+      "decision": "OVER VALUE",
+      "decision_is_authorized_for_betting": false
     }
   ],
-  "settled_v5_market_count": 63,
+  "settled_v5_market_count": 64,
   "settled_v5_clv_diagnostics": {
     "definition": "Opening immutable v5.1 publication quote vs latest captured exact SportyBet market-225 pregame quote; near-close counts only if quote was observed within 45 minutes of tip. This is not an official bookmaker close.",
     "close_window_minutes": 45,
-    "settled_v5_fixtures_audited": 63,
-    "near_close_observations": 51,
+    "settled_v5_fixtures_audited": 64,
+    "near_close_observations": 52,
     "positive_probability_clv_n": 21,
-    "positive_line_clv_n": 15,
-    "mean_probability_clv": -0.00153,
-    "mean_line_clv_points": -0.6078,
+    "positive_line_clv_n": 16,
+    "mean_probability_clv": -0.0016,
+    "mean_line_clv_points": -0.5769,
     "fixtures": [
       {
         "event_id": "401909907",
@@ -4671,17 +4714,45 @@
         "positive_probability_clv": false,
         "positive_line_clv": false,
         "is_official_bookmaker_close": false
+      },
+      {
+        "event_id": "401909987",
+        "matchup": "LA Clippers vs Charlotte Hornets",
+        "selected_side": "OVER",
+        "clv_status": "NEAR_CLOSE_CAPTURED",
+        "opening": {
+          "snapshot_id": "nba-total-pub:f16810cdefe1e0b31c188b80",
+          "quote_timestamp": "2026-11-15T14:07:31.049000+00:00",
+          "line": 214.5,
+          "over_odds": 1.91,
+          "under_odds": 1.9,
+          "selected_side_no_vig_probability": 0.498688
+        },
+        "latest_pregame": {
+          "snapshot_id": "nba-total-pub:8d4eee1be2f2a90bcec93d64",
+          "quote_timestamp": "2026-11-15T21:27:31.551000+00:00",
+          "minutes_before_start": 2.474,
+          "line": 213.5,
+          "over_odds": 1.95,
+          "under_odds": 1.9,
+          "selected_side_no_vig_probability": 0.493506
+        },
+        "selected_side_no_vig_probability_clv": -0.005181,
+        "selected_side_line_clv_points": 1.0,
+        "positive_probability_clv": false,
+        "positive_line_clv": true,
+        "is_official_bookmaker_close": false
       }
     ],
     "sample_is_sufficient_for_release": false
   },
   "settled_v5_probability_score_summary": {
-    "n": 63,
+    "n": 64,
     "pushes_excluded_from_binary_metrics": 0,
-    "model_brier": 0.266625,
-    "market_no_vig_brier": 0.248196,
-    "model_log_loss": 0.729728,
-    "market_no_vig_log_loss": 0.689539,
+    "model_brier": 0.264651,
+    "market_no_vig_brier": 0.248245,
+    "model_log_loss": 0.72566,
+    "market_no_vig_log_loss": 0.689636,
     "over_probability_buckets": [
       {
         "range": "0.3-0.4",
@@ -4697,9 +4768,9 @@
       },
       {
         "range": "0.6-0.7",
-        "n": 22,
-        "mean_model_over_probability": 0.6306,
-        "observed_over_rate": 0.5909
+        "n": 23,
+        "mean_model_over_probability": 0.6304,
+        "observed_over_rate": 0.6087
       },
       {
         "range": "0.7-0.8",
@@ -4719,8 +4790,8 @@
     "prospective_unique_fixtures_with_any_snapshot": 105,
     "prospective_verified_fresh_market_225_snapshot_records": 9299,
     "prospective_unique_fixtures_with_verified_fresh_market_225_snapshot": 105,
-    "prospective_settled_unique_market_selections": 63,
-    "prospective_settled_selections_with_exact_snapshot_match": 63,
+    "prospective_settled_unique_market_selections": 64,
+    "prospective_settled_selections_with_exact_snapshot_match": 64,
     "prospective_settled_selections_missing_or_mismatched_snapshot": 0,
     "snapshot_linkage_failures": [],
     "target_unique_settled_selections_for_roi": 100,
@@ -4730,11 +4801,11 @@
   "prospective_probability_fixture_coverage": {
     "cutoff_utc": "2026-11-02T02:00:00+00:00",
     "source": "data/nba_totals_probability_settlements.json",
-    "candidate_unique_events": 98,
-    "valid_unique_settled_fixtures": 98,
-    "binary_scored_unique_fixtures": 98,
+    "candidate_unique_events": 99,
+    "valid_unique_settled_fixtures": 99,
+    "binary_scored_unique_fixtures": 99,
     "push_fixtures_excluded_from_binary_scores": 0,
-    "neutral_no_bet_fixtures_included": 62,
+    "neutral_no_bet_fixtures_included": 63,
     "directional_selection_fixtures_also_tracked_in_bet_ledger": 36,
     "snapshot_linkage_failures": [],
     "snapshot_linkage_failure_count": 0,
@@ -6407,15 +6478,32 @@
       "line": 226.5,
       "pick": "over",
       "probability_validation_only": true
+    },
+    {
+      "event_id": "401909987",
+      "settled_result": "over",
+      "model_probability": {
+        "over": 0.6082474226804123,
+        "under": 0.3917525773195876,
+        "push": 0.0
+      },
+      "market_no_vig_probability": {
+        "over": 0.5013123359580053,
+        "under": 0.49868766404199477
+      },
+      "publication_snapshot_id": "nba-total-pub:5542d9dbfc91836f97270cab",
+      "line": 215.5,
+      "pick": null,
+      "probability_validation_only": true
     }
   ],
   "prospective_probability_score_summary": {
-    "n": 98,
+    "n": 99,
     "pushes_excluded_from_binary_metrics": 0,
-    "model_brier": 0.26109,
-    "market_no_vig_brier": 0.250315,
-    "model_log_loss": 0.717148,
-    "market_no_vig_log_loss": 0.693776,
+    "model_brier": 0.260003,
+    "market_no_vig_brier": 0.250298,
+    "model_log_loss": 0.714926,
+    "market_no_vig_log_loss": 0.693744,
     "over_probability_buckets": [
       {
         "range": "0.3-0.4",
@@ -6437,9 +6525,9 @@
       },
       {
         "range": "0.6-0.7",
-        "n": 12,
-        "mean_model_over_probability": 0.6386,
-        "observed_over_rate": 0.5
+        "n": 13,
+        "mean_model_over_probability": 0.6363,
+        "observed_over_rate": 0.5385
       },
       {
         "range": "0.7-0.8",
@@ -6455,12 +6543,12 @@
   "prospective_clv_diagnostics": {
     "definition": "Opening immutable v5.1 publication quote vs latest captured exact SportyBet market-225 pregame quote; near-close counts only if quote was observed within 45 minutes of tip. This is not an official bookmaker close.",
     "close_window_minutes": 45,
-    "settled_v5_fixtures_audited": 63,
-    "near_close_observations": 51,
+    "settled_v5_fixtures_audited": 64,
+    "near_close_observations": 52,
     "positive_probability_clv_n": 21,
-    "positive_line_clv_n": 15,
-    "mean_probability_clv": -0.00153,
-    "mean_line_clv_points": -0.6078,
+    "positive_line_clv_n": 16,
+    "mean_probability_clv": -0.0016,
+    "mean_line_clv_points": -0.5769,
     "fixtures": [
       {
         "event_id": "401909907",
@@ -8225,6 +8313,34 @@
         "positive_probability_clv": false,
         "positive_line_clv": false,
         "is_official_bookmaker_close": false
+      },
+      {
+        "event_id": "401909987",
+        "matchup": "LA Clippers vs Charlotte Hornets",
+        "selected_side": "OVER",
+        "clv_status": "NEAR_CLOSE_CAPTURED",
+        "opening": {
+          "snapshot_id": "nba-total-pub:f16810cdefe1e0b31c188b80",
+          "quote_timestamp": "2026-11-15T14:07:31.049000+00:00",
+          "line": 214.5,
+          "over_odds": 1.91,
+          "under_odds": 1.9,
+          "selected_side_no_vig_probability": 0.498688
+        },
+        "latest_pregame": {
+          "snapshot_id": "nba-total-pub:8d4eee1be2f2a90bcec93d64",
+          "quote_timestamp": "2026-11-15T21:27:31.551000+00:00",
+          "minutes_before_start": 2.474,
+          "line": 213.5,
+          "over_odds": 1.95,
+          "under_odds": 1.9,
+          "selected_side_no_vig_probability": 0.493506
+        },
+        "selected_side_no_vig_probability_clv": -0.005181,
+        "selected_side_line_clv_points": 1.0,
+        "positive_probability_clv": false,
+        "positive_line_clv": true,
+        "is_official_bookmaker_close": false
       }
     ],
     "sample_is_sufficient_for_release": false,
@@ -8233,8 +8349,8 @@
   },
   "prospective_clv_release_check_passed": false,
   "historical_value_signal_summary": {
-    "n": 30,
-    "wins": 15,
+    "n": 31,
+    "wins": 16,
     "losses": 15,
     "insufficient_sample": true
   },
@@ -8246,7 +8362,7 @@
       "matchup": "Milwaukee Bucks vs Atlanta Hawks",
       "start_time": "2026-11-16T01:00:00+00:00",
       "quote_timestamp": "2026-11-16T00:05:32.331000+00:00",
-      "quote_age_minutes": 1.3286,
+      "quote_age_minutes": 3.2201,
       "forecast_total": 228.6737,
       "sportybet_line": 233.5,
       "over_odds": 1.93,
@@ -8288,7 +8404,7 @@
       "matchup": "Sacramento Kings vs Oklahoma City Thunder",
       "start_time": "2026-11-16T02:00:00+00:00",
       "quote_timestamp": "2026-11-16T00:05:32.331000+00:00",
-      "quote_age_minutes": 1.3286,
+      "quote_age_minutes": 3.2201,
       "forecast_total": 223.4869,
       "sportybet_line": 223.5,
       "over_odds": 1.95,
@@ -8328,10 +8444,10 @@
   ],
   "upcoming_value_diagnostics_count": 2,
   "upcoming_predictions_without_exact_fresh_pair": 44,
-  "prospective_settled_market_bets_after_cutoff": 63,
+  "prospective_settled_market_bets_after_cutoff": 64,
   "prospective_minimum_sample_reached": false,
-  "prospective_probability_scored_unique_fixtures": 98,
-  "prospective_probability_settled_unique_fixtures": 98,
+  "prospective_probability_scored_unique_fixtures": 99,
+  "prospective_probability_settled_unique_fixtures": 99,
   "prospective_probability_validation_sample_met": true,
   "live_value_decisions_authorized": false,
   "release_decision": "RESEARCH_ONLY",
@@ -8340,9 +8456,9 @@
   "source_data_fingerprint": {
     "data/nba_history.json": "590e36dc78461e99a978851a4f8229ac355357adfb5fec68553d7bdd202fafa5",
     "data/nba_predictions.json": "f6ea5f2632aa05c181c1c399b0f1342e014a3fc47d336938f98bdef5ed2f345e",
-    "data/nba_totals_ledger.json": "b1f1ed582b643a36160db24ac207018902192218639e320bd28083bcbaa1b0dd",
+    "data/nba_totals_ledger.json": "795adceb4e9988f1e66a4415ed197fd77c42d65c7718acd05013da24478bbbac",
     "data/nba_totals_publication_snapshots.json": "59eb76c58facde36fe2d340d89c7687162f2cb700fa5baaa00cca352ab5f8324",
-    "data/nba_totals_probability_settlements.json": "f42d136fd3b0c905826593aef97bbfa74b48f6d33847e25bbc41797f6c484fcf",
+    "data/nba_totals_probability_settlements.json": "4ab8904bac109bbe4804ea5e013b80f4bd4173cbaa0ddd4340a26eda5985372d",
     "data/nba_totals_price_capture_status.json": "caab3b1bf32c7a1180d571d0728d189bb809aee4bf73556b8fa5adcb48b10f1e",
     "data/nba_totals_oos_value_test.json": "99b29afcd0f140009fe7c8a7917b2a1a9bf979408938d17d46f40bebbdcab39a"
   }
