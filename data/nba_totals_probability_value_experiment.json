@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-16T01:05:35.842369+00:00",
+  "generated_at": "2026-11-16T01:11:21.046168+00:00",
   "paper_only": true,
   "experiment": "NBA_TOTALS_EMPIRICAL_RESIDUAL_VALUE_V3",
   "model_version": "nba-total-v5.1-pace-efficiency-calibrated",
@@ -2897,6 +2897,49 @@
       "decision_is_authorized_for_betting": false
     },
     {
+      "event_id": "401909989",
+      "matchup": "Boston Celtics vs Dallas Mavericks",
+      "published_at": "2026-11-15T06:14:24.078003+00:00",
+      "settled_result": "over",
+      "won_by_original_point_edge_pick": true,
+      "research_value_signal_outcome": "WIN",
+      "forecast_total": 219.7703,
+      "sportybet_line": 216.5,
+      "over_odds": 1.88,
+      "under_odds": 1.93,
+      "model_probability": {
+        "over": 0.6151,
+        "under": 0.3849,
+        "push": 0.0
+      },
+      "market_no_vig_probability": {
+        "over": 0.5066,
+        "under": 0.4934
+      },
+      "model_probability_conditional_on_no_push": {
+        "over": 0.6151,
+        "under": 0.3849
+      },
+      "model_probability_edge": {
+        "over": 0.1086,
+        "under": -0.1086
+      },
+      "expected_value_per_unit": {
+        "over": 0.1564,
+        "under": -0.2572
+      },
+      "bootstrap_95_lower_bound": {
+        "over_probability_edge": 0.0501,
+        "under_probability_edge": -0.1601,
+        "over_expected_value": 0.0466,
+        "under_expected_value": -0.3567,
+        "method": "deterministic paired empirical-residual bootstrap; 4,000 resamples"
+      },
+      "calibration_check": "PASS",
+      "decision": "OVER VALUE",
+      "decision_is_authorized_for_betting": false
+    },
+    {
       "event_id": "401909987",
       "matchup": "LA Clippers vs Charlotte Hornets",
       "published_at": "2026-11-15T14:07:33.963517+00:00",
@@ -2940,16 +2983,16 @@
       "decision_is_authorized_for_betting": false
     }
   ],
-  "settled_v5_market_count": 64,
+  "settled_v5_market_count": 65,
   "settled_v5_clv_diagnostics": {
     "definition": "Opening immutable v5.1 publication quote vs latest captured exact SportyBet market-225 pregame quote; near-close counts only if quote was observed within 45 minutes of tip. This is not an official bookmaker close.",
     "close_window_minutes": 45,
-    "settled_v5_fixtures_audited": 64,
-    "near_close_observations": 52,
-    "positive_probability_clv_n": 21,
+    "settled_v5_fixtures_audited": 65,
+    "near_close_observations": 53,
+    "positive_probability_clv_n": 22,
     "positive_line_clv_n": 16,
-    "mean_probability_clv": -0.0016,
-    "mean_line_clv_points": -0.5769,
+    "mean_probability_clv": -0.001522,
+    "mean_line_clv_points": -0.5849,
     "fixtures": [
       {
         "event_id": "401909907",
@@ -4716,6 +4759,34 @@
         "is_official_bookmaker_close": false
       },
       {
+        "event_id": "401909989",
+        "matchup": "Boston Celtics vs Dallas Mavericks",
+        "selected_side": "OVER",
+        "clv_status": "NEAR_CLOSE_CAPTURED",
+        "opening": {
+          "snapshot_id": "nba-total-pub:9cd0999811f2b07660795b6c",
+          "quote_timestamp": "2026-11-15T06:14:20.524000+00:00",
+          "line": 216.5,
+          "over_odds": 1.88,
+          "under_odds": 1.93,
+          "selected_side_no_vig_probability": 0.506562
+        },
+        "latest_pregame": {
+          "snapshot_id": "nba-total-pub:0fdfcdd1737d68be9e00c9ef",
+          "quote_timestamp": "2026-11-15T22:47:05.751000+00:00",
+          "minutes_before_start": 12.904,
+          "line": 217.5,
+          "over_odds": 1.89,
+          "under_odds": 1.96,
+          "selected_side_no_vig_probability": 0.509091
+        },
+        "selected_side_no_vig_probability_clv": 0.002529,
+        "selected_side_line_clv_points": -1.0,
+        "positive_probability_clv": true,
+        "positive_line_clv": false,
+        "is_official_bookmaker_close": false
+      },
+      {
         "event_id": "401909987",
         "matchup": "LA Clippers vs Charlotte Hornets",
         "selected_side": "OVER",
@@ -4747,12 +4818,12 @@
     "sample_is_sufficient_for_release": false
   },
   "settled_v5_probability_score_summary": {
-    "n": 64,
+    "n": 65,
     "pushes_excluded_from_binary_metrics": 0,
-    "model_brier": 0.26493,
-    "market_no_vig_brier": 0.248245,
-    "model_log_loss": 0.726247,
-    "market_no_vig_log_loss": 0.689636,
+    "model_brier": 0.263134,
+    "market_no_vig_brier": 0.248171,
+    "model_log_loss": 0.72255,
+    "market_no_vig_log_loss": 0.689489,
     "over_probability_buckets": [
       {
         "range": "0.3-0.4",
@@ -4768,9 +4839,9 @@
       },
       {
         "range": "0.6-0.7",
-        "n": 23,
-        "mean_model_over_probability": 0.6299,
-        "observed_over_rate": 0.6087
+        "n": 24,
+        "mean_model_over_probability": 0.6293,
+        "observed_over_rate": 0.625
       },
       {
         "range": "0.7-0.8",
@@ -4786,12 +4857,12 @@
   "prospective_pregame_snapshot_coverage": {
     "cutoff_utc": "2026-11-02T02:00:00+00:00",
     "snapshot_source": "data/nba_totals_publication_snapshots.json",
-    "prospective_v5_snapshot_records": 9309,
+    "prospective_v5_snapshot_records": 9311,
     "prospective_unique_fixtures_with_any_snapshot": 106,
-    "prospective_verified_fresh_market_225_snapshot_records": 9309,
+    "prospective_verified_fresh_market_225_snapshot_records": 9311,
     "prospective_unique_fixtures_with_verified_fresh_market_225_snapshot": 106,
-    "prospective_settled_unique_market_selections": 64,
-    "prospective_settled_selections_with_exact_snapshot_match": 64,
+    "prospective_settled_unique_market_selections": 65,
+    "prospective_settled_selections_with_exact_snapshot_match": 65,
     "prospective_settled_selections_missing_or_mismatched_snapshot": 0,
     "snapshot_linkage_failures": [],
     "target_unique_settled_selections_for_roi": 100,
@@ -4801,12 +4872,12 @@
   "prospective_probability_fixture_coverage": {
     "cutoff_utc": "2026-11-02T02:00:00+00:00",
     "source": "data/nba_totals_probability_settlements.json",
-    "candidate_unique_events": 100,
-    "valid_unique_settled_fixtures": 100,
-    "binary_scored_unique_fixtures": 100,
+    "candidate_unique_events": 101,
+    "valid_unique_settled_fixtures": 101,
+    "binary_scored_unique_fixtures": 101,
     "push_fixtures_excluded_from_binary_scores": 0,
     "neutral_no_bet_fixtures_included": 64,
-    "directional_selection_fixtures_also_tracked_in_bet_ledger": 36,
+    "directional_selection_fixtures_also_tracked_in_bet_ledger": 37,
     "snapshot_linkage_failures": [],
     "snapshot_linkage_failure_count": 0,
     "target_unique_settled_probability_observations": 30,
@@ -6512,15 +6583,32 @@
       "line": 223.5,
       "pick": null,
       "probability_validation_only": true
+    },
+    {
+      "event_id": "401909989",
+      "settled_result": "over",
+      "model_probability": {
+        "over": 0.6151202749140894,
+        "under": 0.3848797250859107,
+        "push": 0.0
+      },
+      "market_no_vig_probability": {
+        "over": 0.5065616797900262,
+        "under": 0.4934383202099738
+      },
+      "publication_snapshot_id": "nba-total-pub:9cd0999811f2b07660795b6c",
+      "line": 216.5,
+      "pick": "over",
+      "probability_validation_only": true
     }
   ],
   "prospective_probability_score_summary": {
-    "n": 100,
+    "n": 101,
     "pushes_excluded_from_binary_metrics": 0,
-    "model_brier": 0.260778,
-    "market_no_vig_brier": 0.250361,
-    "model_log_loss": 0.71648,
-    "market_no_vig_log_loss": 0.69387,
+    "model_brier": 0.259663,
+    "market_no_vig_brier": 0.250293,
+    "model_log_loss": 0.714197,
+    "market_no_vig_log_loss": 0.693733,
     "over_probability_buckets": [
       {
         "range": "0.3-0.4",
@@ -6542,9 +6630,9 @@
       },
       {
         "range": "0.6-0.7",
-        "n": 13,
-        "mean_model_over_probability": 0.6357,
-        "observed_over_rate": 0.5385
+        "n": 14,
+        "mean_model_over_probability": 0.6343,
+        "observed_over_rate": 0.5714
       },
       {
         "range": "0.7-0.8",
@@ -6560,12 +6648,12 @@
   "prospective_clv_diagnostics": {
     "definition": "Opening immutable v5.1 publication quote vs latest captured exact SportyBet market-225 pregame quote; near-close counts only if quote was observed within 45 minutes of tip. This is not an official bookmaker close.",
     "close_window_minutes": 45,
-    "settled_v5_fixtures_audited": 64,
-    "near_close_observations": 52,
-    "positive_probability_clv_n": 21,
+    "settled_v5_fixtures_audited": 65,
+    "near_close_observations": 53,
+    "positive_probability_clv_n": 22,
     "positive_line_clv_n": 16,
-    "mean_probability_clv": -0.0016,
-    "mean_line_clv_points": -0.5769,
+    "mean_probability_clv": -0.001522,
+    "mean_line_clv_points": -0.5849,
     "fixtures": [
       {
         "event_id": "401909907",
@@ -8332,6 +8420,34 @@
         "is_official_bookmaker_close": false
       },
       {
+        "event_id": "401909989",
+        "matchup": "Boston Celtics vs Dallas Mavericks",
+        "selected_side": "OVER",
+        "clv_status": "NEAR_CLOSE_CAPTURED",
+        "opening": {
+          "snapshot_id": "nba-total-pub:9cd0999811f2b07660795b6c",
+          "quote_timestamp": "2026-11-15T06:14:20.524000+00:00",
+          "line": 216.5,
+          "over_odds": 1.88,
+          "under_odds": 1.93,
+          "selected_side_no_vig_probability": 0.506562
+        },
+        "latest_pregame": {
+          "snapshot_id": "nba-total-pub:0fdfcdd1737d68be9e00c9ef",
+          "quote_timestamp": "2026-11-15T22:47:05.751000+00:00",
+          "minutes_before_start": 12.904,
+          "line": 217.5,
+          "over_odds": 1.89,
+          "under_odds": 1.96,
+          "selected_side_no_vig_probability": 0.509091
+        },
+        "selected_side_no_vig_probability_clv": 0.002529,
+        "selected_side_line_clv_points": -1.0,
+        "positive_probability_clv": true,
+        "positive_line_clv": false,
+        "is_official_bookmaker_close": false
+      },
+      {
         "event_id": "401909987",
         "matchup": "LA Clippers vs Charlotte Hornets",
         "selected_side": "OVER",
@@ -8366,8 +8482,8 @@
   },
   "prospective_clv_release_check_passed": false,
   "historical_value_signal_summary": {
-    "n": 31,
-    "wins": 16,
+    "n": 32,
+    "wins": 17,
     "losses": 15,
     "insufficient_sample": true
   },
@@ -8378,38 +8494,38 @@
       "event_id": "401909993",
       "matchup": "Sacramento Kings vs Oklahoma City Thunder",
       "start_time": "2026-11-16T02:00:00+00:00",
-      "quote_timestamp": "2026-11-16T01:04:30.466000+00:00",
-      "quote_age_minutes": 1.0896,
+      "quote_timestamp": "2026-11-16T01:09:59.675000+00:00",
+      "quote_age_minutes": 1.3562,
       "forecast_total": 223.4869,
       "sportybet_line": 222.5,
-      "over_odds": 1.89,
-      "under_odds": 1.95,
+      "over_odds": 1.96,
+      "under_odds": 1.88,
       "model_probability": {
         "over": 0.567,
         "under": 0.433,
         "push": 0.0
       },
       "market_no_vig_probability": {
-        "over": 0.5078,
-        "under": 0.4922
+        "over": 0.4896,
+        "under": 0.5104
       },
       "model_probability_conditional_on_no_push": {
         "over": 0.567,
         "under": 0.433
       },
       "model_probability_edge": {
-        "over": 0.0592,
-        "under": -0.0592
+        "over": 0.0774,
+        "under": -0.0774
       },
       "expected_value_per_unit": {
-        "over": 0.0716,
-        "under": -0.1557
+        "over": 0.1113,
+        "under": -0.186
       },
       "bootstrap_95_lower_bound": {
-        "over_probability_edge": 0.0008,
-        "under_probability_edge": -0.1142,
-        "over_expected_value": -0.0388,
-        "under_expected_value": -0.2629,
+        "over_probability_edge": 0.019,
+        "under_probability_edge": -0.1324,
+        "over_expected_value": -0.0032,
+        "under_expected_value": -0.2893,
         "method": "deterministic paired empirical-residual bootstrap; 4,000 resamples"
       },
       "calibration_check": "PASS",
@@ -8420,8 +8536,8 @@
       "event_id": "401909999",
       "matchup": "Minnesota Timberwolves vs Portland Trail Blazers",
       "start_time": "2026-11-17T01:00:00+00:00",
-      "quote_timestamp": "2026-11-16T01:04:30.466000+00:00",
-      "quote_age_minutes": 1.0896,
+      "quote_timestamp": "2026-11-16T01:09:59.675000+00:00",
+      "quote_age_minutes": 1.3562,
       "forecast_total": 227.0557,
       "sportybet_line": 228.5,
       "over_odds": 1.89,
@@ -8461,10 +8577,10 @@
   ],
   "upcoming_value_diagnostics_count": 2,
   "upcoming_predictions_without_exact_fresh_pair": 50,
-  "prospective_settled_market_bets_after_cutoff": 64,
+  "prospective_settled_market_bets_after_cutoff": 65,
   "prospective_minimum_sample_reached": false,
-  "prospective_probability_scored_unique_fixtures": 100,
-  "prospective_probability_settled_unique_fixtures": 100,
+  "prospective_probability_scored_unique_fixtures": 101,
+  "prospective_probability_settled_unique_fixtures": 101,
   "prospective_probability_validation_sample_met": true,
   "live_value_decisions_authorized": false,
   "release_decision": "RESEARCH_ONLY",
@@ -8472,11 +8588,11 @@
   "market_prices_used_as_model_inputs": false,
   "source_data_fingerprint": {
     "data/nba_history.json": "9b8f8e5395380a589779d3445074b6f3a8953cfb219d4ed5860be3f7cdcfc21c",
-    "data/nba_predictions.json": "4600db0bffaf51e8aa5678d1794bd814a73161b059af62d1d268fb2b17414914",
-    "data/nba_totals_ledger.json": "08e6c8787620df99a8f0cdcf868ba317958c924db5bc4875101cc0e774683717",
-    "data/nba_totals_publication_snapshots.json": "c98fa73be2498e3c6ee625eb3d08b690fb8eb5efd11e43edb16b15e3a5edfbd3",
-    "data/nba_totals_probability_settlements.json": "e63403f2e642d970787733bdaadfb13665ddf4d8f831aeea9c35dcd4b62f8ab2",
-    "data/nba_totals_price_capture_status.json": "3c80555b81c35b5577505bd050089bb67d2f259ab1453306364cf9844bb0e578",
-    "data/nba_totals_oos_value_test.json": "289b0166e78e4f7aaec1c2d5677bf321917b9526623a0ca7d35e020973dcb07b"
+    "data/nba_predictions.json": "e50824f633fcb2babf50dc8c71327d807bd43fead2e6cfb6544a8f26c18d86e4",
+    "data/nba_totals_ledger.json": "92cd3ec08979657e5c1379528820d0a25508c163873f5cc8ca8a6f6150c58ff8",
+    "data/nba_totals_publication_snapshots.json": "256faa62111700fc34a736550de99ac36bdbafff4f9c6ac56efc9952abf46532",
+    "data/nba_totals_probability_settlements.json": "98ca3f0a50eef8033daf35585df8f6cb36d0b9f53ce367c97602d01d6b9ef100",
+    "data/nba_totals_price_capture_status.json": "bc38c74d8cf33cdc189d2e201bb90d6cfa3b485c170717ebe37d4abfa7a72cd5",
+    "data/nba_totals_oos_value_test.json": "431c3d262db1bba169c89c6a54c88b4b1f1d49f8e3c449e92289b2ca759bde35"
   }
 }
