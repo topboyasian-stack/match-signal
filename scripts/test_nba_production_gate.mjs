@@ -82,44 +82,30 @@ async function postJson(base, path, payload) {
 
 const probeResults = [];
 for (const base of bases) {
-  // Market-225 totals must fail at the global release gate while evidence is RESEARCH_ONLY.
-  // Only after qualification should synthetic legs reach live fixture validation.
+  // Manual market-225 totals must skip model qualification and reach exact live fixture validation.
   const manual = await postJson(base, '/api/sportybet-booking', {
     mode: 'manual',
     manual_selections: legs
   });
-  if (!locallyQualified) {
-    assert.equal(manual.response.status, 423, base + ' must keep manual market-225 totals locked while release evidence is RESEARCH_ONLY');
-    assert.equal(manual.body.ok, false);
-    assert.equal(manual.body.error, 'NBA_RELEASE_GATE_LOCKED');
-    assert.equal(manual.body.booking_code_withheld, true);
-    assert.equal(Object.hasOwn(manual.body, 'booking_code'), false);
-    probeResults.push({
-      base, endpoint_type: 'manual_nba_totals_release_gate',
-      http_status: manual.response.status, error: manual.body.error,
-      current_main_release_qualified: locallyQualified,
-      booking_code_withheld: manual.body.booking_code_withheld,
-      booking_code_present: Object.hasOwn(manual.body, 'booking_code')
-    });
-    console.log('PASS: manual NBA market-225 totals remain locked until the full release gate passes', JSON.stringify(probeResults.at(-1)));
-  } else {
-    assert.equal(manual.response.status, 409, base + ' must reject synthetic manual NBA fixtures after the qualified gate opens');
-    assert.equal(manual.body.ok, false);
-    assert.equal(manual.body.error, 'MANUAL_TICKET_REJECTED_PARTIAL');
-    assert.equal(manual.body.booking_code_withheld, true);
-    assert.equal(Object.hasOwn(manual.body, 'booking_code'), false);
-    assert.equal(manual.body.excluded_count, 2);
-    assert.ok(Array.isArray(manual.body.validation) && manual.body.validation.length === 2);
-    assert.ok(manual.body.validation.every(item => item.ok === false));
-    probeResults.push({
-      base, endpoint_type: 'manual_shared_ticket_after_release_gate',
-      http_status: manual.response.status, error: manual.body.error,
-      current_main_release_qualified: locallyQualified,
-      booking_code_withheld: manual.body.booking_code_withheld,
-      booking_code_present: Object.hasOwn(manual.body, 'booking_code')
-    });
-    console.log('PASS: qualified manual NBA totals still reject synthetic fixtures during live validation', JSON.stringify(probeResults.at(-1)));
-  }
+  // Manual shared-ticket preparation is independent of model qualification.
+  // Synthetic fixtures must therefore reach exact live validation and be rejected
+  // as missing, never at the automated NBA model-release gate.
+  assert.equal(manual.response.status, 409, base + ' must reject synthetic manual NBA fixtures during live validation');
+  assert.equal(manual.body.ok, false);
+  assert.equal(manual.body.error, 'MANUAL_TICKET_REJECTED_PARTIAL');
+  assert.equal(manual.body.booking_code_withheld, true);
+  assert.equal(Object.hasOwn(manual.body, 'booking_code'), false);
+  assert.equal(manual.body.excluded_count, 2);
+  assert.ok(Array.isArray(manual.body.validation) && manual.body.validation.length === 2);
+  assert.ok(manual.body.validation.every(item => item.ok === false));
+  probeResults.push({
+    base, endpoint_type: 'manual_shared_ticket_live_validation',
+    http_status: manual.response.status, error: manual.body.error,
+    current_main_release_qualified: locallyQualified,
+    booking_code_withheld: manual.body.booking_code_withheld,
+    booking_code_present: Object.hasOwn(manual.body, 'booking_code')
+  });
+  console.log('PASS: manual NBA totals bypass model qualification but still fail closed on missing live fixtures', JSON.stringify(probeResults.at(-1)));
 
   // The dedicated Basketball-only booking endpoint retains the independent
   // NBA model-release gate. It must never mint a code for synthetic fixtures.
