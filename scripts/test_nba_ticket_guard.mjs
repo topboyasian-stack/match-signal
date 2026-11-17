@@ -378,7 +378,7 @@ test('NBA ticket resolves SportyBet event ID separately from ESPN prediction ID 
       request: requestFor([manualLeg(one), manualLeg(two)])
     });
     const body = await response.json();
-    assert.equal(mock.calls.raw, 0, 'manual NBA picks must not require model-release artifacts');
+    assert.ok(mock.calls.raw > 0, 'manual NBA totals must verify current release evidence before live validation');
     assert.equal(mock.calls.event, 2, 'each stored NBA provider ID must be checked through the single-event details endpoint');
     assert.equal(mock.calls.feed, 3, 'only the missing NBA leg should fall back to the three bounded market catalog queries');
     assert.equal(mock.calls.share, 0, 'must not request a share code when any NBA leg is missing');
@@ -419,7 +419,7 @@ test('NBA ticket with a partial SportyBet acceptance withholds the provider shar
       request: requestFor([manualLeg(one), manualLeg(two)])
     });
     const body = await response.json();
-    assert.equal(mock.calls.raw, 0, 'manual NBA picks must not require model-release artifacts');
+    assert.ok(mock.calls.raw > 0, 'manual NBA totals must verify current release evidence before live validation');
     assert.equal(mock.calls.event, 2, 'both stored NBA provider IDs must be checked directly');
     assert.equal(mock.calls.feed, 0, 'current event details should avoid broad catalogue paging when both legs resolve');
     assert.equal(mock.calls.share, 1);
@@ -576,7 +576,7 @@ test('manual NBA leg with a mismatched current market-225 line is rejected befor
     assert.equal(response.status, 409);
     assert.equal(body.error, 'MANUAL_TICKET_REJECTED_PARTIAL');
     assert.equal(body.booking_code_withheld, true);
-    assert.equal(mock.calls.raw, 0, 'manual NBA picks must not require model-release artifacts');
+    assert.ok(mock.calls.raw > 0, 'manual NBA totals must verify current release evidence before live validation');
     assert.equal(mock.calls.event, 2);
     assert.equal(mock.calls.feed, 3, 'only the mismatched-line leg should use catalogue fallback');
     assert.equal(mock.calls.share, 0, 'a leg with a stale SportyBet line must not reach the share endpoint');
