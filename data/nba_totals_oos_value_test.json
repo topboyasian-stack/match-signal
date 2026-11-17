@@ -1,11 +1,11 @@
 {
-  "generated_at": "2026-11-17T01:02:23.696043+00:00",
+  "generated_at": "2026-11-17T01:03:21.627857+00:00",
   "paper_only": true,
   "evaluation_type": "NBA_TOTALS_FIXED_CUTOFF_V2",
   "market_id": "225",
   "market_definition": "full_game_total_including_overtime",
   "model_version": "nba-total-v5.1-pace-efficiency-calibrated",
-  "history_games": 1231,
+  "history_games": 1223,
   "holdout_protocol": {
     "fixed_cutoff_utc": "2026-11-02T02:00:00+00:00",
     "forecast_timestamp_field": "forecast_timestamp",
@@ -17,23 +17,23 @@
   "walk_forward": {
     "method": "expanding chronological forecasts; every game uses only strictly earlier completed games; prospective holdout begins at the fixed cutoff",
     "baseline": "mean NBA game total over the preceding 90 days (or all prior games when unavailable)",
-    "development_games": 1083,
+    "development_games": 1076,
     "holdout": {
       "n": 104,
-      "mae": 13.5894,
+      "mae": 13.5895,
       "rmse": 17.6396,
-      "bias": -1.8181,
+      "bias": -1.8183,
       "start_utc": "2026-11-02T02:00:00+00:00",
       "uncalibrated": {
         "n": 104,
-        "mae": 13.5688,
+        "mae": 13.5689,
         "rmse": 17.6066,
-        "bias": -1.4639
+        "bias": -1.4641
       },
       "baseline_mae": 14.1079,
       "baseline_rmse": 18.1335,
       "baseline_bias": -0.8106,
-      "mae_improvement_vs_baseline": 0.5185,
+      "mae_improvement_vs_baseline": 0.5184,
       "beats_baseline": true,
       "pace_feature_games": 104
     }
@@ -41,9 +41,9 @@
   "model_calibration": {
     "selected_pace_blend_weight": 0.8,
     "production_bias_correction": 0.3542,
-    "development_n": 1083,
-    "development_raw_bias": -0.5595,
-    "pace_feature_development_games": 1083,
+    "development_n": 1076,
+    "development_raw_bias": -0.6303,
+    "pace_feature_development_games": 1076,
     "pace_feature_coverage": 1.0,
     "selection_rule": "frozen v5.1 production calibration selected on the pre-registered training window; applied identically to live forecasts and holdout evaluation"
   },
