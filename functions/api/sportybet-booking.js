@@ -1310,10 +1310,11 @@ async function handlePost(context) {
     // Keep the lookup bounded by SportyBet's supported 30-day catalogue window.
     const catalogueTimeline = manualMode ? ticketCatalogueTimeline(legs) : 168;
     let nbaReleaseContext = null;
-    if (hasBasketballTotalsLeg || (hasBasketballLeg && !manualMode)) {
-      // Market-225 NBA totals stay locked in both manual shared slips and the
-      // automated Builder until the complete prospective release gate passes.
-      // Manual market-219 NBA match-winner selections remain a separate product.
+    if (!manualMode && (hasBasketballTotalsLeg || hasBasketballLeg)) {
+      // Automated NBA Builder batches remain behind the full prospective release gate.
+      // Explicitly manual slips are a separate paper-only workflow: they do not claim
+      // model qualification, but every NBA leg must pass exact live event/market/line,
+      // both-side-price, quote-freshness and pregame checks before a share code is requested.
       // This guard runs before provider lookups and before any share-code request.
       try { nbaReleaseContext = await loadNbaReleaseContext(requestDeadlineAt); }
       catch (error) { return json({ ok: false, error: 'NBA_RELEASE_EVIDENCE_UNAVAILABLE', message: 'NBA release evidence could not be verified. No NBA market-225 share code was requested.' }, 503); }
