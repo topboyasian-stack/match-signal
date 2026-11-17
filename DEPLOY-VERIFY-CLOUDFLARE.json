@@ -4,19 +4,19 @@
   "qualified_best_quote_coverage_status": "INCOMPLETE",
   "qualified_best_candidate_pool_rows": 0,
   "qualified_best_model_qualified_rows": 0,
-  "booking_api_status": "VERIFIED",
+  "booking_api_status": "FAIL",
   "qualified_alternatives_status": "READY",
-  "qualified_alternatives_count": 107,
+  "qualified_alternatives_count": 180,
   "qualified_alternatives": {
-    "verified_at": "2026-11-17T11:47:21.420Z",
+    "verified_at": "2026-11-17T12:54:49.832Z",
     "endpoint": "/api/public/market-alternatives",
     "api_status": "OK",
     "status": "READY",
-    "alternative_count": 107,
-    "visible_candidate_count": 114,
-    "unique_fixture_count": 91,
-    "builder_qualified_count": 2,
-    "research_only_count": 112,
+    "alternative_count": 180,
+    "visible_candidate_count": 186,
+    "unique_fixture_count": 140,
+    "builder_qualified_count": 36,
+    "research_only_count": 150,
     "sports": [
       "efootball",
       "tennis"
@@ -57,12 +57,12 @@
         "match": "Arthur Fils vs Rafael Jodar",
         "market": "total",
         "pick": "under",
-        "line": 26.5,
-        "odds": 1.5,
-        "probability": 0.816088,
+        "line": 27.5,
+        "odds": 1.51,
+        "probability": 0.817159,
         "start_time": "2026-11-17T13:00Z",
-        "quote_status": "STALE",
-        "qualification_status": "RESEARCH_ONLY_QUOTE_NOT_CURRENT"
+        "quote_status": "FRESH_EXACT",
+        "qualification_status": "BUILDER_QUALIFIED"
       },
       {
         "sport": "tennis",
@@ -71,9 +71,9 @@
         "match": "Arthur Fils vs Rafael Jodar",
         "market": "total",
         "pick": "under",
-        "line": 25.5,
-        "odds": 1.62,
-        "probability": 0.757861,
+        "line": 26.5,
+        "odds": 1.5,
+        "probability": 0.816088,
         "start_time": "2026-11-17T13:00Z",
         "quote_status": "STALE",
         "qualification_status": "RESEARCH_ONLY_QUOTE_NOT_CURRENT"
@@ -96,11 +96,11 @@
   },
   "shared_ticket_drawer_status": "READY",
   "provider": "Cloudflare Pages",
-  "source_commit": "f385eba47b7372dbd2ee42d3f7152c47b1dd51ed",
-  "verified_at": "2026-11-17T11:48:55.592959+00:00",
+  "source_commit": "7bc8f5537357a2da35d14117c6669f56c2fa4537",
+  "verified_at": "2026-11-17T12:55:46.479951+00:00",
   "live_virtual_feed": {
     "endpoint": "/api/sportybet-virtual",
-    "verified_at": "2026-11-17T11:48:41.047Z",
+    "verified_at": "2026-11-17T12:55:45.471Z",
     "status": "LIVE",
     "events_count": 200,
     "product_counts": {
@@ -111,13 +111,13 @@
       "efootball_live": {
         "status": "EMPTY",
         "events": 0,
-        "latency_ms": 276,
+        "latency_ms": 458,
         "endpoint": "/api/ng/factsCenter/wapConfigurableIndexLiveEvents"
       },
       "vfootball_live": {
         "status": "EMPTY",
         "events": 0,
-        "latency_ms": 1056,
+        "latency_ms": 848,
         "endpoint": "/api/ng/factsCenter/wapConfigurableIndexLiveEvents"
       },
       "efootball": {
@@ -125,53 +125,29 @@
         "events": 100,
         "attempts": 1,
         "retried": false,
-        "latency_ms": 1658,
+        "latency_ms": 1906,
         "endpoint": "/api/ng/factsCenter/pcUpcomingEvents",
         "primary_endpoint": "/api/ng/factsCenter/pcUpcomingEvents"
       },
       "vfootball": {
         "status": "LIVE",
         "events": 100,
-        "latency_ms": 3256
+        "latency_ms": 3768
       }
     },
     "errors": []
   },
   "booking_api": {
-    "verified_at": "2026-11-17T11:48:00.632Z",
-    "status": "VOLATILE_MARKET",
-    "http_status": 409,
-    "ok": true,
+    "verified_at": "2026-11-17T12:55:27.399Z",
+    "status": "FAIL",
+    "http_status": 503,
+    "ok": false,
     "batch_id": "DESK-BATCH-03",
     "selection_count": 2,
     "booking_code_available": false,
-    "error": "EFOOTBALL_SLIP_REJECTED_PARTIAL",
-    "message": "At least one eFootball leg failed current SportyBet validation. No share code was created. Refresh the whole ticket and add the current qualified selections again.",
-    "volatile_market": true,
-    "validation": [
-      {
-        "event_id": "sr:match:BAaHd1f4kd1ytLicfSQHLxg",
-        "sport": "virtual",
-        "match": "Al Nassr (Virtual_13) vs Shanghai Port (Virtual_14)",
-        "market": "virtual_total",
-        "pick": "Al Nassr (Virtual_13) vs Shanghai Port (Virtual_14) \u2014 O/U over 1.5",
-        "line": 1.5,
-        "ok": false,
-        "excluded": true,
-        "reason": "Event is no longer present in SportyBet current catalogue."
-      },
-      {
-        "event_id": "sr:match:BAaHnD|T7dx6ARWx6joDNVQ",
-        "sport": "virtual",
-        "match": "Man City (Krkula) vs Sporting CP (lzrn)",
-        "market": "virtual_total",
-        "pick": "Man City (Krkula) vs Sporting CP (lzrn) \u2014 O/U under 5.5",
-        "line": 5.5,
-        "ok": false,
-        "excluded": true,
-        "reason": "Event is no longer present in SportyBet current catalogue."
-      }
-    ]
+    "error": null,
+    "message": null,
+    "volatile_market": false
   },
   "nba_ticket_gate_probe_status": "NOT_RECORDED",
   "nba_ticket_gate_probe": {},
@@ -182,7 +158,7 @@
     "live_virtual_proxy",
     "virtual_lab_live_snapshot",
     "live_production_data",
-    "booking_api_post",
+    "booking_api_post_not_verified",
     "qualified_best_live_quote_diagnostic_incomplete",
     "nba_ticket_gate_probe_not_verified",
     "qualified_alternatives_live"
