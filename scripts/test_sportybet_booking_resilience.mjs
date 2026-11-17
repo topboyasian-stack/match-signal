@@ -71,16 +71,17 @@ try {
   assert.equal(nbaTotalsReleaseQualified({}, {}), false,
     'missing independent NBA evidence must never qualify ticket booking');
 
-  // Manual shared tickets may include unqualified NBA legs when every leg passes
-  // exact, current SportyBet market checks. This must not call model-release artifacts.
+  // Manual shared tickets may include market-219 NBA winners after exact current
+  // SportyBet checks. Market-225 totals are separately locked by the global
+  // release gate and are covered by nba-ticket-guard-tests.yml.
   const mixedBase = Date.now() + 6 * 60 * 60 * 1000;
   const mixedFixtures = [
     {id:'elche-betis',event_id:'espn:manual-elche-betis',provider_id:'sr:match:manual-elche-betis',sport:'football',market:'total',pick:'under',line:5.5,market_id:'18',player_1:'Elche',player_2:'Real Betis',match:'Elche vs Real Betis',start_ms:mixedBase,odds:1.09,over_odds:7.5,under_odds:1.09},
     {id:'sociedad-rayo',event_id:'espn:manual-sociedad-rayo',provider_id:'sr:match:manual-sociedad-rayo',sport:'football',market:'total',pick:'under',line:5.5,market_id:'18',player_1:'Real Sociedad',player_2:'Rayo Vallecano',match:'Real Sociedad vs Rayo Vallecano',start_ms:mixedBase+60*60*1000,odds:1.10,over_odds:7.2,under_odds:1.10},
     {id:'atletico-barcelona',event_id:'espn:manual-atletico-barcelona',provider_id:'sr:match:manual-atletico-barcelona',sport:'football',market:'total',pick:'under',line:5.5,market_id:'18',player_1:'Atlético Madrid',player_2:'Barcelona',match:'Atlético Madrid vs Barcelona',start_ms:mixedBase+2*60*60*1000,odds:1.21,over_odds:5.8,under_odds:1.21},
-    {id:'warriors-magic',event_id:'espn:manual-warriors-magic',provider_id:'sr:match:manual-warriors-magic',sport:'basketball',market:'total',pick:'over',line:207.5,market_id:'225',player_1:'Golden State Warriors',player_2:'Orlando Magic',match:'Golden State Warriors vs Orlando Magic',start_ms:mixedBase+3*60*60*1000,odds:1.25,over_odds:1.25,under_odds:3.7},
-    {id:'suns-rockets',event_id:'espn:manual-suns-rockets',provider_id:'sr:match:manual-suns-rockets',sport:'basketball',market:'total',pick:'over',line:215.5,market_id:'225',player_1:'Phoenix Suns',player_2:'Houston Rockets',match:'Phoenix Suns vs Houston Rockets',start_ms:mixedBase+4*60*60*1000,odds:1.42,over_odds:1.42,under_odds:2.8},
-    {id:'trailblazers-spurs',event_id:'espn:manual-trailblazers-spurs',provider_id:'sr:match:manual-trailblazers-spurs',sport:'basketball',market:'total',pick:'over',line:216.5,market_id:'225',player_1:'Portland Trail Blazers',player_2:'San Antonio Spurs',match:'Portland Trail Blazers vs San Antonio Spurs',start_ms:mixedBase+5*60*60*1000,odds:1.26,over_odds:1.26,under_odds:3.2}
+    {id:'warriors-magic',event_id:'espn:manual-warriors-magic',provider_id:'sr:match:manual-warriors-magic',sport:'basketball',market:'winner',pick:'p1',market_id:'219',player_1:'Golden State Warriors',player_2:'Orlando Magic',match:'Golden State Warriors vs Orlando Magic',start_ms:mixedBase+3*60*60*1000,odds:1.25,home_odds:1.25,away_odds:3.7},
+    {id:'suns-rockets',event_id:'espn:manual-suns-rockets',provider_id:'sr:match:manual-suns-rockets',sport:'basketball',market:'winner',pick:'p2',market_id:'219',player_1:'Phoenix Suns',player_2:'Houston Rockets',match:'Phoenix Suns vs Houston Rockets',start_ms:mixedBase+4*60*60*1000,odds:2.8,home_odds:1.42,away_odds:2.8},
+    {id:'trailblazers-spurs',event_id:'espn:manual-trailblazers-spurs',provider_id:'sr:match:manual-trailblazers-spurs',sport:'basketball',market:'winner',pick:'p1',market_id:'219',player_1:'Portland Trail Blazers',player_2:'San Antonio Spurs',match:'Portland Trail Blazers vs San Antonio Spurs',start_ms:mixedBase+5*60*60*1000,odds:1.26,home_odds:1.26,away_odds:3.2}
   ];
   function mixedEvent(fixture) {
     const basketball = fixture.sport === 'basketball';
@@ -93,12 +94,15 @@ try {
       matchStatus:'Not start',
       markets:[{
         id:fixture.market_id,
-        desc:basketball?'Full Game Total incl. OT':'Total Goals Over/Under',
-        specifier:'total='+fixture.line,
+        desc:basketball?(fixture.market==='total'?'Full Game Total incl. OT':'Match Winner incl. OT'):'Total Goals Over/Under',
+        specifier:fixture.market==='total'?'total='+fixture.line:null,
         status:'0',
-        outcomes:[
+        outcomes:fixture.market==='total'?[
           {id:'over-'+fixture.id,desc:'Over '+fixture.line,odds:fixture.over_odds,isActive:1},
           {id:'under-'+fixture.id,desc:'Under '+fixture.line,odds:fixture.under_odds,isActive:1}
+        ]:[
+          {id:'home-'+fixture.id,desc:'Home',odds:fixture.home_odds,isActive:1},
+          {id:'away-'+fixture.id,desc:'Away',odds:fixture.away_odds,isActive:1}
         ]
       }]
     };
@@ -113,7 +117,7 @@ try {
     if (url.pathname === '/api/ng/orders/share') {
       return jsonResponse({bizCode:10000,data:{
         shareCode:'MANUAL-MIXED-TICKET-OK',
-        outcomes:mixedFixtures.map(fixture=>({odds:fixture.pick==='over'?fixture.over_odds:fixture.under_odds}))
+        outcomes:mixedFixtures.map(fixture=>({odds:fixture.market==='total'?(fixture.pick==='over'?fixture.over_odds:fixture.under_odds):(fixture.pick==='p1'?fixture.home_odds:fixture.away_odds)}))
       }});
     }
     if (/\/(?:pcUpcomingEvents|wapConfigurableUpcomingEvents)$/.test(url.pathname)) {

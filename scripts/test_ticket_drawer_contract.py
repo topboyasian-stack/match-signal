@@ -82,7 +82,9 @@ def main():
             "if (manualMode && (" in api,
             "Every manual sport must use the same all-or-nothing pre-validation and provider-acceptance contract")
     require("MANUAL PICK — model qualification not claimed; live recheck required" in drawer,
-            "Research-only model status must not be misrepresented as a manual-ticket booking prohibition")
+            "Manual selections must remain clearly labelled and live-rechecked")
+    require("hasBasketballTotalsLeg" in api and "NBA_RELEASE_GATE_LOCKED" in api,
+            "Manual NBA market-225 totals must be blocked by the independent release gate until evidence qualifies")
     require("manual_selections" in drawer and "/api/sportybet-booking" in drawer,
             "The shared ticket must submit all selections through the root-relative common revalidation API")
     require("AbortSignal.timeout(26000)" in drawer and "Your ticket is still saved; no code is assumed to exist." in drawer,
@@ -179,11 +181,11 @@ def main():
     require("leg?.model_qualified!==true" in api and "leg?.market_id!=='225'" in api and
             "leg.market === 'winner'" in api and "leg.market_id !== '219'" in api and
             "!leg.sportybet_event_id" in api and "NBA_RELEASE_GATE_LOCKED" in api and
-            "nbaTotalTicketLegQualified" in api and "if (hasBasketballLeg && !manualMode)" in api and
+            "nbaTotalTicketLegQualified" in api and "if (hasBasketballTotalsLeg || (hasBasketballLeg && !manualMode))" in api and
             "if (basketballLeg && !manualMode)" in api and
             "const expectedMarket = isWinner ? '219' : '225'" in api and
             "15 * 60 * 1000" in api,
-            "Automated NBA totals Builder batches must retain the strict model-release gate; manual market-219 winner and market-225 total picks must pass exact fresh quote validation")
+            "Automated NBA totals Builder batches and manual market-225 totals must retain the strict release gate; market-219 manual winners remain separate and every qualified totals leg must pass exact fresh quote validation")
     require("prospective_probability_fixture_coverage" in api and
             "valid_unique_settled_fixtures" in api and "binary_scored_unique_fixtures" in api and
             "snapshot_linkage_failure_count" in api and
