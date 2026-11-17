@@ -20,7 +20,7 @@ jobs:
         env:
           MATCH_SIGNAL_ORIGIN: https://match-signal.pages.dev
         run: |
-          node <<'NODE'
+          node --input-type=module <<'NODE'
           const origin = process.env.MATCH_SIGNAL_ORIGIN;
           const teams = [
             {home:'Minnesota Timberwolves', away:'Portland Trail Blazers', line:238.5, side:'under'},
