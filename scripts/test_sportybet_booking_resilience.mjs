@@ -71,9 +71,9 @@ try {
   assert.equal(nbaTotalsReleaseQualified({}, {}), false,
     'missing independent NBA evidence must never qualify ticket booking');
 
-  // Manual shared tickets may include market-219 NBA winners after exact current
-  // SportyBet checks. Market-225 totals are separately locked by the global
-  // release gate and are covered by nba-ticket-guard-tests.yml.
+  // Manual shared tickets may include NBA market-219 winners and market-225 totals
+  // after exact current SportyBet checks. Automated NBA Builder batches remain locked
+  // by the independent global release gate (covered by nba-ticket-guard-tests.yml).
   const mixedBase = Date.now() + 6 * 60 * 60 * 1000;
   const mixedFixtures = [
     {id:'elche-betis',event_id:'espn:manual-elche-betis',provider_id:'sr:match:manual-elche-betis',sport:'football',market:'total',pick:'under',line:5.5,market_id:'18',player_1:'Elche',player_2:'Real Betis',match:'Elche vs Real Betis',start_ms:mixedBase,odds:1.09,over_odds:7.5,under_odds:1.09},
@@ -81,7 +81,8 @@ try {
     {id:'atletico-barcelona',event_id:'espn:manual-atletico-barcelona',provider_id:'sr:match:manual-atletico-barcelona',sport:'football',market:'total',pick:'under',line:5.5,market_id:'18',player_1:'Atlético Madrid',player_2:'Barcelona',match:'Atlético Madrid vs Barcelona',start_ms:mixedBase+2*60*60*1000,odds:1.21,over_odds:5.8,under_odds:1.21},
     {id:'warriors-magic',event_id:'espn:manual-warriors-magic',provider_id:'sr:match:manual-warriors-magic',sport:'basketball',market:'winner',pick:'p1',market_id:'219',player_1:'Golden State Warriors',player_2:'Orlando Magic',match:'Golden State Warriors vs Orlando Magic',start_ms:mixedBase+3*60*60*1000,odds:1.25,home_odds:1.25,away_odds:3.7},
     {id:'suns-rockets',event_id:'espn:manual-suns-rockets',provider_id:'sr:match:manual-suns-rockets',sport:'basketball',market:'winner',pick:'p2',market_id:'219',player_1:'Phoenix Suns',player_2:'Houston Rockets',match:'Phoenix Suns vs Houston Rockets',start_ms:mixedBase+4*60*60*1000,odds:2.8,home_odds:1.42,away_odds:2.8},
-    {id:'trailblazers-spurs',event_id:'espn:manual-trailblazers-spurs',provider_id:'sr:match:manual-trailblazers-spurs',sport:'basketball',market:'winner',pick:'p1',market_id:'219',player_1:'Portland Trail Blazers',player_2:'San Antonio Spurs',match:'Portland Trail Blazers vs San Antonio Spurs',start_ms:mixedBase+5*60*60*1000,odds:1.26,home_odds:1.26,away_odds:3.2}
+    {id:'trailblazers-spurs',event_id:'espn:manual-trailblazers-spurs',provider_id:'sr:match:manual-trailblazers-spurs',sport:'basketball',market:'winner',pick:'p1',market_id:'219',player_1:'Portland Trail Blazers',player_2:'San Antonio Spurs',match:'Portland Trail Blazers vs San Antonio Spurs',start_ms:mixedBase+5*60*60*1000,odds:1.26,home_odds:1.26,away_odds:3.2},
+    {id:'wolves-blazers-total',event_id:'espn:manual-wolves-blazers-total',provider_id:'sr:match:manual-wolves-blazers-total',sport:'basketball',market:'total',pick:'under',line:238.5,market_id:'225',player_1:'Minnesota Timberwolves',player_2:'Portland Trail Blazers',match:'Minnesota Timberwolves vs Portland Trail Blazers',start_ms:mixedBase+6*60*60*1000,odds:1.26,over_odds:3.45,under_odds:1.26}
   ];
   function mixedEvent(fixture) {
     const basketball = fixture.sport === 'basketball';
@@ -146,9 +147,9 @@ try {
   assert.equal(mixedRequest.status,200,JSON.stringify(manualSixPayload));
   assert.equal(manualSixPayload.ok,true,JSON.stringify(manualSixPayload));
   assert.equal(manualSixPayload.booking_code,'MANUAL-MIXED-TICKET-OK');
-  assert.equal(manualSixPayload.initial_selection_count,6);
-  assert.equal(manualSixPayload.selection_count,6);
-  assert.equal(manualSixPayload.selections.length,6);
+  assert.equal(manualSixPayload.initial_selection_count,7);
+  assert.equal(manualSixPayload.selection_count,7);
+  assert.equal(manualSixPayload.selections.length,7);
   const expectedMixedCombinedOdds=Number(mixedFixtures.reduce((product,fixture)=>product*fixture.odds,1).toFixed(4));
   assert.equal(manualSixPayload.combined_odds,expectedMixedCombinedOdds,
     'When SportyBet omits outcome odds, combined odds must use exact revalidated selection prices instead of incorrectly returning 1.');
@@ -1237,5 +1238,5 @@ try {
   assert.equal(feedFirstCatalogueRequests,0,'exact live-feed matches must bypass the broad catalogue crawl');
   assert.equal(feedFirstShareRequests,1,'the resolved two-leg paper batch must request exactly one share code');
 
-  console.log('SportyBet booking resilience: PASS (bounded paging, stale-ID recovery, football and basketball aliases, exact Tennis Set 1/Set 2 market-202 scopes, virtual eFootball aliases, and full-ticket safeguards).');
+  console.log('SportyBet booking resilience: PASS (manual NBA market-225 share-code path, automated NBA gate separation, bounded paging, stale-ID recovery, football/basketball aliases, tennis set scopes, eFootball aliases, and full-ticket safeguards).');
 } finally { globalThis.fetch=originalFetch; }
