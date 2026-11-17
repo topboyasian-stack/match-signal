@@ -117,7 +117,9 @@ try {
     if (url.pathname === '/api/ng/orders/share') {
       return jsonResponse({bizCode:10000,data:{
         shareCode:'MANUAL-MIXED-TICKET-OK',
-        outcomes:mixedFixtures.map(fixture=>({odds:fixture.market==='total'?(fixture.pick==='over'?fixture.over_odds:fixture.under_odds):(fixture.pick==='p1'?fixture.home_odds:fixture.away_odds)}))
+        // SportyBet may accept every leg but omit outcome odds in its share response.
+        // The endpoint must use the exact revalidated selection prices, not report 1.
+        outcomes:mixedFixtures.map(()=>({}))
       }});
     }
     if (/\/(?:pcUpcomingEvents|wapConfigurableUpcomingEvents)$/.test(url.pathname)) {
@@ -147,6 +149,9 @@ try {
   assert.equal(manualSixPayload.initial_selection_count,6);
   assert.equal(manualSixPayload.selection_count,6);
   assert.equal(manualSixPayload.selections.length,6);
+  const expectedMixedCombinedOdds=Number(mixedFixtures.reduce((product,fixture)=>product*fixture.odds,1).toFixed(4));
+  assert.equal(manualSixPayload.combined_odds,expectedMixedCombinedOdds,
+    'When SportyBet omits outcome odds, combined odds must use exact revalidated selection prices instead of incorrectly returning 1.');
   assert.ok(manualSixPayload.selections.every(selection=>selection.ok===true));
   assert.equal(mixedCalls.some(url=>url.hostname==='raw.githubusercontent.com'),false,
     'Manual mixed-sport tickets must not require NBA model-release evidence.');
