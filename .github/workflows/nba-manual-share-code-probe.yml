@@ -80,8 +80,7 @@ jobs:
               const start = Date.parse(String(event.start_time||''));
               if (!Number.isFinite(start) || start <= now+120000) { unavailable = true; break; }
               const market = (event.markets||[]).find(m =>
-                String(m.id)==='225' && String(m.specifier||'')==='total='+target.line &&
-                String(m.status||'0')==='0'
+                String(m.id)==='225' && String(m.specifier||'')==='total='+target.line
               );
               const outcomes = market?.outcomes||[];
               const over = outcomes.find(o => /\bover\b/i.test(String(o.name||'')) && o.active!==false && Number(o.odds)>1);
@@ -111,6 +110,7 @@ jobs:
                 current_over_odds:Number(over.odds),
                 current_under_odds:Number(under.odds),
                 selected_odds:Number(selected.odds),
+                market_status:market.status,
                 quote_age_seconds:Math.round((now-fetchedAt)/1000)
               });
             }
@@ -143,6 +143,11 @@ jobs:
               console.log('CONFIRMED_SHARE_URL='+String(body.share_url||''));
               console.log('PASS: production generated a real SportyBet share code for all five requested NBA market-225 legs. No stake or wager was placed.');
               process.exit(0);
+            }
+            if (body?.error==='MANUAL_TICKET_REJECTED_PARTIAL' && body?.booking_code_withheld===true && !Object.hasOwn(body,'booking_code')) {
+              console.log('Attempt '+attempt+': live backend rejected at least one exact market/line before requesting a share code; validation='+JSON.stringify(body.validation||[])+'. Rechecking the feed before another safe validation-only attempt.');
+              await wait(30000);
+              continue;
             }
             if (body?.error==='NBA_RELEASE_GATE_LOCKED' || body?.error==='NBA_RELEASE_EVIDENCE_UNAVAILABLE') {
               console.log('Attempt '+attempt+': production is still serving the pre-fix release gate; no share request was made. Retrying after deployment settles.');
