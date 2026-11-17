@@ -1718,12 +1718,19 @@ async function handlePost(context) {
     }
 
     const partial = preExcluded.length > 0 || unavailable.length > 0 || acceptedCount < legs.length;
-    const combinedOddsSource = acceptedOutcomes.length ? acceptedOutcomes : selections;
+    const acceptedOddsAreComplete = acceptedOutcomes.length === selections.length &&
+      acceptedOutcomes.length > 0 && acceptedOutcomes.every(item => Number.isFinite(Number(item?.odds)) && Number(item.odds) > 0);
+    const validatedSelectionOddsAreComplete = unavailable.length === 0 && acceptedCount === selections.length &&
+      selections.length > 0 && selections.every(item => Number.isFinite(Number(item?.odds)) && Number(item.odds) > 0);
+    // SportyBet sometimes omits per-outcome odds in its share response even
+    // when it accepts every selection. In that case use the exact live odds
+    // already revalidated for the complete accepted set; never silently report
+    // a combined price of 1 when the provider omits odds.
+    const combinedOddsSource = acceptedOddsAreComplete
+      ? acceptedOutcomes
+      : validatedSelectionOddsAreComplete ? selections : [];
     const combinedOdds = combinedOddsSource.length
-      ? combinedOddsSource.reduce((product, item) => {
-          const odds = Number(item?.odds);
-          return Number.isFinite(odds) && odds > 0 ? product * odds : product;
-        }, 1)
+      ? combinedOddsSource.reduce((product, item) => product * Number(item.odds), 1)
       : null;
 
     const deadline = Number(data?.deadline || 0);
