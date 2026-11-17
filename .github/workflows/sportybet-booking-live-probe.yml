@@ -1,0 +1,122 @@
+name: SportyBet Manual Booking Live Probe
+
+on:
+  push:
+    paths:
+      - ".github/workflows/sportybet-booking-live-probe.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sportybet-manual-booking-live-probe
+  cancel-in-progress: false
+
+jobs:
+  live-manual-booking:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Validate production manual ticket path against two fresh upcoming eFootball fixtures
+        env:
+          MATCH_SIGNAL_ORIGIN: https://match-signal.pages.dev
+        run: |
+          node <<'NODE'
+          const origin = process.env.MATCH_SIGNAL_ORIGIN;
+          const timeout = ms => AbortSignal.timeout(ms);
+          const getJson = async url => {
+            const r = await fetch(url, {headers:{Accept:'application/json','Cache-Control':'no-cache','Pragma':'no-cache'},cache:'no-store',signal:timeout(20000)});
+            const raw = await r.text();
+            let body;
+            try { body = JSON.parse(raw); } catch { throw new Error('Non-JSON response from '+url+' (HTTP '+r.status+'): '+raw.slice(0,200)); }
+            if (!r.ok) throw new Error(url+' HTTP '+r.status+': '+JSON.stringify(body).slice(0,500));
+            return body;
+          };
+          const now = Date.now();
+          const feed = await getJson(origin+'/api/sportybet-virtual?pageSize=100&pageNum=1&timeline=168&sources=efootball&_t='+now);
+          if (feed?.ok !== true || !Array.isArray(feed.events)) throw new Error('Live eFootball feed is not healthy: '+JSON.stringify({ok:feed?.ok,status:feed?.status,errors:feed?.errors}));
+          const rows = [];
+          for (const event of feed.events) {
+            if (String(event?.source||'').toLowerCase() !== 'efootball') continue;
+            const start = Number(event?.start_time_ms || 0);
+            if (!Number.isFinite(start) || start <= now + 120000) continue;
+            const markets = Array.isArray(event?.markets) ? event.markets : [];
+            for (const market of markets) {
+              const marketId = String(market?.id || '');
+              if (!['18','189'].includes(marketId)) continue;
+              const spec = String(market?.specifier || '');
+              const m = spec.match(/(?:^|[|,;\s&])(?:total|line)\s*=\s*(-?\d+(?:\.\d+)?)(?=$|[|,;\s&])/i);
+              const line = m ? Number(m[1]) : Number(market?.line);
+              if (!Number.isFinite(line) || line <= 0) continue;
+              const changed = Number(market?.lastOddsChangeTime || 0);
+              if (!Number.isFinite(changed) || changed <= 0 || changed > now + 120000 || now - changed > 15*60*1000) continue;
+              if (market?.status != null && String(market.status) !== '0') continue;
+              const outcomes = Array.isArray(market?.outcomes) ? market.outcomes : [];
+              const outcome = outcomes.find(o => /\bover\b/i.test(String(o?.name||o?.desc||'')) && o?.active !== false && Number(o?.odds) > 1 && Number.isFinite(Number(o?.odds)));
+              if (!outcome) continue;
+              rows.push({
+                event_id:String(event.event_id||''),
+                sportybet_event_id:String(event.event_id||''),
+                sport:'efootball',
+                product:String(event.product||'efootball_gt'),
+                market:'total',
+                pick:'over',
+                line,
+                market_id:marketId,
+                start_time:new Date(start).toISOString(),
+                player_1:String(event.team_1||''),
+                player_2:String(event.team_2||''),
+                match:String(event.team_1||'')+' vs '+String(event.team_2||''),
+                model_qualified:false,
+                _odds:Number(outcome.odds),
+                _last_change:changed
+              });
+              break;
+            }
+            if (rows.length >= 8) break;
+          }
+          const selected = [];
+          const ids = new Set();
+          for (const row of rows.sort((a,b)=>Date.parse(a.start_time)-Date.parse(b.start_time))) {
+            if (!row.event_id || ids.has(row.event_id) || !row.player_1 || !row.player_2) continue;
+            ids.add(row.event_id);
+            selected.push(row);
+            if (selected.length === 2) break;
+          }
+          if (selected.length !== 2) {
+            throw new Error('Cannot safely test manual booking: live feed supplied only '+selected.length+' distinct future eFootball fixtures with an active exact O/U market and quote observed within 15 minutes. No booking request was sent.');
+          }
+          const legs = selected.map(({_odds,_last_change,...leg})=>leg);
+          console.log('Selected two distinct future fixtures with exact active SportyBet totals and fresh feed timestamps: '+JSON.stringify(selected.map(x=>({match:x.match,market_id:x.market_id,line:x.line,side:x.pick,observed_odds:x._odds,quote_age_seconds:Math.round((now-x._last_change)/1000)}))));
+          const response = await fetch(origin+'/api/sportybet-booking', {
+            method:'POST',
+            headers:{'Content-Type':'application/json','Accept':'application/json','Cache-Control':'no-cache'},
+            body:JSON.stringify({mode:'manual',manual_selections:legs}),
+            cache:'no-store',
+            signal:timeout(26000)
+          });
+          const raw = await response.text();
+          let payload;
+          try { payload = JSON.parse(raw); } catch { throw new Error('Booking endpoint returned non-JSON HTTP '+response.status+': '+raw.slice(0,300)); }
+          const code = String(payload?.booking_code||'').trim();
+          console.log('Manual booking API result: '+JSON.stringify({
+            http_status:response.status,
+            ok:payload?.ok===true,
+            booking_code_available:Boolean(code),
+            booking_code_redacted:code ? code.slice(0,2)+'…'+code.slice(-2) : null,
+            selection_count:payload?.selection_count ?? null,
+            combined_odds:payload?.combined_odds ?? null,
+            error:payload?.error ?? null,
+            message:payload?.message ?? null,
+            validation:payload?.validation ?? payload?.selections ?? null,
+            fixture_matcher_version:payload?.fixture_matcher_version ?? null
+          }));
+          if (!response.ok || payload?.ok !== true || !code) {
+            throw new Error('PRODUCTION MANUAL BOOKING CODE NOT CONFIRMED. See the redacted response and per-leg validation above; no code was fabricated.');
+          }
+          if (Number(payload.selection_count) !== 2) {
+            throw new Error('SportyBet returned a code but did not accept both requested legs; treating the integration test as failed.');
+          }
+          console.log('PASS: production manual-ticket endpoint returned a real SportyBet share code for both validated legs. The code itself is redacted from public Actions logs. No wager or stake was placed.');
+          NODE
