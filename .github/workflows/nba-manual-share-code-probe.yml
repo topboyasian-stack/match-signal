@@ -1,0 +1,155 @@
+name: One-time NBA Manual Share-Code Verification
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/nba-manual-share-code-probe.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  live-manual-nba-ticket:
+    if: ${{ github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, 'Run NBA manual ticket share-code verification') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Wait for the merged manual-ticket handler and revalidate the exact five NBA selections
+        env:
+          MATCH_SIGNAL_ORIGIN: https://match-signal.pages.dev
+        run: |
+          node <<'NODE'
+          const origin = process.env.MATCH_SIGNAL_ORIGIN;
+          const teams = [
+            {home:'Minnesota Timberwolves', away:'Portland Trail Blazers', line:238.5, side:'under'},
+            {home:'Toronto Raptors', away:'New York Knicks', line:201.5, side:'over'},
+            {home:'San Antonio Spurs', away:'Detroit Pistons', line:234.5, side:'under'},
+            {home:'LA Clippers', away:'Utah Jazz', line:212.5, side:'over'},
+            {home:'Los Angeles Lakers', away:'Charlotte Hornets', line:208.5, side:'over'}
+          ];
+          const timeout = ms => AbortSignal.timeout(ms);
+          const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+          async function json(url, options={}) {
+            const response = await fetch(url, {
+              ...options,
+              headers: {Accept:'application/json','Cache-Control':'no-cache','Pragma':'no-cache',...(options.headers||{})},
+              cache:'no-store',
+              signal:timeout(options.timeoutMs || 20000)
+            });
+            const raw = await response.text();
+            let body;
+            try { body = JSON.parse(raw); }
+            catch { throw new Error('Non-JSON response from '+url+' (HTTP '+response.status+'): '+raw.slice(0,200)); }
+            return {response,body};
+          }
+          const deadline = Date.now() + 40*60*1000;
+          let attempt = 0;
+          while (Date.now() < deadline) {
+            attempt++;
+            const now = Date.now();
+            let feed;
+            try {
+              const result = await json(origin+'/api/sportybet-basketball?pageSize=100&pageNum=1&timeline=96&_t='+now);
+              if (!result.response.ok || result.body?.ok !== true || !Array.isArray(result.body.events)) {
+                throw new Error('Basketball feed unavailable: '+JSON.stringify(result.body).slice(0,400));
+              }
+              feed = result.body;
+            } catch (error) {
+              console.log('Attempt '+attempt+': live feed not ready: '+String(error.message||error));
+              await wait(30000);
+              continue;
+            }
+            const fetchedAt = Date.parse(String(feed.fetched_at||''));
+            if (!Number.isFinite(fetchedAt) || fetchedAt > now+120000 || now-fetchedAt > 15*60*1000 || (feed.source_errors||[]).length) {
+              console.log('Attempt '+attempt+': feed timestamp/source is not fresh and clean; retrying.');
+              await wait(30000);
+              continue;
+            }
+            const legs = [];
+            const details = [];
+            let unavailable = false;
+            for (const target of teams) {
+              const event = feed.events.find(row =>
+                [row.home,row.away].includes(target.home) &&
+                [row.home,row.away].includes(target.away) &&
+                row.home !== row.away
+              );
+              if (!event) { unavailable = true; break; }
+              const start = Date.parse(String(event.start_time||''));
+              if (!Number.isFinite(start) || start <= now+120000) { unavailable = true; break; }
+              const market = (event.markets||[]).find(m =>
+                String(m.id)==='225' && String(m.specifier||'')==='total='+target.line &&
+                String(m.status||'0')==='0'
+              );
+              const outcomes = market?.outcomes||[];
+              const over = outcomes.find(o => /\bover\b/i.test(String(o.name||'')) && o.active!==false && Number(o.odds)>1);
+              const under = outcomes.find(o => /\bunder\b/i.test(String(o.name||'')) && o.active!==false && Number(o.odds)>1);
+              const selected = target.side==='over' ? over : under;
+              if (!market || !over || !under || !selected || !String(event.event_id||'')) { unavailable = true; break; }
+              legs.push({
+                event_id:'manual-nba-'+event.event_id,
+                sportybet_event_id:String(event.event_id),
+                sport:'basketball',
+                market:'total',
+                pick:target.side,
+                line:target.line,
+                market_id:'225',
+                model_qualified:false,
+                start_time:new Date(start).toISOString(),
+                player_1:target.home,
+                player_2:target.away,
+                match:target.home+' vs '+target.away
+              });
+              details.push({
+                match:target.home+' vs '+target.away,
+                event_id:event.event_id,
+                start_time:event.start_time,
+                line:target.line,
+                side:target.side,
+                current_over_odds:Number(over.odds),
+                current_under_odds:Number(under.odds),
+                selected_odds:Number(selected.odds),
+                quote_age_seconds:Math.round((now-fetchedAt)/1000)
+              });
+            }
+            if (unavailable || legs.length!==5) {
+              console.log('Attempt '+attempt+': not all five exact, future market-225 lines are available; no booking request sent.');
+              await wait(30000);
+              continue;
+            }
+            console.log('All five exact SportyBet Nigeria market-225 selections are current. Revalidated feed details: '+JSON.stringify(details));
+            const {response,payload:unused,body} = await (async()=>{
+              const result=await json(origin+'/api/sportybet-booking',{
+                method:'POST',
+                headers:{'Content-Type':'application/json'},
+                body:JSON.stringify({mode:'manual',manual_selections:legs}),
+                timeoutMs:30000
+              });
+              return {response:result.response,body:result.body};
+            })();
+            console.log('Booking response: '+JSON.stringify({
+              http_status:response.status,
+              ok:body?.ok===true,
+              error:body?.error||null,
+              message:body?.message||null,
+              selection_count:body?.selection_count??body?.initial_selection_count??null,
+              combined_odds:body?.combined_odds??null,
+              validation:body?.validation??body?.selections??null
+            }));
+            if (body?.ok===true && String(body.booking_code||'').trim() && Number(body.selection_count)===5) {
+              console.log('CONFIRMED_REAL_SPORTYBET_SHARE_CODE='+String(body.booking_code).trim());
+              console.log('CONFIRMED_SHARE_URL='+String(body.share_url||''));
+              console.log('PASS: production generated a real SportyBet share code for all five requested NBA market-225 legs. No stake or wager was placed.');
+              process.exit(0);
+            }
+            if (body?.error==='NBA_RELEASE_GATE_LOCKED' || body?.error==='NBA_RELEASE_EVIDENCE_UNAVAILABLE') {
+              console.log('Attempt '+attempt+': production is still serving the pre-fix release gate; no share request was made. Retrying after deployment settles.');
+              await wait(30000);
+              continue;
+            }
+            throw new Error('Production did not generate a share code for all five requested selections. Refusing to fabricate a code or retry an ambiguous share request.');
+          }
+          throw new Error('Timed out waiting for the manual NBA handler to be deployed and generate a real share code. No code was fabricated.');
+          NODE
