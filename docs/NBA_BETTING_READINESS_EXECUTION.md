@@ -15,7 +15,7 @@
 - Keep the model projection independent of bookmaker prices. Prices may be used only after projection to calculate value.
 - Treat one ESPN event ID as one independent settled fixture for ROI and confidence calculations. Repeated quote snapshots are not extra bets.
 - Freeze model versions and evaluation dates. Do not move the holdout boundary after seeing outcomes.
-- Keep the Basketball leg release gate. No manual-only bypass and no generated booking codes for unqualified NBA legs.
+- Keep model qualification separate from manual paper-ticket preparation. Automated NBA Builder batches and model-qualified labels remain behind the release gate. Explicitly manual market-225 slips may request a share code only after every leg passes exact, fresh SportyBet Nigeria event/market/line/side/both-price validation and pregame checks; they remain unqualified manual picks.
 
 ## Verified baseline at the start of this work
 
@@ -68,8 +68,8 @@ Latest inspected artifacts were generated around **2026-11-02 02:00 UTC**:
 ### P2 — production and ticket release
 
 20. [ ] Re-run Basketball page, live feed, settled results, odds display, and ticket-builder regression tests against the latest main.
-21. [ ] Verify each NBA ticket leg against a fresh exact SportyBet 225 event/line/side/price immediately before code generation. Reject the whole slip if any leg is missing, stale, changed, started, or not model-qualified.
-22. [ ] Unlock NBA ticket selection/code generation only after the model passes the prospective gates and the production smoke tests pass. Keep paper/research-only controls visible until then.
+21. [ ] Verify each NBA ticket leg against a fresh exact SportyBet 225 event/line/side/both-price pair immediately before code generation. Reject the whole slip if any leg is missing, stale, changed, started, or has an incomplete market. Automated Builder legs must additionally be model-qualified; manual selections must remain visibly unqualified.
+22. [ ] Unlock automated NBA Builder selection/code generation only after the model passes the prospective gates and production smoke tests pass. Manual paper-ticket preparation is a separate path and must not imply model release; retain paper/research-only controls and exact live-price checks.
 
 ## Verified completion checkpoint — 2026-11-02
 
@@ -394,3 +394,11 @@ The ordered production promotion [run 44039450630](https://github.com/topboyasia
 ### Next action
 
 Let the current ordered promotion finish; inspect its Pages run and deployed verification record. Then continue P15 by checking new exact SportyBet captures and official ESPN settlements, deduplicating by unique fixture/selection and immutable snapshot ID. Re-evaluate all thresholds without changing the cutoff or qualification rules. Keep `RESEARCH_ONLY` until every release condition independently passes.
+
+
+## Manual NBA ticket preparation regression fix — 2026-11-17
+
+- Commit series on PR #549 separates explicitly manual NBA market-225 share-code preparation from the automated NBA release gate. The release evidence remains RESEARCH_ONLY and no model qualification is implied.
+- Manual slips are still all-or-nothing and must pass current exact SportyBet event resolution, market 225, line, selected side, both active prices, quote freshness (no more than 15 minutes old), and pregame status before a share request.
+- Automated NBA Builder batches continue to require the full prospective release gate. This separation is not permission to use stale odds, substitute bookmakers, guess event IDs, or place wagers automatically.
+- Regression coverage: `scripts/test_nba_ticket_guard.mjs`, `scripts/test_sportybet_booking_resilience.mjs`, and `scripts/test_ticket_drawer_contract.py`.
