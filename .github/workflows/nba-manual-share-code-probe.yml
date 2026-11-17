@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - name: Wait for the merged manual-ticket handler and revalidate the exact four NBA selections
+      - name: Wait for the merged manual-ticket handler and revalidate the exact five NBA selections
         env:
           MATCH_SIGNAL_ORIGIN: https://match-signal.pages.dev
         run: |
@@ -24,6 +24,7 @@ jobs:
           const origin = process.env.MATCH_SIGNAL_ORIGIN;
           const teams = [
             {home:'Minnesota Timberwolves', away:'Portland Trail Blazers', line:238.5, side:'under'},
+            {home:'Toronto Raptors', away:'New York Knicks', line:201.5, side:'over'},
               {home:'San Antonio Spurs', away:'Detroit Pistons', line:234.5, side:'under'},
             {home:'LA Clippers', away:'Utah Jazz', line:212.5, side:'over'},
             {home:'Los Angeles Lakers', away:'Charlotte Hornets', line:208.5, side:'over'}
@@ -113,8 +114,8 @@ jobs:
                 quote_age_seconds:Math.round((now-fetchedAt)/1000)
               });
             }
-            if (unavailable || legs.length!==4) {
-              console.log('Attempt '+attempt+': not all four exact, future market-225 lines are available; no booking request sent.');
+            if (unavailable || legs.length!==5) {
+              console.log('Attempt '+attempt+': not all five exact, future market-225 lines are available; no booking request sent.');
               await wait(30000);
               continue;
             }
@@ -137,10 +138,10 @@ jobs:
               combined_odds:body?.combined_odds??null,
               validation:body?.validation??body?.selections??null
             }));
-            if (body?.ok===true && String(body.booking_code||'').trim() && Number(body.selection_count)===4) {
+            if (body?.ok===true && String(body.booking_code||'').trim() && Number(body.selection_count)===5) {
               console.log('CONFIRMED_REAL_SPORTYBET_SHARE_CODE='+String(body.booking_code).trim());
               console.log('CONFIRMED_SHARE_URL='+String(body.share_url||''));
-              console.log('PASS: production generated a real SportyBet share code for all four requested NBA market-225 legs. No stake or wager was placed.');
+              console.log('PASS: production generated a real SportyBet share code for all five requested NBA market-225 legs. No stake or wager was placed.');
               process.exit(0);
             }
             if (body?.error==='NBA_RELEASE_GATE_LOCKED' || body?.error==='NBA_RELEASE_EVIDENCE_UNAVAILABLE') {
@@ -148,7 +149,7 @@ jobs:
               await wait(30000);
               continue;
             }
-            throw new Error('Production did not generate a share code for all four requested selections. Refusing to fabricate a code or retry an ambiguous share request.');
+            throw new Error('Production did not generate a share code for all five requested selections. Refusing to fabricate a code or retry an ambiguous share request.');
           }
           throw new Error('Timed out waiting for the manual NBA handler to be deployed and generate a real share code. No code was fabricated.');
           NODE
