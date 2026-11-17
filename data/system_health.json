@@ -1,26 +1,26 @@
 {
-  "generated_at": "2026-11-17T01:29:26.739860+00:00",
+  "generated_at": "2026-11-17T02:08:40.328939+00:00",
   "status": "DEGRADED",
   "critical_issues": 0,
-  "warning_issues": 2,
+  "warning_issues": 1,
   "info_issues": 1,
   "checks": [
     {
       "engine": "core_prediction_pipeline",
       "status": "PASS",
-      "age_hours": 2.72,
+      "age_hours": 3.38,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.05,
+      "age_hours": 0.03,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
       "status": "PASS",
-      "age_hours": 2.79,
+      "age_hours": 0.05,
       "threshold_hours": 4
     },
     {
@@ -37,34 +37,34 @@
     },
     {
       "engine": "virtual_participant_history",
-      "status": "PASS",
-      "max_input_age_minutes": 16.7,
-      "virtual_lab_status_age_minutes": 18.3,
+      "status": "STALE",
+      "max_input_age_minutes": 55.8,
+      "virtual_lab_status_age_minutes": 57.6,
       "threshold_minutes": 30.0,
       "stale_inputs": []
     },
     {
       "engine": "tennis_forward_discovery",
       "status": "PASS",
-      "age_hours": 3.04,
+      "age_hours": 3.69,
       "threshold_hours": 8
     },
     {
       "engine": "virtual_live_feed",
-      "status": "STALE",
-      "age_hours": 0.53,
+      "status": "PASS",
+      "age_hours": 0.04,
       "threshold_hours": 0.5,
       "heartbeat_source": "virtual_lab_live.json",
-      "events_count": 677
+      "events_count": 577
     },
     {
       "engine": "nba_live_observation_recorder",
-      "status": "STALE",
-      "age_hours": 0.25,
+      "status": "PASS",
+      "age_hours": 0.04,
       "threshold_hours": 0.25,
       "heartbeat_source": "nba_live_observations.json.gz",
       "games_tracked": 133,
-      "snapshots_recorded": 15668
+      "snapshots_recorded": 15700
     },
     {
       "engine": "engine_lifecycle",
@@ -85,8 +85,8 @@
         "nba_totals_desk": {
           "status": "LIVE_EXPERIMENTAL",
           "paper_only": true,
-          "historical_events": 1231,
-          "current_fixtures": 60
+          "historical_events": 1223,
+          "current_fixtures": 61
         },
         "pdl_experimental_prediction_feed": {
           "status": "CURRENT",
@@ -103,14 +103,9 @@
   ],
   "issues": [
     {
-      "code": "VIRTUAL_LIVE_FEED_STALE",
+      "code": "VIRTUAL_PARTICIPANT_HISTORY_STALE",
       "severity": "warning",
-      "detail": "virtual_lab_live.json age 0.53h exceeds 0.50h; a downstream Unified Upcoming refresh cannot substitute for a fresh source snapshot"
-    },
-    {
-      "code": "NBA_LIVE_OBSERVATION_STALE",
-      "severity": "warning",
-      "detail": "nba_live_observations.json.gz age 0.25h exceeds 0.25h; the in-game observation recorder has not published a recent heartbeat"
+      "detail": "input older than 30 minutes: participant_lifecycle, collector_status, model_evaluation; oldest participant/settlement/model input is 55.8 minutes old; virtual_lab_status.json is 57.6 minutes old; current eFootball/virtual predictions must remain withheld until the source collector publishes fresh data"
     },
     {
       "code": "SELECTION_GATE_EMPTY",
@@ -124,8 +119,8 @@
     "past_kickoff_rows_hidden": 0,
     "stale_live_flags_hidden": 0,
     "expired_settled_rows_hidden": 0,
-    "virtual_market_rows_held_for_kickoff_window": 198,
-    "virtual_rows_held_for_stale_participant_history": 0,
-    "virtual_rows_held_for_recent_product_drawdown": 63
+    "virtual_market_rows_held_for_kickoff_window": 0,
+    "virtual_rows_held_for_stale_participant_history": 3489,
+    "virtual_rows_held_for_recent_product_drawdown": 59
   }
 }
