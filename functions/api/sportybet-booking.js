@@ -1300,19 +1300,24 @@ async function handlePost(context) {
     // If an NBA totals leg is present, the shared slip must remain all-or-nothing.
     // Never surface a share code for a mixed or partially accepted NBA ticket.
     const hasBasketballLeg = legs.some(leg => String(leg?.sport || '').toLowerCase() === 'basketball');
+    const hasBasketballTotalsLeg = legs.some(leg =>
+      String(leg?.sport || '').toLowerCase() === 'basketball' &&
+      String(leg?.market || '').toLowerCase() === 'total' &&
+      String(leg?.market_id || '') === '225'
+    );
     const hasEfootballLeg = legs.some(leg => productForLeg(leg) === 'efootball');
     // Manual selections can be scheduled beyond the feed's seven-day default.
     // Keep the lookup bounded by SportyBet's supported 30-day catalogue window.
     const catalogueTimeline = manualMode ? ticketCatalogueTimeline(legs) : 168;
     let nbaReleaseContext = null;
-    if (hasBasketballLeg && !manualMode) {
-      // The automated NBA Builder remains locked to independent model-release
-      // evidence. A user-created manual ticket is a different operation: it may
-      // include an explicitly unqualified NBA selection only after the exact
-      // current SportyBet event, market, line, both prices and kickoff are checked.
+    if (hasBasketballTotalsLeg || (hasBasketballLeg && !manualMode)) {
+      // Market-225 NBA totals stay locked in both manual shared slips and the
+      // automated Builder until the complete prospective release gate passes.
+      // Manual market-219 NBA match-winner selections remain a separate product.
+      // This guard runs before provider lookups and before any share-code request.
       try { nbaReleaseContext = await loadNbaReleaseContext(requestDeadlineAt); }
-      catch (error) { return json({ ok: false, error: 'NBA_RELEASE_EVIDENCE_UNAVAILABLE', message: 'NBA release evidence could not be verified. No Builder ticket code was requested.' }, 503); }
-      if (!nbaTotalsReleaseQualified(nbaReleaseContext.evidence, nbaReleaseContext.probability, nbaReleaseContext.sourceEvidenceFresh===true)) return json({ ok: false, error: 'NBA_RELEASE_GATE_LOCKED', booking_code_withheld: true, message: 'The independent NBA totals release gate has not passed. No Builder ticket code was requested.' }, 423);
+      catch (error) { return json({ ok: false, error: 'NBA_RELEASE_EVIDENCE_UNAVAILABLE', message: 'NBA release evidence could not be verified. No NBA market-225 share code was requested.' }, 503); }
+      if (!nbaTotalsReleaseQualified(nbaReleaseContext.evidence, nbaReleaseContext.probability, nbaReleaseContext.sourceEvidenceFresh===true)) return json({ ok: false, error: 'NBA_RELEASE_GATE_LOCKED', booking_code_withheld: true, message: 'The independent NBA totals release gate has not passed. No NBA market-225 share code was requested.' }, 423);
     }
     // Started selections cannot be pre-match bookable. Avoid looking them up
     // as upcoming fixtures; final validation reports the precise reason.

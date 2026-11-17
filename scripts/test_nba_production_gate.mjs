@@ -1,10 +1,40 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { nbaTotalsReleaseQualified } from '../functions/api/sportybet-booking.js';
 
 const evidence = JSON.parse(readFileSync(new URL('../data/nba_totals_oos_value_test.json', import.meta.url), 'utf8'));
 const probability = JSON.parse(readFileSync(new URL('../data/nba_totals_probability_value_experiment.json', import.meta.url), 'utf8'));
-const locallyQualified = nbaTotalsReleaseQualified(evidence, probability);
+const sourcePaths = [
+  'data/nba_history.json',
+  'data/nba_predictions.json',
+  'data/nba_totals_ledger.json',
+  'data/nba_totals_publication_snapshots.json',
+  'data/nba_totals_probability_settlements.json',
+  'data/nba_totals_price_capture_status.json',
+  'data/nba_totals_oos_value_test.json'
+];
+const actualFingerprint = Object.fromEntries(sourcePaths.map(path => [
+  path,
+  createHash('sha256').update(readFileSync(new URL('../' + path, import.meta.url))).digest('hex')
+]));
+const recordedFingerprint = probability?.source_data_fingerprint || {};
+const fingerprintMatches = Object.keys(recordedFingerprint).length === sourcePaths.length &&
+  sourcePaths.every(path => recordedFingerprint[path] === actualFingerprint[path]);
+const ledger = JSON.parse(readFileSync(new URL('../data/nba_totals_ledger.json', import.meta.url), 'utf8'));
+const captureStatus = JSON.parse(readFileSync(new URL('../data/nba_totals_price_capture_status.json', import.meta.url), 'utf8'));
+const evidenceAt = Date.parse(String(evidence?.generated_at || ''));
+const probabilityAt = Date.parse(String(probability?.generated_at || ''));
+const ledgerAt = Date.parse(String(ledger?.updated_at || ''));
+const captureAt = Date.parse(String(captureStatus?.checked_at || ''));
+const nowForEvidence = Date.now();
+const sourceEvidenceFresh = fingerprintMatches &&
+  [evidenceAt, probabilityAt, ledgerAt, captureAt].every(Number.isFinite) &&
+  evidenceAt <= nowForEvidence + 120000 &&
+  probabilityAt <= nowForEvidence + 120000 &&
+  evidenceAt >= ledgerAt && probabilityAt >= ledgerAt &&
+  evidenceAt >= captureAt && probabilityAt >= captureAt;
+const locallyQualified = nbaTotalsReleaseQualified(evidence, probability, sourceEvidenceFresh);
 const bases = [...new Set([
   'https://match-signal.pages.dev',
   process.env.CLOUDFLARE_DEPLOYMENT_URL || ''
@@ -52,27 +82,44 @@ async function postJson(base, path, payload) {
 
 const probeResults = [];
 for (const base of bases) {
-  // Manual shared tickets are not model-qualified by this route. They must
-  // reach live fixture/market validation and fail closed for fake fixtures.
+  // Market-225 totals must fail at the global release gate while evidence is RESEARCH_ONLY.
+  // Only after qualification should synthetic legs reach live fixture validation.
   const manual = await postJson(base, '/api/sportybet-booking', {
     mode: 'manual',
     manual_selections: legs
   });
-  assert.equal(manual.response.status, 409, base + ' must reject nonexistent manual NBA fixtures after live validation');
-  assert.equal(manual.body.ok, false);
-  assert.equal(manual.body.error, 'MANUAL_TICKET_REJECTED_PARTIAL');
-  assert.equal(manual.body.booking_code_withheld, true);
-  assert.equal(Object.hasOwn(manual.body, 'booking_code'), false);
-  assert.equal(manual.body.excluded_count, 2);
-  assert.ok(Array.isArray(manual.body.validation) && manual.body.validation.length === 2);
-  assert.ok(manual.body.validation.every(item => item.ok === false));
-  probeResults.push({
-    base, endpoint_type: 'manual_shared_ticket',
-    http_status: manual.response.status, error: manual.body.error,
-    booking_code_withheld: manual.body.booking_code_withheld,
-    booking_code_present: Object.hasOwn(manual.body, 'booking_code')
-  });
-  console.log('PASS: manual NBA ticket reaches live validation and rejects nonexistent fixtures', JSON.stringify(probeResults.at(-1)));
+  if (!locallyQualified) {
+    assert.equal(manual.response.status, 423, base + ' must keep manual market-225 totals locked while release evidence is RESEARCH_ONLY');
+    assert.equal(manual.body.ok, false);
+    assert.equal(manual.body.error, 'NBA_RELEASE_GATE_LOCKED');
+    assert.equal(manual.body.booking_code_withheld, true);
+    assert.equal(Object.hasOwn(manual.body, 'booking_code'), false);
+    probeResults.push({
+      base, endpoint_type: 'manual_nba_totals_release_gate',
+      http_status: manual.response.status, error: manual.body.error,
+      current_main_release_qualified: locallyQualified,
+      booking_code_withheld: manual.body.booking_code_withheld,
+      booking_code_present: Object.hasOwn(manual.body, 'booking_code')
+    });
+    console.log('PASS: manual NBA market-225 totals remain locked until the full release gate passes', JSON.stringify(probeResults.at(-1)));
+  } else {
+    assert.equal(manual.response.status, 409, base + ' must reject synthetic manual NBA fixtures after the qualified gate opens');
+    assert.equal(manual.body.ok, false);
+    assert.equal(manual.body.error, 'MANUAL_TICKET_REJECTED_PARTIAL');
+    assert.equal(manual.body.booking_code_withheld, true);
+    assert.equal(Object.hasOwn(manual.body, 'booking_code'), false);
+    assert.equal(manual.body.excluded_count, 2);
+    assert.ok(Array.isArray(manual.body.validation) && manual.body.validation.length === 2);
+    assert.ok(manual.body.validation.every(item => item.ok === false));
+    probeResults.push({
+      base, endpoint_type: 'manual_shared_ticket_after_release_gate',
+      http_status: manual.response.status, error: manual.body.error,
+      current_main_release_qualified: locallyQualified,
+      booking_code_withheld: manual.body.booking_code_withheld,
+      booking_code_present: Object.hasOwn(manual.body, 'booking_code')
+    });
+    console.log('PASS: qualified manual NBA totals still reject synthetic fixtures during live validation', JSON.stringify(probeResults.at(-1)));
+  }
 
   // The dedicated Basketball-only booking endpoint retains the independent
   // NBA model-release gate. It must never mint a code for synthetic fixtures.

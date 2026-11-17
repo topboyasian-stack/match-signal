@@ -435,11 +435,10 @@ test('NBA ticket with a partial SportyBet acceptance withholds the provider shar
   }
 });
 
-test('manual NBA share-code preparation remains available when model evidence is research-only', async () => {
+test('manual NBA market-225 share-code preparation requires the qualified totals release gate', async () => {
   const one = fixture('espn-one', 'sr:match:one', 'Boston Celtics', 'New York Knicks');
   const two = fixture('espn-two', 'sr:match:two', 'Cleveland Cavaliers', 'Chicago Bulls', 30);
   const bundle = buildEvidence([one, two]);
-  bundle.evidence.release_decision = 'RESEARCH_ONLY';
   const mock = installFetchMock({
     bundle,
     events: [one, two],
@@ -459,11 +458,38 @@ test('manual NBA share-code preparation remains available when model evidence is
     assert.equal(body.ok, true);
     assert.equal(body.booking_code, 'MANUALUNQUALIFIED');
     assert.equal(body.selection_count, 2);
-    assert.equal(mock.calls.raw, 0, 'manual NBA picks must not depend on the model release decision');
+    assert.ok(mock.calls.raw > 0, 'manual NBA totals must verify current release evidence before any share-code request');
     assert.equal(mock.calls.event, 2, 'manual NBA picks must verify both current provider IDs directly');
     assert.equal(mock.calls.feed, 0, 'direct event details should avoid broad catalogue paging when both NBA legs are current');
     assert.equal(mock.calls.share, 1, 'the full manually selected ticket should be sent for share-code preparation');
     assert.ok(body.selections.every(row => row.ok === true));
+  } finally {
+    mock.restore();
+  }
+});
+
+test('manual NBA market-225 totals stay locked when model evidence is research-only', async () => {
+  const one = fixture('espn-one', 'sr:match:one', 'Boston Celtics', 'New York Knicks');
+  const two = fixture('espn-two', 'sr:match:two', 'Cleveland Cavaliers', 'Chicago Bulls', 30);
+  const bundle = buildEvidence([one, two]);
+  bundle.evidence.release_decision = 'RESEARCH_ONLY';
+  const mock = installFetchMock({
+    bundle,
+    events: [one, two],
+    shareResponse: { bizCode: 10000, data: { shareCode: 'MUSTNOTEXIST', outcomes: [] } }
+  });
+
+  try {
+    const response = await onRequest({ request: requestFor([manualLeg(one), manualLeg(two)]) });
+    const body = await response.json();
+    assert.equal(response.status, 423, JSON.stringify(body));
+    assert.equal(body.ok, false);
+    assert.equal(body.error, 'NBA_RELEASE_GATE_LOCKED');
+    assert.equal(body.booking_code_withheld, true);
+    assert.equal(Object.hasOwn(body, 'booking_code'), false);
+    assert.equal(mock.calls.event, 0, 'the locked market-225 ticket must be rejected before live fixture lookup');
+    assert.equal(mock.calls.feed, 0, 'the locked market-225 ticket must be rejected before catalogue fallback');
+    assert.equal(mock.calls.share, 0, 'no share-code request may be made while the totals gate is locked');
   } finally {
     mock.restore();
   }
