@@ -51,10 +51,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Checkout latest main
+      - name: Check out the tested commit (PR merge ref or pushed commit)
         uses: actions/checkout@v4
-        with:
-          ref: main
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
