@@ -378,7 +378,7 @@ test('NBA ticket resolves SportyBet event ID separately from ESPN prediction ID 
       request: requestFor([manualLeg(one), manualLeg(two)])
     });
     const body = await response.json();
-    assert.equal(mock.calls.raw, 0, 'manual NBA totals must not depend on model-release evidence before live validation');
+    assert.ok(mock.calls.raw > 0, 'manual NBA market-225 totals must load independent release evidence before live validation');
     assert.equal(mock.calls.event, 2, 'each stored NBA provider ID must be checked through the single-event details endpoint');
     assert.equal(mock.calls.feed, 3, 'only the missing NBA leg should fall back to the three bounded market catalog queries');
     assert.equal(mock.calls.share, 0, 'must not request a share code when any NBA leg is missing');
@@ -419,7 +419,7 @@ test('NBA ticket with a partial SportyBet acceptance withholds the provider shar
       request: requestFor([manualLeg(one), manualLeg(two)])
     });
     const body = await response.json();
-    assert.equal(mock.calls.raw, 0, 'manual NBA totals must not depend on model-release evidence before live validation');
+    assert.ok(mock.calls.raw > 0, 'manual NBA market-225 totals must load independent release evidence before live validation');
     assert.equal(mock.calls.event, 2, 'both stored NBA provider IDs must be checked directly');
     assert.equal(mock.calls.feed, 0, 'current event details should avoid broad catalogue paging when both legs resolve');
     assert.equal(mock.calls.share, 1);
@@ -435,7 +435,7 @@ test('NBA ticket with a partial SportyBet acceptance withholds the provider shar
   }
 });
 
-test('manual NBA market-225 share-code preparation is independent of the model-release gate', async () => {
+test('manual NBA market-225 share-code preparation requires full release qualification', async () => {
   const one = fixture('espn-one', 'sr:match:one', 'Boston Celtics', 'New York Knicks');
   const two = fixture('espn-two', 'sr:match:two', 'Cleveland Cavaliers', 'Chicago Bulls', 30);
   const bundle = buildEvidence([one, two]);
@@ -458,8 +458,8 @@ test('manual NBA market-225 share-code preparation is independent of the model-r
     assert.equal(body.ok, true);
     assert.equal(body.booking_code, 'MANUALUNQUALIFIED');
     assert.equal(body.selection_count, 2);
-    assert.equal(mock.calls.raw, 0, 'manual NBA totals must not request model-release evidence');
-    assert.equal(mock.calls.event, 2, 'manual NBA picks must verify both current provider IDs directly');
+    assert.ok(mock.calls.raw > 0, 'manual NBA totals must load the independent release evidence before provider lookup');
+    assert.equal(mock.calls.event, 2, 'after release qualification, manual NBA picks must verify both current provider IDs directly');
     assert.equal(mock.calls.feed, 0, 'direct event details should avoid broad catalogue paging when both NBA legs are current');
     assert.equal(mock.calls.share, 1, 'the full manually selected ticket should be sent for share-code preparation');
     assert.ok(body.selections.every(row => row.ok === true));
@@ -468,7 +468,7 @@ test('manual NBA market-225 share-code preparation is independent of the model-r
   }
 });
 
-test('manual NBA market-225 totals still generate a code when model evidence remains research-only', async () => {
+test('manual NBA market-225 totals stay locked when model evidence is research-only', async () => {
   const one = fixture('espn-one', 'sr:match:one', 'Boston Celtics', 'New York Knicks');
   const two = fixture('espn-two', 'sr:match:two', 'Cleveland Cavaliers', 'Chicago Bulls', 30);
   const bundle = buildEvidence([one, two]);
@@ -482,15 +482,14 @@ test('manual NBA market-225 totals still generate a code when model evidence rem
   try {
     const response = await onRequest({ request: requestFor([manualLeg(one), manualLeg(two)]) });
     const body = await response.json();
-    assert.equal(response.status, 200, JSON.stringify(body));
-    assert.equal(body.ok, true);
-    assert.equal(body.booking_code, 'MUSTNOTEXIST');
-    assert.equal(body.selection_count, 2);
-    assert.equal(mock.calls.raw, 0, 'manual totals preparation must not load model-release evidence');
-    assert.equal(mock.calls.event, 2, 'both exact SportyBet events must still be checked live');
-    assert.equal(mock.calls.feed, 0, 'current event details should avoid catalogue fallback');
-    assert.equal(mock.calls.share, 1, 'the valid manual ticket must reach SportyBet share preparation');
-    assert.ok(body.selections.every(row => row.ok === true));
+    assert.equal(response.status, 423, JSON.stringify(body));
+    assert.equal(body.error, 'NBA_RELEASE_GATE_LOCKED');
+    assert.equal(body.booking_code_withheld, true);
+    assert.equal(Object.hasOwn(body, 'booking_code'), false);
+    assert.ok(mock.calls.raw > 0, 'manual totals must load independent release evidence');
+    assert.equal(mock.calls.event, 0, 'an unqualified totals slip must be rejected before SportyBet event lookup');
+    assert.equal(mock.calls.feed, 0, 'an unqualified totals slip must be rejected before catalogue lookup');
+    assert.equal(mock.calls.share, 0, 'an unqualified totals slip must never request a share code');
   } finally {
     mock.restore();
   }
@@ -577,7 +576,7 @@ test('manual NBA leg with a mismatched current market-225 line is rejected befor
     assert.equal(response.status, 409);
     assert.equal(body.error, 'MANUAL_TICKET_REJECTED_PARTIAL');
     assert.equal(body.booking_code_withheld, true);
-    assert.equal(mock.calls.raw, 0, 'manual NBA totals must not depend on model-release evidence before live validation');
+    assert.ok(mock.calls.raw > 0, 'manual NBA market-225 totals must load independent release evidence before live validation');
     assert.equal(mock.calls.event, 2);
     assert.equal(mock.calls.feed, 3, 'only the mismatched-line leg should use catalogue fallback');
     assert.equal(mock.calls.share, 0, 'a leg with a stale SportyBet line must not reach the share endpoint');

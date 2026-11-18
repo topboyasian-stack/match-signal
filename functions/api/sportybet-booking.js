@@ -1310,15 +1310,14 @@ async function handlePost(context) {
     // Keep the lookup bounded by SportyBet's supported 30-day catalogue window.
     const catalogueTimeline = manualMode ? ticketCatalogueTimeline(legs) : 168;
     let nbaReleaseContext = null;
-    if (!manualMode && (hasBasketballTotalsLeg || hasBasketballLeg)) {
-      // Automated NBA Builder batches remain behind the full prospective release gate.
-      // Explicitly manual slips are a separate paper-only workflow: they do not claim
-      // model qualification, but every NBA leg must pass exact live event/market/line,
-      // both-side-price, quote-freshness and pregame checks before a share code is requested.
-      // This guard runs before provider lookups and before any share-code request.
+    if (hasBasketballTotalsLeg || (!manualMode && hasBasketballLeg)) {
+      // Every NBA market-225 totals slip, manual or automated, must pass the full
+      // independent prospective release gate before provider lookup or share-code creation.
+      // Automated NBA Builder batches also gate every Basketball leg. Manual market-219
+      // match-winner slips remain a separate path; market-225 totals are never exempt.
       try { nbaReleaseContext = await loadNbaReleaseContext(requestDeadlineAt); }
-      catch (error) { return json({ ok: false, error: 'NBA_RELEASE_EVIDENCE_UNAVAILABLE', message: 'NBA release evidence could not be verified. No NBA market-225 share code was requested.' }, 503); }
-      if (!nbaTotalsReleaseQualified(nbaReleaseContext.evidence, nbaReleaseContext.probability, nbaReleaseContext.sourceEvidenceFresh===true)) return json({ ok: false, error: 'NBA_RELEASE_GATE_LOCKED', booking_code_withheld: true, message: 'The independent NBA totals release gate has not passed. No NBA market-225 share code was requested.' }, 423);
+      catch (error) { return json({ ok: false, error: 'NBA_RELEASE_EVIDENCE_UNAVAILABLE', message: 'NBA release evidence could not be verified. No NBA share code was requested.' }, 503); }
+      if (!nbaTotalsReleaseQualified(nbaReleaseContext.evidence, nbaReleaseContext.probability, nbaReleaseContext.sourceEvidenceFresh===true)) return json({ ok: false, error: 'NBA_RELEASE_GATE_LOCKED', booking_code_withheld: true, message: 'The independent NBA release gate has not passed. No NBA share code was requested.' }, 423);
     }
     // Started selections cannot be pre-match bookable. Avoid looking them up
     // as upcoming fixtures; final validation reports the precise reason.

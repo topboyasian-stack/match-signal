@@ -15,7 +15,7 @@
 - Keep the model projection independent of bookmaker prices. Prices may be used only after projection to calculate value.
 - Treat one ESPN event ID as one independent settled fixture for ROI and confidence calculations. Repeated quote snapshots are not extra bets.
 - Freeze model versions and evaluation dates. Do not move the holdout boundary after seeing outcomes.
-- Keep model qualification separate from manual paper-ticket preparation. Automated NBA Builder batches and model-qualified labels remain behind the release gate. Explicitly manual market-225 slips may request a share code only after every leg passes exact, fresh SportyBet Nigeria event/market/line/side/both-price validation and pregame checks; they remain unqualified manual picks.
+- Keep every NBA market-225 totals slip behind the full independent release gate for both manual and automated share-code generation. If any release condition fails, manual totals must be rejected before SportyBet provider lookup/share-code creation. When the full gate passes, every leg must still pass exact, fresh SportyBet Nigeria event/market/line/side/both-price validation and pregame checks immediately before code generation. Manual market-219 match-winner slips remain a separate path and do not qualify NBA totals.
 
 ## Verified baseline at the start of this work
 
@@ -396,15 +396,15 @@ The ordered production promotion [run 44039450630](https://github.com/topboyasia
 Let the current ordered promotion finish; inspect its Pages run and deployed verification record. Then continue P15 by checking new exact SportyBet captures and official ESPN settlements, deduplicating by unique fixture/selection and immutable snapshot ID. Re-evaluate all thresholds without changing the cutoff or qualification rules. Keep `RESEARCH_ONLY` until every release condition independently passes.
 
 
-## Manual NBA ticket preparation regression fix — 2026-11-17
+## Manual NBA ticket preparation gate policy — updated 2026-11-18
 
-- Commit series on PR #549 separates explicitly manual NBA market-225 share-code preparation from the automated NBA release gate. The release evidence remains RESEARCH_ONLY and no model qualification is implied.
-- Manual slips are still all-or-nothing and must pass current exact SportyBet event resolution, market 225, line, selected side, both active prices, quote freshness (no more than 15 minutes old), and pregame status before a share request.
-- Automated NBA Builder batches continue to require the full prospective release gate. This separation is not permission to use stale odds, substitute bookmakers, guess event IDs, or place wagers automatically.
+- The earlier manual market-225 bypass is revoked: manual and automated NBA totals slips both require the full prospective release gate before any SportyBet event lookup or share-code request.
+- If the evidence remains RESEARCH_ONLY, the manual market-225 route returns `423 NBA_RELEASE_GATE_LOCKED`, withholds the code, and performs no provider lookup/share request. If the gate qualifies, exact event/market/line/side/both-price freshness and pregame validation still apply to every leg immediately before code generation.
+- Manual market-219 match-winner slips remain a separate path. They do not authorize NBA totals or change the totals release status.
 - Regression coverage: `scripts/test_nba_ticket_guard.mjs`, `scripts/test_sportybet_booking_resilience.mjs`, and `scripts/test_ticket_drawer_contract.py`.
 
 
-## Latest continuation checkpoint — 2026-11-18T07:49:00Z
+## Archived continuation checkpoint — 2026-11-18T07:49:00Z (superseded by the gate-hardening checkpoint)
 
 **Single current state:** `RESEARCH_ONLY`; keep the Basketball/NBA market-225 ticket gate locked. The frozen prospective cutoff remains **2026-11-02T02:00:00+00:00**. No threshold was relaxed, no alternate bookmaker or inferred price was used, repeated quote revisions were not counted as independent selections, and no auto-betting was enabled.
 
@@ -432,3 +432,35 @@ Let the current ordered promotion finish; inspect its Pages run and deployed ver
 ### Next action
 
 Keep P15 as the first unchecked priority. Reconcile the next scheduled official ESPN settlement run, refresh the report only from the latest immutable capture/settlement evidence, and continue counting by unique ESPN event/selection with exact snapshot linkage. Then verify the existing ordered production promotion. Do not label NBA totals betting-ready or unlock tickets unless every release condition independently passes.
+
+
+## Latest continuation checkpoint — 2026-11-18T07:50:00Z
+
+**Single current state:** `RESEARCH_ONLY`; the Basketball/NBA market-225 totals ticket gate remains locked. Frozen cutoff: **2026-11-02T02:00:00+00:00**. All release thresholds remain unchanged. No alternate bookmaker, inferred price, duplicate-quote bet count, or auto-betting was introduced.
+
+### First unchecked priority
+
+**P15 — at least 100 unique settled prospective SportyBet Nigeria market-225 selections; target 200.** Latest verified cohort: **74** unique settled selections, 36 wins / 38 losses, zero exact-snapshot linkage failures. The minimum is still 26 selections away; target is 126 away.
+
+### Current evidence and run references
+
+- Fixed-cutoff OOS report [`data/nba_totals_oos_value_test.json`](https://github.com/topboyasian-stack/match-signal/blob/main/data/nba_totals_oos_value_test.json), generated **2026-11-18T07:47:07.781970+00:00**: forecast holdout **n=115**, MAE **13.7782** vs baseline **14.4898**, bias **−1.4583**. The forecast condition passes.
+- Prospective probability report [`data/nba_totals_probability_value_experiment.json`](https://github.com/topboyasian-stack/match-signal/blob/main/data/nba_totals_probability_value_experiment.json), generated **2026-11-18T07:48:08.714915+00:00**: **118** unique settled fixtures and zero snapshot-linkage failures, but model Brier **0.256921** and log loss **0.708458** are worse than market no-vig Brier **0.250322** and log loss **0.693791**.
+- Market holdout: **74 selections**, ROI **−8.32%**, bootstrapped 95% lower bound **−30.99%**, favourite benchmark **+9.14%**. All three value gates fail.
+- CLV: **59** near-close later pregame quotes; mean probability CLV **−0.001172**, mean line CLV **−0.5254 points**. These are not official bookmaker closes; average movement remains negative and the CLV gate fails.
+- Exact fresh capture [run 44261470260](https://github.com/topboyasian-stack/match-signal/actions/runs/44261470260) succeeded: **12** exact fresh market-225 pairs and **12** immutable snapshots added; no feed error. 38 future fixtures were not listed and one had a start-time mismatch. They remain unpriced.
+- Probability/value refresh [run 44261596659](https://github.com/topboyasian-stack/match-signal/actions/runs/44261596659) succeeded and published its report. Latest-main ticket regression [run 44261817261](https://github.com/topboyasian-stack/match-signal/actions/runs/44261817261) was still running before this gate-hardening patch; do not treat it as validation of the patch. Verify the post-patch Actions run.
+- Settlement ledger [`data/nba_totals_ledger.json`](https://github.com/topboyasian-stack/match-signal/blob/main/data/nba_totals_ledger.json) was last updated **2026-11-18T07:36:21.896137+00:00**; successful settlement run [44260095833](https://github.com/topboyasian-stack/match-signal/actions/runs/44260095833) is the latest observed at this checkpoint. Captures alone do not add settled selections.
+
+### Safety defect found and corrected in this checkpoint
+
+The previous shared booking handler allowed manual market-225 totals slips to bypass the independent release gate, and regression tests explicitly expected a code while evidence was `RESEARCH_ONLY`. That contradicted the current readiness policy. This patch now applies the full release gate to manual and automated market-225 totals before provider lookup or share-code request. Automated NBA Builder batches remain gated for any Basketball leg; manual market-219 winners remain a separate path. Tests now require a 423 fail-closed response with no provider lookup/share request for unqualified market-225 totals, and the generic mixed-sport test no longer includes a totals leg in its manual path. Verify the post-patch Actions results and production rollout before treating this fix as live.
+
+### Production state
+
+- Latest completed Pages run at checkpoint time: [44260428453](https://github.com/topboyasian-stack/match-signal/actions/runs/44260428453), success on source commit `87a8a0ca9dff3f3e7e07137a6f4310198930ee02`. Its production record is `VERIFIED_WITH_DIAGNOSTIC_INCOMPLETE`; its NBA gate probe passed, with automated Basketball blocked by 423 `NBA_RELEASE_GATE_LOCKED` and the manual market-225 probe withholding a code.
+- Production OOS data still lagged main (production report generated at 07:35:22Z versus main report at 07:47:07Z). Ordered promotion [44260182668](https://github.com/topboyasian-stack/match-signal/actions/runs/44260182668) remained in progress and [44261742915](https://github.com/topboyasian-stack/match-signal/actions/runs/44261742915) was pending. Do not start a competing deployment. After promotion, verify the deployed source SHA, current live report timestamps, manual and automated market-225 fail-closed probes, and latest-main regressions.
+
+### Next action
+
+Keep P15 as the first unchecked evidence priority while the gate-hardening tests and existing ordered deployment run. Reconcile the next official ESPN settlement update, refresh reports only from immutable exact-market evidence, then verify the post-patch test and production deployment. Do not notify betting readiness unless every release condition independently passes.
