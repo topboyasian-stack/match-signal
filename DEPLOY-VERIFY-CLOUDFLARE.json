@@ -4,19 +4,75 @@
   "qualified_best_quote_coverage_status": "INCOMPLETE",
   "qualified_best_candidate_pool_rows": 0,
   "qualified_best_model_qualified_rows": 0,
-  "booking_api_status": "NOT_RECORDED",
-  "qualified_alternatives_status": "NOT_RECORDED",
+  "booking_api_status": "NO_FUTURE_BATCH",
+  "qualified_alternatives_status": "ERROR",
   "qualified_alternatives_count": 0,
-  "qualified_alternatives": {},
+  "qualified_alternatives": {
+    "verified_at": "2026-11-18T19:56:01.951Z",
+    "endpoint": "/api/public/market-alternatives",
+    "status": "ERROR",
+    "alternative_count": 0,
+    "unique_fixture_count": 0,
+    "sports": [],
+    "error": "HTTP 503 body=<!DOCTYPE html> <!--[if lt IE 7]> <html class=\"no-js ie6 oldie\" lang=\"en-US\"> <![endif]--> <!--[if IE 7]> <html class=\"no-js ie7 oldie\" lang=\"en-US\"> <![endif]--> <!--[if IE 8]> <html class=\"no-js ie8 oldie\" lang=\"en-US\"> <![endif]--> <!--["
+  },
   "shared_ticket_drawer_status": "NOT_VERIFIED",
   "provider": "Cloudflare Pages",
-  "source_commit": "35b07b54267ed5f77e91b5bcfb688f27914a3791",
-  "verified_at": "2026-11-18T18:18:14.973762+00:00",
-  "live_virtual_feed": {},
-  "booking_api": {},
+  "source_commit": "e2b2c84514398cdb01969dc8b6238848eb595905",
+  "verified_at": "2026-11-18T19:56:20.894151+00:00",
+  "live_virtual_feed": {
+    "endpoint": "/api/sportybet-virtual",
+    "verified_at": "2026-11-18T19:56:18.078Z",
+    "status": "LIVE",
+    "events_count": 200,
+    "product_counts": {
+      "efootball_gt": 100,
+      "vfootball": 100
+    },
+    "source_status": {
+      "efootball_live": {
+        "status": "EMPTY",
+        "events": 0,
+        "latency_ms": 283,
+        "endpoint": "/api/ng/factsCenter/wapConfigurableIndexLiveEvents"
+      },
+      "vfootball_live": {
+        "status": "EMPTY",
+        "events": 0,
+        "latency_ms": 898,
+        "endpoint": "/api/ng/factsCenter/wapConfigurableIndexLiveEvents"
+      },
+      "efootball": {
+        "status": "LIVE",
+        "events": 100,
+        "attempts": 1,
+        "retried": false,
+        "latency_ms": 1665,
+        "endpoint": "/api/ng/factsCenter/pcUpcomingEvents",
+        "primary_endpoint": "/api/ng/factsCenter/pcUpcomingEvents"
+      },
+      "vfootball": {
+        "status": "LIVE",
+        "events": 100,
+        "latency_ms": 3120
+      }
+    },
+    "errors": []
+  },
+  "booking_api": {
+    "verified_at": "2026-11-18T19:56:14.876Z",
+    "status": "NO_FUTURE_BATCH",
+    "http_status": null,
+    "ok": false,
+    "batch_id": null,
+    "selection_count": 0,
+    "booking_code_available": false,
+    "error": null,
+    "message": null
+  },
   "nba_ticket_gate_probe_status": "PASS",
   "nba_ticket_gate_probe": {
-    "verified_at": "2026-11-18T18:17:55.555Z",
+    "verified_at": "2026-11-18T19:56:20.694Z",
     "status": "PASS",
     "probe_type": "manual_and_automated_nba_release_gate",
     "current_main_release_qualified": false,
@@ -41,7 +97,7 @@
         "booking_code_present": false
       },
       {
-        "base": "https://6038c74c.match-signal.pages.dev",
+        "base": "https://bd5df1d6.match-signal.pages.dev",
         "endpoint_type": "manual_market225_release_gate",
         "http_status": 423,
         "error": "NBA_RELEASE_GATE_LOCKED",
@@ -50,7 +106,7 @@
         "booking_code_present": false
       },
       {
-        "base": "https://6038c74c.match-signal.pages.dev",
+        "base": "https://bd5df1d6.match-signal.pages.dev",
         "endpoint_type": "automated_basketball_builder",
         "http_status": 423,
         "error": "NBA_RELEASE_GATE_LOCKED",
