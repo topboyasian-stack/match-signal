@@ -474,3 +474,39 @@ Keep P15 as the first unchecked priority. Reconcile the next scheduled official 
 2. Let report run 44263817988 and ordered promotion run 44263724286 finish; inspect the newest report source fingerprint and latest-main regression results.
 3. If the promotion ancestry check fails again while current main demonstrably descends from the board commit, add bounded retries around the compare/merge-base read. Do not remove the ancestry check or bypass the ordered promotion.
 4. Keep the ticket gate locked until every release condition is independently proven, including positive ROI with positive 95% lower bound above the favourite benchmark, positive authentic later CLV, forecast requirements, and all latest-main and live production regressions.
+
+
+## Latest continuation checkpoint — 2026-11-18T08:17:00Z
+
+### Decision and first unchecked priority
+
+- **Decision remains `RESEARCH_ONLY`; keep every Basketball/NBA market-225 ticket path locked.** No auto-betting, alternate bookmaker, inferred price, duplicate-selection counting, or cutoff change.
+- The frozen prospective cutoff remains **`2026-11-02T02:00:00+00:00`**.
+- First unchecked priority remains **P15: at least 100 unique settled prospective market-225 selections, target 200**. Latest verified v5.1 cohort remains **74 selections (36 wins, 38 losses)**: 26 short of the minimum and 126 short of the target. Repeated quote revisions do not add selections.
+
+### Latest main-branch evidence
+
+- Latest fixed-cutoff OOS report generated **2026-11-18T08:16:13.868239Z**: **115** post-cutoff forecast games, MAE **13.7782** versus development-baseline MAE **14.4898**, bias **−1.4583**. The forecast gate passes.
+  - Report: [`data/nba_totals_oos_value_test.json`](https://github.com/topboyasian-stack/match-signal/blob/main/data/nba_totals_oos_value_test.json) | [production report URL](https://match-signal.pages.dev/data/nba_totals_oos_value_test.json)
+- Latest probability/value report generated **2026-11-18T08:16:14.393529Z**: **118 unique settled probability-validation fixtures**, zero snapshot-linkage failures, meeting the separate 30-fixture minimum. Model Brier **0.256921** and log loss **0.708458** remain worse than market no-vig Brier **0.250322** and log loss **0.693791**.
+  - Report: [`data/nba_totals_probability_value_experiment.json`](https://github.com/topboyasian-stack/match-signal/blob/main/data/nba_totals_probability_value_experiment.json) | [production report URL](https://match-signal.pages.dev/data/nba_totals_probability_value_experiment.json)
+- Market-225 holdout remains **74 selections**, flat-stake ROI **−8.32%**, bootstrapped 95% ROI lower bound **−30.99%**, market-favourite benchmark **+9.14%**, and ROI **17.46 percentage points below** the benchmark. These fail independently.
+- Later pregame SportyBet quote diagnostics: **59** observations within the defined 45-minute window; mean selected-side probability CLV **−0.001172** and mean line CLV **−0.5254 points**. The report correctly labels these as captured pregame quotes, not an official bookmaker close; CLV release check fails.
+- Latest exact capture status checked **2026-11-18T08:12:04.786534Z**: no feed error; **12 exact fresh market-225 pairs** and 12 immutable snapshots added by capture run [44264818215](https://github.com/topboyasian-stack/match-signal/actions/runs/44264818215). The 51 upcoming model predictions comprise 12 exact matches and 39 unmatched fixtures (38 not listed in the SportyBet feed, one start-time mismatch over 45 minutes); unmatched fixtures remain unpriced.
+- Official settlement ledger last updated **2026-11-18T08:12:52.412057Z**. The v5.1 cohort remains 74; the latest v5.1 settled fixture shown is ESPN event **401910005**, settled from the official ESPN scoreboard at **2026-11-18T07:03:37.880783Z**. Do not infer new settled selections from the capture alone.
+  - Ledger: [`data/nba_totals_ledger.json`](https://github.com/topboyasian-stack/match-signal/blob/main/data/nba_totals_ledger.json)
+- Report refresh run [44264981598](https://github.com/topboyasian-stack/match-signal/actions/runs/44264981598) succeeded and published both reports with matching source fingerprints in commit [`8303226ce6774da8b1d5c5f5ed1f0121530210bf`](https://github.com/topboyasian-stack/match-signal/commit/8303226ce6774da8b1d5c5f5ed1f0121530210bf). It dispatched latest-main gate regression run [44265626248](https://github.com/topboyasian-stack/match-signal/actions/runs/44265626248), which was still in progress at the last check. Previous mainline regression run [44264396516](https://github.com/topboyasian-stack/match-signal/actions/runs/44264396516) passed all 12 NBA ticket guard tests plus the Basketball desk and shared-ticket contracts; the newly dispatched run must be checked before treating regressions as current.
+
+### Production and deployment verification
+
+- Latest completed Cloudflare Pages run observed remains [44260428453](https://github.com/topboyasian-stack/match-signal/actions/runs/44260428453), source commit **`87a8a0ca9dff3f3e7e07137a6f4310198930ee02`**. Its verification record was checked at **2026-11-18T07:40:40.055569Z** and remains **`VERIFIED_WITH_DIAGNOSTIC_INCOMPLETE`**, not a current verification of the latest main evidence.
+- The recorded production probes show automated Basketball Builder requests fail closed with HTTP **423 `NBA_RELEASE_GATE_LOCKED`**, but manual market-225 totals return HTTP **409 `MANUAL_TICKET_REJECTED_PARTIAL`** instead of the required **423**. Both withheld codes; the manual production behavior is not yet verified against the latest manual-gate fix.
+- Ordered Builder/Pages promotion run [44263724286](https://github.com/topboyasian-stack/match-signal/actions/runs/44263724286) was still in progress at the post-build Unified Upcoming publication step. **Do not start a competing deployment.** Re-check this run and then verify the actual deployed source SHA, live `DEPLOY-VERIFY-CLOUDFLARE.json`, manual and automated 423 probes, and the latest-main regression result.
+  - Verification record in repository: [`DEPLOY-VERIFY-CLOUDFLARE.json`](https://github.com/topboyasian-stack/match-signal/blob/main/DEPLOY-VERIFY-CLOUDFLARE.json)
+  - Production verification URL: [`DEPLOY-VERIFY-CLOUDFLARE.json`](https://match-signal.pages.dev/DEPLOY-VERIFY-CLOUDFLARE.json)
+
+### Next action
+
+1. Continue P15 first: reconcile new official ESPN settlements against exact immutable market-225 snapshots, count only unique v5.1 selections, and refresh reports only from current evidence. Preserve the fixed cutoff and all thresholds.
+2. Check gate regression run 44265626248. Let ordered promotion 44263724286 finish; do not initiate a competing deployment. Once it completes, verify the actual live deployment and both manual/automated fail-closed behavior.
+3. Keep `RESEARCH_ONLY` until the 100-selection minimum (target 200), positive ROI and positive 95% lower bound above the market-favourite benchmark, positive authentic later SportyBet CLV, forecast requirements, and every latest-main/production regression all independently pass.
