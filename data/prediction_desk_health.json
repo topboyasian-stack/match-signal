@@ -1,26 +1,26 @@
 {
   "status": "GENERATED",
-  "generated_at": "2026-11-18T20:37:03.874044+00:00",
+  "generated_at": "2026-11-18T20:45:46.568015+00:00",
   "horizon_days": 7,
-  "event_count": 5093,
+  "event_count": 5088,
   "live_count": 0,
   "pending_settlement_count": 0,
   "publication_filters": {
     "past_kickoff_rows_hidden": 1,
     "stale_live_flags_hidden": 0,
     "expired_settled_rows_hidden": 0,
-    "virtual_market_rows_held_for_kickoff_window": 109,
+    "virtual_market_rows_held_for_kickoff_window": 111,
     "virtual_rows_held_for_stale_participant_history": 0,
-    "virtual_rows_held_for_recent_product_drawdown": 91
+    "virtual_rows_held_for_recent_product_drawdown": 86
   },
   "participant_history_freshness": {
     "fresh": true,
-    "max_age_minutes": 7.8,
+    "max_age_minutes": 16.5,
     "max_age_minutes_allowed": 30,
     "input_age_minutes": {
-      "participant_lifecycle": 7.8,
-      "collector_status": 7.8,
-      "model_evaluation": 6.1
+      "participant_lifecycle": 16.5,
+      "collector_status": 16.5,
+      "model_evaluation": 14.8
     },
     "participant_lifecycle_generated_at": "2026-11-18T20:29:18.298710+00:00",
     "collector_status_updated_at": "2026-11-18T20:29:18.786974+00:00",
@@ -30,33 +30,9 @@
   "high_line_under_evidence": [
     {
       "product": "efootball_gt",
-      "line": 7.5,
-      "side": "under",
-      "event_rows": 23,
-      "walkforward_n": 51,
-      "walkforward_hit_rate": 0.6862745098039216,
-      "walkforward_brier": 0.22889513056460342,
-      "walkforward_model_variant": "poisson",
-      "qualification_status": "RECENT_PRODUCT_DRAWDOWN_PAUSE",
-      "betting_qualified": false
-    },
-    {
-      "product": "efootball_gt",
-      "line": 8.5,
-      "side": "under",
-      "event_rows": 30,
-      "walkforward_n": 54,
-      "walkforward_hit_rate": 0.6481481481481481,
-      "walkforward_brier": 0.2356314252422846,
-      "walkforward_model_variant": "poisson",
-      "qualification_status": "MODEL_PROBABILITY_BELOW_0_65",
-      "betting_qualified": false
-    },
-    {
-      "product": "efootball_gt",
       "line": 6.5,
       "side": "under",
-      "event_rows": 19,
+      "event_rows": 17,
       "walkforward_n": 160,
       "walkforward_hit_rate": 0.54375,
       "walkforward_brier": 0.2552917168020722,
@@ -65,10 +41,22 @@
       "betting_qualified": false
     },
     {
+      "product": "efootball_gt",
+      "line": 7.5,
+      "side": "under",
+      "event_rows": 22,
+      "walkforward_n": 51,
+      "walkforward_hit_rate": 0.6862745098039216,
+      "walkforward_brier": 0.22889513056460342,
+      "walkforward_model_variant": "poisson",
+      "qualification_status": "RECENT_PRODUCT_DRAWDOWN_PAUSE",
+      "betting_qualified": false
+    },
+    {
       "product": "vfootball",
       "line": 6.5,
       "side": "under",
-      "event_rows": 452,
+      "event_rows": 453,
       "walkforward_n": 326,
       "walkforward_hit_rate": 0.9631901840490797,
       "walkforward_brier": 0.0349538573275287,
@@ -80,7 +68,7 @@
       "product": "vfootball",
       "line": 7.5,
       "side": "under",
-      "event_rows": 452,
+      "event_rows": 453,
       "walkforward_n": 39,
       "walkforward_hit_rate": 0.9743589743589743,
       "walkforward_brier": 0.02522100155064107,
@@ -92,7 +80,7 @@
       "product": "vfootball",
       "line": 8.5,
       "side": "under",
-      "event_rows": 452,
+      "event_rows": 453,
       "walkforward_n": 0,
       "walkforward_hit_rate": null,
       "walkforward_brier": null,
@@ -104,12 +92,24 @@
       "product": "vfootball",
       "line": 9.5,
       "side": "under",
-      "event_rows": 452,
+      "event_rows": 453,
       "walkforward_n": 0,
       "walkforward_hit_rate": null,
       "walkforward_brier": null,
       "walkforward_model_variant": null,
       "qualification_status": "HIGH_LINE_UNDER_EVIDENCE_GATE_PENDING",
+      "betting_qualified": false
+    },
+    {
+      "product": "efootball_gt",
+      "line": 8.5,
+      "side": "under",
+      "event_rows": 29,
+      "walkforward_n": 54,
+      "walkforward_hit_rate": 0.6481481481481481,
+      "walkforward_brier": 0.2356314252422846,
+      "walkforward_model_variant": "poisson",
+      "qualification_status": "EDGE_BELOW_2PCT",
       "betting_qualified": false
     },
     {
@@ -127,22 +127,22 @@
   ],
   "prospective_poisson_shadow_coverage": {
     "efootball_gt": {
-      "efootball_rows": 515,
-      "unique_events": 255,
-      "rows_with_valid_shadow": 54,
-      "unique_events_with_valid_shadow": 18,
+      "efootball_rows": 496,
+      "unique_events": 245,
+      "rows_with_valid_shadow": 51,
+      "unique_events_with_valid_shadow": 17,
       "rejection_reason_counts": {
-        "historical_product_fallback_rejected": 461,
-        "eligible_leave_one_line_out_fit": 54
+        "historical_product_fallback_rejected": 445,
+        "eligible_leave_one_line_out_fit": 51
       },
       "lambda_fit_source_counts_by_side": {
         "over": {
-          "historical_product_lambda_fallback": 461,
-          "current_market_ladder_leave_one_line_out": 54
+          "historical_product_lambda_fallback": 445,
+          "current_market_ladder_leave_one_line_out": 51
         },
         "under": {
-          "historical_product_lambda_fallback": 461,
-          "current_market_ladder_leave_one_line_out": 54
+          "historical_product_lambda_fallback": 445,
+          "current_market_ladder_leave_one_line_out": 51
         }
       },
       "mode": "PAPER_SHADOW_ONLY",
@@ -150,6 +150,6 @@
     }
   },
   "qualified_virtual_kickoff_window_minutes": 60,
-  "virtual_market_rows_held_for_kickoff_window": 109,
+  "virtual_market_rows_held_for_kickoff_window": 111,
   "policy": "Virtual picks outside the next 60 minutes remain visible as research but cannot be currently qualified; the rolling board re-scores as settled results arrive. Past kickoff rows are removed from Upcoming unless still credibly live or inside the two-hour settlement-result grace. Archived evidence is not deleted. Under 6.5 and higher Under lines are surfaced for line-specific diagnostics; high VFootball Under lines require their own exact-line chronological sample before betting qualification."
 }
