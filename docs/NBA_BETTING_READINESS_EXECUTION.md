@@ -434,33 +434,43 @@ Let the current ordered promotion finish; inspect its Pages run and deployed ver
 Keep P15 as the first unchecked priority. Reconcile the next scheduled official ESPN settlement run, refresh the report only from the latest immutable capture/settlement evidence, and continue counting by unique ESPN event/selection with exact snapshot linkage. Then verify the existing ordered production promotion. Do not label NBA totals betting-ready or unlock tickets unless every release condition independently passes.
 
 
-## Latest continuation checkpoint — 2026-11-18T07:50:00Z
+## Latest continuation checkpoint — 2026-11-18T08:06:00Z
 
-**Single current state:** `RESEARCH_ONLY`; the Basketball/NBA market-225 totals ticket gate remains locked. Frozen cutoff: **2026-11-02T02:00:00+00:00**. All release thresholds remain unchanged. No alternate bookmaker, inferred price, duplicate-quote bet count, or auto-betting was introduced.
+### Current decision
 
-### First unchecked priority
+- **Overall state remains `RESEARCH_ONLY`; no betting-ready claim and no auto-betting.**
+- Frozen prospective cutoff remains `2026-11-02T02:00:00+00:00`.
+- First unchecked evidence priority remains **P15: reach 100 uniquely settled prospective market-225 selections** (target 200). Latest verified v5.1 ledger still has **74 unique settled selections: 36 wins, 38 losses** — 26 short of the minimum and 126 short of target.
+- No thresholds, bookmaker sources, price rules, or independence rules were relaxed. Repeated quote snapshots remain observations, not additional settled selections.
 
-**P15 — at least 100 unique settled prospective SportyBet Nigeria market-225 selections; target 200.** Latest verified cohort: **74** unique settled selections, 36 wins / 38 losses, zero exact-snapshot linkage failures. The minimum is still 26 selections away; target is 126 away.
+### Latest evidence and report freshness
 
-### Current evidence and run references
+- Latest observed main head: `e5f827c94511b7bde11d99589abf4e4e63689bbf` (`Refresh research-gated Odds Builder`).
+- Latest capture status: `2026-11-18T08:03:46Z`, no feed error, 12 exact fresh market-225 Over/Under pairs, 12 immutable snapshots added, 39 fixtures unmatched/unpriced. The repeated capture did not add settled selections.
+- Latest official ESPN settlement recovery: run [44262619715](https://github.com/topboyasian-stack/match-signal/actions/runs/44262619715) succeeded, but found **no new official settled outcomes**. Ledger timestamp is `2026-11-18T07:55:52Z`; the v5.1 settled-selection count remains 74.
+- OOS report refreshed at `2026-11-18T08:04:12Z`; probability/value report refreshed at `2026-11-18T08:05:18Z`. The freshness workflow fix now refreshes the OOS report before the probability report and publishes both only when the source fingerprint matches the current inputs. Report-refresh run [44263534174](https://github.com/topboyasian-stack/match-signal/actions/runs/44263534174) succeeded. Follow-up report run [44263817988](https://github.com/topboyasian-stack/match-signal/actions/runs/44263817988) was in progress at this checkpoint.
+- Latest verified OOS metrics remain: 115 post-cutoff forecast games; MAE 13.7782 versus development baseline 14.4898; absolute bias 1.4583. Forecast gate passes.
+- Value gate still fails: 74 settled market-225 selections; flat-stake ROI **−8.32%**; bootstrapped 95% ROI lower bound **−30.99%**; market-favourite benchmark **+9.14%**.
+- Probability report still fails comparison to the market: 118 unique settled fixtures, zero prospective snapshot-linkage failures, Brier score 0.256921 versus market 0.250322, log loss 0.708458 versus market 0.693791.
+- Later-price diagnostics remain negative: 59 later quotes; mean probability CLV −0.001172 and mean line CLV −0.5254 points. These are not evidence of positive authentic closing-line value.
+- Overall release decision stays `RESEARCH_ONLY`. No fresh settled outcomes were invented or inferred from repeated quotes.
 
-- Fixed-cutoff OOS report [`data/nba_totals_oos_value_test.json`](https://github.com/topboyasian-stack/match-signal/blob/main/data/nba_totals_oos_value_test.json), generated **2026-11-18T07:47:07.781970+00:00**: forecast holdout **n=115**, MAE **13.7782** vs baseline **14.4898**, bias **−1.4583**. The forecast condition passes.
-- Prospective probability report [`data/nba_totals_probability_value_experiment.json`](https://github.com/topboyasian-stack/match-signal/blob/main/data/nba_totals_probability_value_experiment.json), generated **2026-11-18T07:48:08.714915+00:00**: **118** unique settled fixtures and zero snapshot-linkage failures, but model Brier **0.256921** and log loss **0.708458** are worse than market no-vig Brier **0.250322** and log loss **0.693791**.
-- Market holdout: **74 selections**, ROI **−8.32%**, bootstrapped 95% lower bound **−30.99%**, favourite benchmark **+9.14%**. All three value gates fail.
-- CLV: **59** near-close later pregame quotes; mean probability CLV **−0.001172**, mean line CLV **−0.5254 points**. These are not official bookmaker closes; average movement remains negative and the CLV gate fails.
-- Exact fresh capture [run 44261470260](https://github.com/topboyasian-stack/match-signal/actions/runs/44261470260) succeeded: **12** exact fresh market-225 pairs and **12** immutable snapshots added; no feed error. 38 future fixtures were not listed and one had a start-time mismatch. They remain unpriced.
-- Probability/value refresh [run 44261596659](https://github.com/topboyasian-stack/match-signal/actions/runs/44261596659) succeeded and published its report. Latest-main ticket regression [run 44261817261](https://github.com/topboyasian-stack/match-signal/actions/runs/44261817261) was still running before this gate-hardening patch; do not treat it as validation of the patch. Verify the post-patch Actions run.
-- Settlement ledger [`data/nba_totals_ledger.json`](https://github.com/topboyasian-stack/match-signal/blob/main/data/nba_totals_ledger.json) was last updated **2026-11-18T07:36:21.896137+00:00**; successful settlement run [44260095833](https://github.com/topboyasian-stack/match-signal/actions/runs/44260095833) is the latest observed at this checkpoint. Captures alone do not add settled selections.
+### Concrete code fixes and regression evidence
 
-### Safety defect found and corrected in this checkpoint
+- `functions/api/sportybet-booking.js` now applies the full NBA release gate to **manual and automated market-225 totals** before provider lookup or share-code generation. When unqualified, the backend returns `423 NBA_RELEASE_GATE_LOCKED`, withholds the code, and does not make a provider lookup/share-code request. Manual non-total Basketball picks retain their separate path.
+- Backend/test patch: `edf1a52ebf9b0003ccd03cb202c5f30cc054d6ae`. The first guard run failed only because `scripts/test_ticket_drawer_contract.py` still asserted the old policy; that contract was corrected in `be7e3586c3a7b44375d068b2a6dd1e7c59949159`. Guard run [44262409995](https://github.com/topboyasian-stack/match-signal/actions/runs/44262409995) then passed. SportyBet booking-resolution run [44262257039](https://github.com/topboyasian-stack/match-signal/actions/runs/44262257039) passed. Latest guard run [44263534210](https://github.com/topboyasian-stack/match-signal/actions/runs/44263534210) passed on the report-workflow patch commit.
+- Production gate smoke-test script was updated in commit `4ea9f0a`: when the current report is unqualified, a manual market-225 request must receive 423, not proceed to a partial event-resolution error.
+- Report freshness fix: `9c3dd42c7085f83ae6776e51f0b01670a0cff7c8` adds `scripts/refresh_nba_totals_oos_report.py`, runs the fixed-cutoff OOS refresh before probability diagnostics, publishes both reports together, and regenerates them on latest main if the source fingerprint changed. The workflow contract test now checks these invariants. This does not alter evidence, odds, or thresholds.
 
-The previous shared booking handler allowed manual market-225 totals slips to bypass the independent release gate, and regression tests explicitly expected a code while evidence was `RESEARCH_ONLY`. That contradicted the current readiness policy. This patch now applies the full release gate to manual and automated market-225 totals before provider lookup or share-code request. Automated NBA Builder batches remain gated for any Basketball leg; manual market-219 winners remain a separate path. Tests now require a 423 fail-closed response with no provider lookup/share request for unqualified market-225 totals, and the generic mixed-sport test no longer includes a totals leg in its manual path. Verify the post-patch Actions results and production rollout before treating this fix as live.
+### Production deployment status — still unverified
 
-### Production state
-
-- Latest completed Pages run at checkpoint time: [44260428453](https://github.com/topboyasian-stack/match-signal/actions/runs/44260428453), success on source commit `87a8a0ca9dff3f3e7e07137a6f4310198930ee02`. Its production record is `VERIFIED_WITH_DIAGNOSTIC_INCOMPLETE`; its NBA gate probe passed, with automated Basketball blocked by 423 `NBA_RELEASE_GATE_LOCKED` and the manual market-225 probe withholding a code.
-- Production OOS data still lagged main (production report generated at 07:35:22Z versus main report at 07:47:07Z). Ordered promotion [44260182668](https://github.com/topboyasian-stack/match-signal/actions/runs/44260182668) remained in progress and [44261742915](https://github.com/topboyasian-stack/match-signal/actions/runs/44261742915) was pending. Do not start a competing deployment. After promotion, verify the deployed source SHA, current live report timestamps, manual and automated market-225 fail-closed probes, and latest-main regressions.
+- Latest completed Cloudflare Pages run remains [44260428453](https://github.com/topboyasian-stack/match-signal/actions/runs/44260428453), source commit `87a8a0ca` (older than the safety patch), status `VERIFIED_WITH_DIAGNOSTIC_INCOMPLETE`. Its manual market-225 probe returned 409 rather than the required 423 gate lock. **Do not treat the new backend fix as live yet.**
+- Ordered promotion run [44260182668](https://github.com/topboyasian-stack/match-signal/actions/runs/44260182668) failed at the final ancestry guard with “Main is not descended from the post-build board publication; refusing to deploy.” The currently observed main parent chain includes board commit `0953a2977b052e218d1956db8b40c4aa932d5217`; the failure appears consistent with a stale/racing ancestry read, but the safety guard must not be removed or relaxed.
+- Retry promotion run [44263724286](https://github.com/topboyasian-stack/match-signal/actions/runs/44263724286) was in progress at this checkpoint. Do not start a competing Pages deployment. Verify its result, then verify the deployed source SHA and the live manual/automated market-225 423 probes before considering the safety fix deployed.
 
 ### Next action
 
-Keep P15 as the first unchecked evidence priority while the gate-hardening tests and existing ordered deployment run. Reconcile the next official ESPN settlement update, refresh reports only from immutable exact-market evidence, then verify the post-patch test and production deployment. Do not notify betting readiness unless every release condition independently passes.
+1. Keep P15 as the first unchecked evidence priority and continue collecting exact fresh SportyBet Nigeria market-225 snapshots plus official ESPN settlements.
+2. Let report run 44263817988 and ordered promotion run 44263724286 finish; inspect the newest report source fingerprint and latest-main regression results.
+3. If the promotion ancestry check fails again while current main demonstrably descends from the board commit, add bounded retries around the compare/merge-base read. Do not remove the ancestry check or bypass the ordered promotion.
+4. Keep the ticket gate locked until every release condition is independently proven, including positive ROI with positive 95% lower bound above the favourite benchmark, positive authentic later CLV, forecast requirements, and all latest-main and live production regressions.
