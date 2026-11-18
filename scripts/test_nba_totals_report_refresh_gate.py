@@ -118,6 +118,21 @@ def run():
     assert "source_data_fingerprint" in workflow and "report_source_fingerprint_matches" in workflow, (
         "The workflow must detect source files that changed after a run checked out main."
     )
+    assert "scripts/refresh_nba_totals_oos_report.py" in workflow, (
+        "Settlement-only changes must refresh the fixed-cutoff OOS report as well as probability diagnostics."
+    )
+    assert "Refresh fixed-cutoff NBA OOS report from current official evidence" in workflow, (
+        "The OOS report must be regenerated from current ledger, predictions, history and immutable snapshots."
+    )
+    assert workflow.index("Refresh fixed-cutoff NBA OOS report from current official evidence") < workflow.index("Run residual-calibrated SportyBet value diagnostics"), (
+        "The probability report fingerprint must include the freshly regenerated OOS report."
+    )
+    assert "git add data/nba_totals_oos_value_test.json data/nba_totals_probability_value_experiment.json" in workflow, (
+        "Both source-dependent reports must be published together."
+    )
+    assert "Source data changed during report generation; regenerating both reports on latest main." in workflow, (
+        "Concurrent main updates must not publish reports with stale source fingerprints."
+    )
     assert "  workflow_run:" not in workflow, (
         "Capture and settlement must explicitly dispatch the report after new evidence is published; remove duplicate workflow_run handoffs."
     )
