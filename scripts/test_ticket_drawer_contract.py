@@ -181,11 +181,11 @@ def main():
     require("leg?.model_qualified!==true" in api and "leg?.market_id!=='225'" in api and
             "leg.market === 'winner'" in api and "leg.market_id !== '219'" in api and
             "!leg.sportybet_event_id" in api and "NBA_RELEASE_GATE_LOCKED" in api and
-            "nbaTotalTicketLegQualified" in api and "if (!manualMode && (hasBasketballTotalsLeg || hasBasketballLeg))" in api and
+            "nbaTotalTicketLegQualified" in api and "if (hasBasketballTotalsLeg || (!manualMode && hasBasketballLeg))" in api and
             "if (basketballLeg && !manualMode)" in api and
             "const expectedMarket = isWinner ? '219' : '225'" in api and
             "15 * 60 * 1000" in api,
-            "Automated NBA Builder batches retain the strict release gate; manual market-225 totals remain model-unqualified but must pass exact fresh quote validation, and market-219 manual winners remain separate")
+            "Manual and automated NBA market-225 totals require the full release gate before provider lookup or share-code creation; automated NBA Builder batches gate all Basketball legs, while manual market-219 winners remain separate")
     require("prospective_probability_fixture_coverage" in api and
             "valid_unique_settled_fixtures" in api and "binary_scored_unique_fixtures" in api and
             "snapshot_linkage_failure_count" in api and
