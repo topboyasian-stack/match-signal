@@ -18,13 +18,9 @@ from live_expansion_pipeline import (
     sportybet_total_for_fixture,
     nba_team_key,
 )
-from nba_totals_walk_forward import evaluate as evaluate_nba_totals
 
 PREDICTIONS = DATA / "nba_predictions.json"
 SNAPSHOTS = DATA / "nba_totals_publication_snapshots.json"
-LEDGER = DATA / "nba_totals_ledger.json"
-HISTORY = DATA / "nba_history.json"
-REPORT = DATA / "nba_totals_oos_value_test.json"
 STATUS = DATA / "nba_totals_price_capture_status.json"
 NBA_TOURNAMENT_ID = "sr:tournament:132"
 
@@ -346,17 +342,10 @@ def capture_timestamp(feed, observed_at=None):
 def main():
     predictions = load_json(PREDICTIONS, [])
     snapshots = load_json(SNAPSHOTS, [])
-    ledger_payload = load_json(LEDGER, {})
-    history = load_json(HISTORY, [])
-    ledger = ledger_payload.get("records", []) if isinstance(ledger_payload, dict) else ledger_payload
     if not isinstance(predictions, list):
         predictions = []
     if not isinstance(snapshots, list):
         snapshots = []
-    if not isinstance(ledger, list):
-        ledger = []
-    if not isinstance(history, list):
-        history = []
 
     feed, feed_error, feed_diagnostics = sportybet_basketball_feed_paged()
     now = capture_timestamp(feed, datetime.now(timezone.utc))
@@ -365,14 +354,7 @@ def main():
     snapshot_status = append_nba_totals_publication_snapshots(
         snapshot_candidates, SNAPSHOTS, published_at=now.isoformat()
     )
-    after_snapshots = load_json(SNAPSHOTS, [])
-    report = evaluate_nba_totals(
-        history, ledger, after_snapshots if isinstance(after_snapshots, list) else [],
-        predictions, as_of=now.isoformat()
-    )
-
     PREDICTIONS.write_text(json.dumps(predictions, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    REPORT.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     status = {
         "checked_at": now.isoformat(),
         "paper_only": True,
@@ -389,8 +371,6 @@ def main():
         "immutable_snapshot_count_before": before_count,
         "immutable_snapshot_count_after": snapshot_status.get("total", 0),
         "immutable_snapshots_added": snapshot_status.get("added", 0),
-        "publication_capture": report.get("publication_capture"),
-        "release_decision": report.get("release_decision"),
         "note": (
             "Missing market-225 events are left unpriced. Per-fixture diagnostics distinguish "
             "unopened bookmaker markets from identity/time mismatch or an unusable price pair. "

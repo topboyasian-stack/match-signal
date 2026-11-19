@@ -62,29 +62,30 @@ jobs:
           python -m py_compile scripts/capture_nba_totals_prices.py scripts/nba_totals_walk_forward.py scripts/test_nba_totals_price_capture.py scripts/test_nba_totals_walk_forward.py
           PYTHONPATH=scripts python scripts/test_nba_totals_walk_forward.py
           PYTHONPATH=scripts python scripts/test_nba_totals_price_capture.py
+          python - <<'PY'
+          from pathlib import Path
+          source = Path("scripts/capture_nba_totals_prices.py").read_text(encoding="utf-8")
+          assert "nba_totals_oos_value_test.json" not in source
+          assert "REPORT.write_text" not in source
+          print("PASS: quote capture does not publish OOS/probability reports.")
+          PY
 
       - name: Capture fresh SportyBet market-225 pairs and update the totals audit
         run: PYTHONPATH=scripts python scripts/capture_nba_totals_prices.py
 
-      - name: Verify regenerated fixed-cutoff evaluation report
+      - name: Verify capture status without rewriting OOS research reports
         run: |
           python - <<'PY'
           import json
           from pathlib import Path
-          report = json.loads(Path("data/nba_totals_oos_value_test.json").read_text(encoding="utf-8"))
-          expected = "2026-11-02T02:00:00+00:00"
-          assert report.get("evaluation_type") == "NBA_TOTALS_FIXED_CUTOFF_V2"
-          assert report.get("holdout_protocol", {}).get("fixed_cutoff_utc") == expected
-          audit = report.get("market_record_audit")
-          assert isinstance(audit, list), "per-fixture market audit is missing"
-          ids = [row.get("event_id") for row in audit]
-          assert len(ids) == len(set(ids)), "a fixture was counted more than once"
-          assert report.get("market_overall", {}).get("roi_ci_method", "").startswith("deterministic fixture-level percentile bootstrap")
-          assert report.get("paper_only") is True
-          print("Fixed cutoff:", expected)
-          print("Verified market records:", len(audit))
-          print("Market holdout bets:", report.get("market_holdout", {}).get("n"))
-          print("Release decision:", report.get("release_decision"))
+          status = json.loads(Path("data/nba_totals_price_capture_status.json").read_text(encoding="utf-8"))
+          assert status.get("paper_only") is True
+          assert status.get("model_version") == "nba-total-v5.1-pace-efficiency-calibrated"
+          assert status.get("checked_at")
+          assert isinstance(status.get("feed_events"), int)
+          assert isinstance(status.get("feed_events_with_market_225"), int)
+          assert isinstance(status.get("immutable_snapshots_added"), int)
+          print("Capture status verified; OOS/probability reports are published by the dedicated research workflow.")
           PY
 
       - name: Publish immutable price snapshots and capture status
@@ -93,7 +94,7 @@ jobs:
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add data/nba_predictions.json data/nba_totals_publication_snapshots.json data/nba_totals_oos_value_test.json data/nba_totals_price_capture_status.json
+          git add data/nba_predictions.json data/nba_totals_publication_snapshots.json data/nba_totals_price_capture_status.json
           if git diff --cached --quiet; then
             echo 'No fresh market-225 price or audit changes to publish.'
             exit 0
@@ -110,7 +111,7 @@ jobs:
               git rebase --abort || true
               git reset --hard origin/main
               PYTHONPATH=scripts python scripts/capture_nba_totals_prices.py
-              git add data/nba_predictions.json data/nba_totals_publication_snapshots.json data/nba_totals_oos_value_test.json data/nba_totals_price_capture_status.json
+              git add data/nba_predictions.json data/nba_totals_publication_snapshots.json data/nba_totals_price_capture_status.json
               if git diff --cached --quiet; then
                 echo 'Latest main already contains the current market-225 capture.'
                 exit 0
