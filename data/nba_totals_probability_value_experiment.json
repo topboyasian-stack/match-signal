@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-19T04:04:17.236415+00:00",
+  "generated_at": "2026-11-19T04:31:40.403623+00:00",
   "paper_only": true,
   "experiment": "NBA_TOTALS_EMPIRICAL_RESIDUAL_VALUE_V3",
   "model_version": "nba-total-v5.1-pace-efficiency-calibrated",
@@ -5829,10 +5829,10 @@
   "prospective_pregame_snapshot_coverage": {
     "cutoff_utc": "2026-11-02T02:00:00+00:00",
     "snapshot_source": "data/nba_totals_publication_snapshots.json",
-    "prospective_v5_snapshot_records": 10923,
-    "prospective_unique_fixtures_with_any_snapshot": 131,
-    "prospective_verified_fresh_market_225_snapshot_records": 10923,
-    "prospective_unique_fixtures_with_verified_fresh_market_225_snapshot": 131,
+    "prospective_v5_snapshot_records": 10927,
+    "prospective_unique_fixtures_with_any_snapshot": 132,
+    "prospective_verified_fresh_market_225_snapshot_records": 10927,
+    "prospective_unique_fixtures_with_verified_fresh_market_225_snapshot": 132,
     "prospective_settled_unique_market_selections": 79,
     "prospective_settled_selections_with_exact_snapshot_match": 79,
     "prospective_settled_selections_missing_or_mismatched_snapshot": 0,
@@ -10275,41 +10275,83 @@
   "historical_market_line_backtest_available": false,
   "upcoming_exact_fresh_market_225_value_diagnostics": [
     {
+      "event_id": "401910021",
+      "matchup": "Minnesota Timberwolves vs New York Knicks",
+      "start_time": "2026-11-20T01:00:00+00:00",
+      "quote_timestamp": "2026-11-19T04:24:15.883000+00:00",
+      "quote_age_minutes": 7.4087,
+      "forecast_total": 216.6688,
+      "sportybet_line": 217.5,
+      "over_odds": 1.93,
+      "under_odds": 1.88,
+      "model_probability": {
+        "over": 0.5464,
+        "under": 0.4536,
+        "push": 0.0
+      },
+      "market_no_vig_probability": {
+        "over": 0.4934,
+        "under": 0.5066
+      },
+      "model_probability_conditional_on_no_push": {
+        "over": 0.5464,
+        "under": 0.4536
+      },
+      "model_probability_edge": {
+        "over": 0.053,
+        "under": -0.053
+      },
+      "expected_value_per_unit": {
+        "over": 0.0545,
+        "under": -0.1472
+      },
+      "bootstrap_95_lower_bound": {
+        "over_probability_edge": -0.0055,
+        "under_probability_edge": -0.1079,
+        "over_expected_value": -0.0582,
+        "under_expected_value": -0.2506,
+        "method": "deterministic paired empirical-residual bootstrap; 4,000 resamples"
+      },
+      "calibration_check": "PASS",
+      "decision": "NO BET",
+      "decision_is_authorized_for_betting": false
+    },
+    {
       "event_id": "401910022",
       "matchup": "San Antonio Spurs vs LA Clippers",
       "start_time": "2026-11-20T01:00:00+00:00",
-      "quote_timestamp": "2026-11-19T04:00:46.402000+00:00",
-      "quote_age_minutes": 3.5139,
+      "quote_timestamp": "2026-11-19T04:24:15.883000+00:00",
+      "quote_age_minutes": 7.4087,
       "forecast_total": 224.9506,
       "sportybet_line": 225.5,
-      "over_odds": 1.9,
-      "under_odds": 1.91,
+      "over_odds": 1.92,
+      "under_odds": 1.88,
       "model_probability": {
         "over": 0.5498,
         "under": 0.4502,
         "push": 0.0
       },
       "market_no_vig_probability": {
-        "over": 0.5013,
-        "under": 0.4987
+        "over": 0.4947,
+        "under": 0.5053
       },
       "model_probability_conditional_on_no_push": {
         "over": 0.5498,
         "under": 0.4502
       },
       "model_probability_edge": {
-        "over": 0.0485,
-        "under": -0.0485
+        "over": 0.0551,
+        "under": -0.0551
       },
       "expected_value_per_unit": {
-        "over": 0.0447,
-        "under": -0.1402
+        "over": 0.0557,
+        "under": -0.1537
       },
       "bootstrap_95_lower_bound": {
-        "over_probability_edge": -0.0099,
-        "under_probability_edge": -0.1069,
-        "over_expected_value": -0.0663,
-        "under_expected_value": -0.2518,
+        "over_probability_edge": -0.0033,
+        "under_probability_edge": -0.1135,
+        "over_expected_value": -0.0565,
+        "under_expected_value": -0.2635,
         "method": "deterministic paired empirical-residual bootstrap; 4,000 resamples"
       },
       "calibration_check": "PASS",
@@ -10317,8 +10359,8 @@
       "decision_is_authorized_for_betting": false
     }
   ],
-  "upcoming_value_diagnostics_count": 1,
-  "upcoming_predictions_without_exact_fresh_pair": 47,
+  "upcoming_value_diagnostics_count": 2,
+  "upcoming_predictions_without_exact_fresh_pair": 46,
   "prospective_settled_market_bets_after_cutoff": 79,
   "prospective_minimum_sample_reached": false,
   "prospective_probability_scored_unique_fixtures": 127,
@@ -10330,11 +10372,11 @@
   "market_prices_used_as_model_inputs": false,
   "source_data_fingerprint": {
     "data/nba_history.json": "cb24e6629abab1d6d7f7c81dabdb52ccdf0c06f1d24e94eb0bc3f2cd233cfd32",
-    "data/nba_predictions.json": "955c03d71d70b96eceb99c954a73c40bdb3e6f1125790fd80a77f7c17814d2ec",
-    "data/nba_totals_ledger.json": "f29f5e29c0c2382a4b63a2a0d2174ac93a4a29c591408887b83fb2467b474f37",
-    "data/nba_totals_publication_snapshots.json": "05c5dceb0f66cc746eb404d35b62fdabdbb0132b60b33bf74b86da8b07311efd",
-    "data/nba_totals_probability_settlements.json": "4a92edc2e3e00b414dc0248ffe6e7574d1962dcef360b3d0c44a558c76e77086",
-    "data/nba_totals_price_capture_status.json": "10512236416cae13d8959e30132d0dafcb4b5941e7f45e5b9045b9979139abac",
-    "data/nba_totals_oos_value_test.json": "6570c745afc403166fb476fe6ba8a1d7983b99900e939d540105714290d19a21"
+    "data/nba_predictions.json": "31aa84550c3e6350b83edc1ced5c3b9493b6bf89c48e156121479c891f10ee88",
+    "data/nba_totals_ledger.json": "9222a9f49c1722f60782cd7f47c405c277b689f82739d7c194e9a5f405dfb365",
+    "data/nba_totals_publication_snapshots.json": "012ac2b49ad0acbfe8454d3e0147b1b37caebf8e626988f4ed1bf12c358deb97",
+    "data/nba_totals_probability_settlements.json": "b5b41a5b0b3577ca47465bf710aeaf384a2d2283ffa67d7feeac79c3e8ab8de2",
+    "data/nba_totals_price_capture_status.json": "ae951da523e9521866def74ba3e507dd9767a5a9ed0e53aa59f9888a67688725",
+    "data/nba_totals_oos_value_test.json": "eb6c6aba1ee179135b9b932eafe2a6278a2df5d6e3823e8d05b7ebe1f40ea55f"
   }
 }
