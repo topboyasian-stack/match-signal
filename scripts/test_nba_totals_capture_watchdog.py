@@ -243,6 +243,12 @@ def run():
     assert "ACTIVE_CAPTURE_RUNS=\"$(gh api" in capture_decision and "actions/workflows/nba-totals-price-capture.yml/runs?branch=main&per_page=20" in capture_decision, (
         "Capture recovery must re-count active runs at decision time to avoid duplicate captures after a run finishes."
     )
+    assert 'select(.status == "queued" or .status == "in_progress")' in capture_decision, (
+        "The active-run recheck must retain valid jq quoting so recovery cannot bypass the concurrency guard."
+    )
+    assert "printf 'active_capture_runs=%s\\n'" in capture_decision, (
+        "The refreshed active-run diagnostic must be written as a valid GitHub Actions output line."
+    )
     assert "ACTIVE_CAPTURE_RUNS: ${{ steps.active_capture.outputs.count }}" in watchdog_workflow, (
         "The report freshness decision must know when a fresh immutable quote capture is still running."
     )
