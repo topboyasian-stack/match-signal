@@ -4,19 +4,19 @@
   "qualified_best_quote_coverage_status": "INCOMPLETE",
   "qualified_best_candidate_pool_rows": 0,
   "qualified_best_model_qualified_rows": 0,
-  "booking_api_status": "FAIL",
+  "booking_api_status": "VERIFIED",
   "qualified_alternatives_status": "READY",
-  "qualified_alternatives_count": 134,
+  "qualified_alternatives_count": 76,
   "qualified_alternatives": {
-    "verified_at": "2026-11-19T14:20:19.196Z",
+    "verified_at": "2026-11-19T17:12:27.733Z",
     "endpoint": "/api/public/market-alternatives",
     "api_status": "OK",
     "status": "READY",
-    "alternative_count": 134,
-    "visible_candidate_count": 134,
-    "unique_fixture_count": 106,
-    "builder_qualified_count": 1,
-    "research_only_count": 133,
+    "alternative_count": 76,
+    "visible_candidate_count": 76,
+    "unique_fixture_count": 59,
+    "builder_qualified_count": 0,
+    "research_only_count": 76,
     "sports": [
       "efootball",
       "tennis"
@@ -81,14 +81,14 @@
       {
         "sport": "efootball",
         "product": "efootball_gt",
-        "event_id": "sr:match:BAaHu8aKAcRSYIDOCuKs7YA",
-        "match": "Real Madrid (Sheva) vs Paris (Mapiston)",
+        "event_id": "sr:match:BAaHoIimHcyS5q8txnsQsqg",
+        "match": "Arsenal (Virtual_1) vs Tottenham (Virtual_6)",
         "market": "total",
         "pick": "over",
         "line": 4.5,
-        "odds": 1.77,
+        "odds": 2.6,
         "probability": 0.738095,
-        "start_time": "2026-11-19T14:25:00+00:00",
+        "start_time": "2026-11-19T18:26:00+00:00",
         "quote_status": "STALE",
         "qualification_status": "RESEARCH_ONLY_QUOTE_NOT_CURRENT"
       }
@@ -96,11 +96,11 @@
   },
   "shared_ticket_drawer_status": "READY",
   "provider": "Cloudflare Pages",
-  "source_commit": "1c73c5ddbf8c85db3eea461d314e90d73befd93b",
-  "verified_at": "2026-11-19T14:21:27.334475+00:00",
+  "source_commit": "eb37800836f1fc872bdd0aa576ceeb2e637d8ff6",
+  "verified_at": "2026-11-19T17:13:21.476564+00:00",
   "live_virtual_feed": {
     "endpoint": "/api/sportybet-virtual",
-    "verified_at": "2026-11-19T14:21:23.874Z",
+    "verified_at": "2026-11-19T17:13:17.436Z",
     "status": "LIVE",
     "events_count": 200,
     "product_counts": {
@@ -111,13 +111,13 @@
       "efootball_live": {
         "status": "EMPTY",
         "events": 0,
-        "latency_ms": 299,
+        "latency_ms": 289,
         "endpoint": "/api/ng/factsCenter/wapConfigurableIndexLiveEvents"
       },
       "vfootball_live": {
         "status": "EMPTY",
         "events": 0,
-        "latency_ms": 746,
+        "latency_ms": 884,
         "endpoint": "/api/ng/factsCenter/wapConfigurableIndexLiveEvents"
       },
       "efootball": {
@@ -125,76 +125,56 @@
         "events": 100,
         "attempts": 1,
         "retried": false,
-        "latency_ms": 1763,
+        "latency_ms": 2000,
         "endpoint": "/api/ng/factsCenter/pcUpcomingEvents",
         "primary_endpoint": "/api/ng/factsCenter/pcUpcomingEvents"
       },
       "vfootball": {
         "status": "LIVE",
         "events": 100,
-        "latency_ms": 2439
+        "latency_ms": 3171
       }
     },
     "errors": []
   },
   "booking_api": {
-    "verified_at": "2026-11-19T14:20:55.974Z",
-    "status": "FAIL",
-    "http_status": 503,
-    "ok": false,
-    "batch_id": "DESK-BATCH-03",
+    "verified_at": "2026-11-19T17:12:48.807Z",
+    "status": "VOLATILE_MARKET",
+    "http_status": 409,
+    "ok": true,
+    "batch_id": "DESK-BATCH-02",
     "selection_count": 2,
     "booking_code_available": false,
-    "error": null,
-    "message": null,
-    "volatile_market": false
-  },
-  "nba_ticket_gate_probe_status": "PASS",
-  "nba_ticket_gate_probe": {
-    "verified_at": "2026-11-19T14:21:27.042Z",
-    "status": "PASS",
-    "probe_type": "manual_and_automated_nba_release_gate",
-    "current_main_release_qualified": false,
-    "current_main_release_decision": "RESEARCH_ONLY",
-    "probes": [
+    "error": "EFOOTBALL_SLIP_REJECTED_PARTIAL",
+    "message": "At least one eFootball leg failed current SportyBet validation. No share code was created. Refresh the whole ticket and add the current qualified selections again.",
+    "volatile_market": true,
+    "validation": [
       {
-        "base": "https://match-signal.pages.dev",
-        "endpoint_type": "manual_market225_release_gate",
-        "http_status": 423,
-        "error": "NBA_RELEASE_GATE_LOCKED",
-        "current_main_release_qualified": false,
-        "booking_code_withheld": true,
-        "booking_code_present": false
+        "event_id": "sr:match:BAaHxcOtFc6i9IhBa3IFGmA",
+        "sport": "virtual",
+        "match": "Argentina (believer) vs Spain (Nightxx)",
+        "market": "virtual_total",
+        "pick": "Argentina (believer) vs Spain (Nightxx) \u2014 O/U under 5.5",
+        "line": 5.5,
+        "ok": false,
+        "excluded": true,
+        "reason": "Event is no longer present in SportyBet current catalogue."
       },
       {
-        "base": "https://match-signal.pages.dev",
-        "endpoint_type": "automated_basketball_builder",
-        "http_status": 423,
-        "error": "NBA_RELEASE_GATE_LOCKED",
-        "current_main_release_qualified": false,
-        "booking_code_withheld": true,
-        "booking_code_present": false
-      },
-      {
-        "base": "https://40b8350f.match-signal.pages.dev",
-        "endpoint_type": "manual_market225_release_gate",
-        "http_status": 423,
-        "error": "NBA_RELEASE_GATE_LOCKED",
-        "current_main_release_qualified": false,
-        "booking_code_withheld": true,
-        "booking_code_present": false
-      },
-      {
-        "base": "https://40b8350f.match-signal.pages.dev",
-        "endpoint_type": "automated_basketball_builder",
-        "http_status": 423,
-        "error": "NBA_RELEASE_GATE_LOCKED",
-        "current_main_release_qualified": false,
-        "booking_code_withheld": true,
-        "booking_code_present": false
+        "event_id": "sr:match:BAaHxcMjcd02kpQ0acQ1qVw",
+        "sport": "virtual",
+        "match": "Brazil (Kavviro) vs France (Simaponika)",
+        "market": "virtual_total",
+        "pick": "Brazil (Kavviro) vs France (Simaponika) \u2014 O/U under 5.5",
+        "line": 5.5,
+        "ok": false,
+        "excluded": true,
+        "reason": "Event is no longer present in SportyBet current catalogue."
       }
     ]
   },
+  "nba_ticket_gate_probe_status": "NOT_RECORDED",
+  "nba_ticket_gate_probe": {},
   "checks": [
     "core_pages",
     "prediction_desk_qualification_gates",
@@ -202,9 +182,9 @@
     "live_virtual_proxy",
     "virtual_lab_live_snapshot",
     "live_production_data",
-    "booking_api_post_not_verified",
+    "booking_api_post",
     "qualified_best_live_quote_diagnostic_incomplete",
-    "nba_ticket_gate_fail_closed",
+    "nba_ticket_gate_probe_not_verified",
     "qualified_alternatives_live"
   ]
 }
