@@ -268,9 +268,9 @@ jobs:
           done
           echo "Unable to publish NBA research artifacts after eight retries."
           exit 1
-      - name: Dispatch NBA totals report refresh after new NBA data is published
+      - name: Dispatch NBA totals settlement after new NBA data is published
         if: steps.publish.outputs.nba_changed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh workflow run nba-totals-probability-value.yml --ref main
+        run: gh workflow run nba-totals-settlement.yml --ref main
 
