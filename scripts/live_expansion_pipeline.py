@@ -577,9 +577,9 @@ def main():
             snapshots_payload if isinstance(snapshots_payload, list) else [],
             predictions_payload if isinstance(predictions_payload, list) else [],
         )
-        (DATA / "nba_totals_oos_value_test.json").write_text(
-            json.dumps(calibration_report, indent=2) + "\n", encoding="utf-8"
-        )
+        # Keep this evaluation in memory for the live model calibration only.
+        # The dedicated NBA probability/value workflow is the single publisher of
+        # the fixed-cutoff OOS report and pairs it with probability diagnostics.
         model_calibration = calibration_report.get("model_calibration") or {}
         pace_blend_weight = float(model_calibration.get("selected_pace_blend_weight") or 0.0)
         bias_adjustment = float(model_calibration.get("production_bias_correction") or 0.0)

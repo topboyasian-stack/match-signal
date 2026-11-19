@@ -97,7 +97,14 @@ jobs:
           assert publish.index('if git rebase origin/main; then') < publish.index('python scripts/run_live_expansion.py')
           assert "steps.ere_publication.outputs.ready" in source
           assert "python scripts/settle_nba_totals.py" in source
-          print('NBA artifacts publish independently; clean worktrees rebase without repeated collection; Eredivisie stays guarded.')
+          assert 'data/nba_totals_oos_value_test.json' not in publish, 'Only the dedicated NBA report workflow may publish the OOS artifact.'
+          pipeline = Path('scripts/live_expansion_pipeline.py').read_text(encoding='utf-8')
+          assert '(DATA / "nba_totals_oos_value_test.json").write_text(' not in pipeline, 'Live expansion must not race the report publisher.'
+          assert 'python scripts/nba_totals_walk_forward.py' not in source, 'The old CLI was a no-op; the report workflow owns evaluation publication.'
+          assert 'Dispatch NBA totals report refresh after new NBA data is published' in source
+          assert 'gh workflow run nba-totals-probability-value.yml --ref main' in source
+          assert source.index('name: Commit isolated expansion data') < source.index('name: Dispatch NBA totals report refresh after new NBA data is published')
+          print('PASS: NBA source publication is separate from the single fingerprint-checked OOS/probability report publisher.')
           PY
       - name: Generate live-experimental NBA + Eredivisie signals
         run: python scripts/run_live_expansion.py
@@ -156,9 +163,6 @@ jobs:
       - name: Settle NBA total snapshots against official final ESPN scores
         run: python scripts/settle_nba_totals.py
 
-      - name: Evaluate NBA totals on a strict chronological holdout
-        run: python scripts/nba_totals_walk_forward.py
-
       - name: Repair and publish Eredivisie from resilient current-season sources
         id: ere_repair
         continue-on-error: true
@@ -209,6 +213,7 @@ jobs:
           print(f'Isolated expansion feed verified: {fixtures} fixtures / {len(data)} predictions')
           PY
       - name: Commit isolated expansion data
+        id: publish
         shell: bash
         env:
           ERE_READY: ${{ steps.ere_publication.outputs.ready == 'true' && steps.ere_qa.outcome == 'success' }}
@@ -219,7 +224,12 @@ jobs:
 
           # Always publish the independent NBA work. Publish Eredivisie only
           # after its own fixture and prediction guard has passed.
-          git add data/nba_history.json data/nba_predictions.json data/nba_totals_publication_snapshots.json data/nba_totals_ledger.json data/nba_totals_oos_value_test.json
+          git add data/nba_history.json data/nba_predictions.json data/nba_totals_publication_snapshots.json data/nba_totals_ledger.json
+          if git diff --cached --quiet -- data/nba_history.json data/nba_predictions.json data/nba_totals_publication_snapshots.json data/nba_totals_ledger.json; then
+            echo "nba_changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "nba_changed=true" >> "$GITHUB_OUTPUT"
+          fi
           if [[ "$ERE_READY" == "true" ]]; then
             git add data/ere_divisie_history.json data/ere_divisie_predictions.json data/expansion_status.json data/expansion_prediction_history.json data/expansion_live_performance.json data/ere_divisie_qa.json
           fi
@@ -245,7 +255,9 @@ jobs:
               git reset --hard origin/main
               python scripts/run_live_expansion.py
               python scripts/settle_nba_totals.py
-              python scripts/nba_totals_walk_forward.py
+              # The conflict-recovery path regenerated NBA sources, so refresh
+              # the single-owner report after the repaired source commit.
+              echo "nba_changed=true" >> "$GITHUB_OUTPUT"
               git add data/nba_history.json data/nba_predictions.json data/nba_totals_publication_snapshots.json data/nba_totals_ledger.json data/nba_totals_oos_value_test.json
               if git diff --cached --quiet; then
                 echo "Latest main already contains the current NBA research artifacts."
@@ -258,3 +270,9 @@ jobs:
           done
           echo "Unable to publish NBA research artifacts after eight retries."
           exit 1
+      - name: Dispatch NBA totals report refresh after new NBA data is published
+        if: steps.publish.outputs.nba_changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run nba-totals-probability-value.yml --ref main
+
