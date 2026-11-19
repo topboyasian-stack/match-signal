@@ -96,14 +96,15 @@ jobs:
           assert 'Generated files conflict with newer main data; rebuild only on this path.' in publish
           assert publish.index('if git rebase origin/main; then') < publish.index('python scripts/run_live_expansion.py')
           assert "steps.ere_publication.outputs.ready" in source
-          assert "python scripts/settle_nba_totals.py" in source
+          assert "Dispatch NBA totals settlement after new NBA data is published" in source
+          assert "Settle NBA total snapshots against official final ESPN " + "scores" not in source
           assert 'data/nba_totals_oos_value_test.json' not in publish, 'Only the dedicated NBA report workflow may publish the OOS artifact.'
           pipeline = Path('scripts/live_expansion_pipeline.py').read_text(encoding='utf-8')
           assert '(DATA / "nba_totals_oos_value_test.json").write_text(' not in pipeline, 'Live expansion must not race the report publisher.'
           assert "Evaluate NBA totals on a strict chronological " + "holdout" not in source, 'The no-op evaluator step must stay removed.'
           assert 'python scripts/nba_totals_walk_forward.py' not in publish, 'The retry publisher must not run a no-op evaluator.'
-          assert 'Dispatch NBA totals report refresh after new NBA data is published' in source
-          assert 'gh workflow run nba-totals-probability-value.yml --ref main' in source
+          assert 'Dispatch NBA totals settlement after new NBA data is published' in source
+          assert 'gh workflow run nba-totals-settlement.yml --ref main' in source
           assert source.index('name: Commit isolated expansion data') < source.index('name: Dispatch NBA totals report refresh after new NBA data is published')
           print('PASS: NBA source publication is separate from the single fingerprint-checked OOS/probability report publisher.')
           PY
@@ -160,9 +161,6 @@ jobs:
           newest = max(parse(r.get("generated_at") or r.get("prediction_created_at") or r.get("published_at")) for r in upcoming)
           print(f"NBA projection freshness passed: {len(upcoming)} upcoming forecasts; newest pre-game model publication {newest.isoformat()}.")
           PY
-
-      - name: Settle NBA total snapshots against official final ESPN scores
-        run: python scripts/settle_nba_totals.py
 
       - name: Repair and publish Eredivisie from resilient current-season sources
         id: ere_repair
@@ -223,10 +221,11 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          # Always publish the independent NBA work. Publish Eredivisie only
-          # after its own fixture and prediction guard has passed.
-          git add data/nba_history.json data/nba_predictions.json data/nba_totals_publication_snapshots.json data/nba_totals_ledger.json
-          if git diff --cached --quiet -- data/nba_history.json data/nba_predictions.json data/nba_totals_publication_snapshots.json data/nba_totals_ledger.json; then
+          # Publish NBA history, forecasts and immutable quote snapshots only.
+          # The settlement workflow owns the ledger; the report workflow owns
+          # the fingerprint-linked OOS and probability artifacts.
+          git add data/nba_history.json data/nba_predictions.json data/nba_totals_publication_snapshots.json
+          if git diff --cached --quiet -- data/nba_history.json data/nba_predictions.json data/nba_totals_publication_snapshots.json; then
             echo "nba_changed=false" >> "$GITHUB_OUTPUT"
           else
             echo "nba_changed=true" >> "$GITHUB_OUTPUT"
@@ -255,11 +254,10 @@ jobs:
               git rebase --abort || true
               git reset --hard origin/main
               python scripts/run_live_expansion.py
-              python scripts/settle_nba_totals.py
-              # The conflict-recovery path regenerated NBA sources, so refresh
-              # the single-owner report after the repaired source commit.
+              # The settlement workflow is the sole ledger writer and
+              # runs after these refreshed NBA source files are committed.
               echo "nba_changed=true" >> "$GITHUB_OUTPUT"
-              git add data/nba_history.json data/nba_predictions.json data/nba_totals_publication_snapshots.json data/nba_totals_ledger.json data/nba_totals_oos_value_test.json
+              git add data/nba_history.json data/nba_predictions.json data/nba_totals_publication_snapshots.json
               if git diff --cached --quiet; then
                 echo "Latest main already contains the current NBA research artifacts."
                 exit 0
