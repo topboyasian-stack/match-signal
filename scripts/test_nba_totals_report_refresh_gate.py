@@ -116,7 +116,7 @@ def run():
     assert "group: nba-totals-probability-value-research-v2-${{ github.event_name == 'schedule' && 'scheduled' || 'event-driven' }}" in concurrency, (
         "The report publisher queue must use the recovery namespace so an orphaned prior run cannot block fresh evidence."
     )
-  assert "latest_snapshot_evidence_time" in workflow, (
+    assert "latest_snapshot_evidence_time" in workflow, (
         "The scheduled/event-driven workflow must include newer immutable quote revisions in its report-refresh decision."
     )
     assert "source_data_fingerprint" in workflow and "report_source_fingerprint_matches" in workflow, (
