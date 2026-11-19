@@ -4,19 +4,19 @@
   "qualified_best_quote_coverage_status": "INCOMPLETE",
   "qualified_best_candidate_pool_rows": 0,
   "qualified_best_model_qualified_rows": 0,
-  "booking_api_status": "VERIFIED",
+  "booking_api_status": "FAIL",
   "qualified_alternatives_status": "READY",
-  "qualified_alternatives_count": 143,
+  "qualified_alternatives_count": 134,
   "qualified_alternatives": {
-    "verified_at": "2026-11-19T13:56:39.548Z",
+    "verified_at": "2026-11-19T14:20:19.196Z",
     "endpoint": "/api/public/market-alternatives",
     "api_status": "OK",
     "status": "READY",
-    "alternative_count": 143,
-    "visible_candidate_count": 143,
-    "unique_fixture_count": 112,
-    "builder_qualified_count": 14,
-    "research_only_count": 129,
+    "alternative_count": 134,
+    "visible_candidate_count": 134,
+    "unique_fixture_count": 106,
+    "builder_qualified_count": 1,
+    "research_only_count": 133,
     "sports": [
       "efootball",
       "tennis"
@@ -81,14 +81,14 @@
       {
         "sport": "efootball",
         "product": "efootball_gt",
-        "event_id": "sr:match:BAaHu8bIafoK3SksqMxaBCA",
-        "match": "Real Madrid (Sheva) vs Bayern Munchen (Dreamer)",
+        "event_id": "sr:match:BAaHu8aKAcRSYIDOCuKs7YA",
+        "match": "Real Madrid (Sheva) vs Paris (Mapiston)",
         "market": "total",
         "pick": "over",
-        "line": 5.5,
-        "odds": 1.47,
-        "probability": 0.625,
-        "start_time": "2026-11-19T14:16:00+00:00",
+        "line": 4.5,
+        "odds": 1.77,
+        "probability": 0.738095,
+        "start_time": "2026-11-19T14:25:00+00:00",
         "quote_status": "STALE",
         "qualification_status": "RESEARCH_ONLY_QUOTE_NOT_CURRENT"
       }
@@ -96,47 +96,105 @@
   },
   "shared_ticket_drawer_status": "READY",
   "provider": "Cloudflare Pages",
-  "source_commit": "982826efd7bfc98cb8ace4a224c5b6fd0ea0c0fd",
-  "verified_at": "2026-11-19T13:57:47.179102+00:00",
-  "live_virtual_feed": {},
+  "source_commit": "1c73c5ddbf8c85db3eea461d314e90d73befd93b",
+  "verified_at": "2026-11-19T14:21:27.334475+00:00",
+  "live_virtual_feed": {
+    "endpoint": "/api/sportybet-virtual",
+    "verified_at": "2026-11-19T14:21:23.874Z",
+    "status": "LIVE",
+    "events_count": 200,
+    "product_counts": {
+      "efootball_gt": 100,
+      "vfootball": 100
+    },
+    "source_status": {
+      "efootball_live": {
+        "status": "EMPTY",
+        "events": 0,
+        "latency_ms": 299,
+        "endpoint": "/api/ng/factsCenter/wapConfigurableIndexLiveEvents"
+      },
+      "vfootball_live": {
+        "status": "EMPTY",
+        "events": 0,
+        "latency_ms": 746,
+        "endpoint": "/api/ng/factsCenter/wapConfigurableIndexLiveEvents"
+      },
+      "efootball": {
+        "status": "LIVE",
+        "events": 100,
+        "attempts": 1,
+        "retried": false,
+        "latency_ms": 1763,
+        "endpoint": "/api/ng/factsCenter/pcUpcomingEvents",
+        "primary_endpoint": "/api/ng/factsCenter/pcUpcomingEvents"
+      },
+      "vfootball": {
+        "status": "LIVE",
+        "events": 100,
+        "latency_ms": 2439
+      }
+    },
+    "errors": []
+  },
   "booking_api": {
-    "verified_at": "2026-11-19T13:57:13.117Z",
-    "status": "VOLATILE_MARKET",
-    "http_status": 409,
-    "ok": true,
+    "verified_at": "2026-11-19T14:20:55.974Z",
+    "status": "FAIL",
+    "http_status": 503,
+    "ok": false,
     "batch_id": "DESK-BATCH-03",
     "selection_count": 2,
     "booking_code_available": false,
-    "error": "EFOOTBALL_SLIP_REJECTED_PARTIAL",
-    "message": "At least one eFootball leg failed current SportyBet validation. No share code was created. Refresh the whole ticket and add the current qualified selections again.",
-    "volatile_market": true,
-    "validation": [
+    "error": null,
+    "message": null,
+    "volatile_market": false
+  },
+  "nba_ticket_gate_probe_status": "PASS",
+  "nba_ticket_gate_probe": {
+    "verified_at": "2026-11-19T14:21:27.042Z",
+    "status": "PASS",
+    "probe_type": "manual_and_automated_nba_release_gate",
+    "current_main_release_qualified": false,
+    "current_main_release_decision": "RESEARCH_ONLY",
+    "probes": [
       {
-        "event_id": "sr:match:BAaHvAEL6di68CHXKVrPVng",
-        "sport": "virtual",
-        "match": "Real Madrid (Andrew) vs Liverpool (Senya)",
-        "market": "virtual_total",
-        "pick": "Real Madrid (Andrew) vs Liverpool (Senya) \u2014 O/U under 5.5",
-        "line": 5.5,
-        "ok": false,
-        "excluded": true,
-        "reason": "Event is no longer present in SportyBet current catalogue."
+        "base": "https://match-signal.pages.dev",
+        "endpoint_type": "manual_market225_release_gate",
+        "http_status": 423,
+        "error": "NBA_RELEASE_GATE_LOCKED",
+        "current_main_release_qualified": false,
+        "booking_code_withheld": true,
+        "booking_code_present": false
       },
       {
-        "event_id": "sr:match:BAaHvADuXcdaEwqjHCfeo-A",
-        "sport": "virtual",
-        "match": "Paris (fantazer) vs Bayern Munchen (Yerema)",
-        "market": "virtual_total",
-        "pick": "Paris (fantazer) vs Bayern Munchen (Yerema) \u2014 O/U under 5.5",
-        "line": 5.5,
-        "ok": false,
-        "excluded": true,
-        "reason": "Event is no longer present in SportyBet current catalogue."
+        "base": "https://match-signal.pages.dev",
+        "endpoint_type": "automated_basketball_builder",
+        "http_status": 423,
+        "error": "NBA_RELEASE_GATE_LOCKED",
+        "current_main_release_qualified": false,
+        "booking_code_withheld": true,
+        "booking_code_present": false
+      },
+      {
+        "base": "https://40b8350f.match-signal.pages.dev",
+        "endpoint_type": "manual_market225_release_gate",
+        "http_status": 423,
+        "error": "NBA_RELEASE_GATE_LOCKED",
+        "current_main_release_qualified": false,
+        "booking_code_withheld": true,
+        "booking_code_present": false
+      },
+      {
+        "base": "https://40b8350f.match-signal.pages.dev",
+        "endpoint_type": "automated_basketball_builder",
+        "http_status": 423,
+        "error": "NBA_RELEASE_GATE_LOCKED",
+        "current_main_release_qualified": false,
+        "booking_code_withheld": true,
+        "booking_code_present": false
       }
     ]
   },
-  "nba_ticket_gate_probe_status": "NOT_RECORDED",
-  "nba_ticket_gate_probe": {},
   "checks": [
     "core_pages",
     "prediction_desk_qualification_gates",
@@ -144,9 +202,9 @@
     "live_virtual_proxy",
     "virtual_lab_live_snapshot",
     "live_production_data",
-    "booking_api_post",
+    "booking_api_post_not_verified",
     "qualified_best_live_quote_diagnostic_incomplete",
-    "nba_ticket_gate_probe_not_verified",
+    "nba_ticket_gate_fail_closed",
     "qualified_alternatives_live"
   ]
 }
