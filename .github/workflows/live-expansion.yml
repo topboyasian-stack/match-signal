@@ -89,7 +89,7 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           source = Path('.github/workflows/live-expansion.yml').read_text(encoding='utf-8')
-          publish = source.split('name: Commit isolated expansion data', 1)[1]
+          publish = source.split('name: Commit isolated expansion ' + 'data', 1)[1]
           assert 'git add data/nba_history.json' in publish
           assert publish.index('git add data/nba_history.json') < publish.index('if git rebase origin/main; then')
           assert 'if git rebase origin/main; then' in publish
