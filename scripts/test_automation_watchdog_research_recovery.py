@@ -169,6 +169,19 @@ class EfootballResearchRecoveryTests(unittest.TestCase):
         self.assertIn("scripts/test_automation_watchdog_research_recovery.py", RESEARCH)
         self.assertIn("python scripts/test_automation_watchdog_research_recovery.py", RESEARCH)
 
+    def test_watchdog_action_log_is_initialized_before_recovery_paths(self):
+        marker = "          python - <<'PY'"
+        start = WATCHDOG.index(marker) + len(marker)
+        start = WATCHDOG.index(chr(10), start) + 1
+        end = WATCHDOG.index("          PY", start)
+        script = textwrap.dedent(WATCHDOG[start:end])
+        self.assertIn("actions = []", script)
+        self.assertLess(
+            script.index("actions = []"),
+            script.index("actions.append("),
+            "Recovery paths can append diagnostics before the old monitor section; initialize the action log first.",
+        )
+
     def test_inline_watchdog_recovery_script_is_valid_python(self):
         marker = "          python - <<'PY'"
         start = WATCHDOG.index(marker) + len(marker)

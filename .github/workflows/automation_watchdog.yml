@@ -111,6 +111,8 @@ jobs:
                   return {}
 
           now = datetime.now(timezone.utc)
+          # Recovery branches append diagnostics before the old monitor section; initialize once up front.
+          actions = []
           virtual = load('data/virtual_lab_live.json')
           nba_live = load('data/nba_live_observations.json.gz')
           if not nba_live.get('updated_at'):
@@ -463,7 +465,6 @@ jobs:
               else:
                   monitor_schedule_status = 'AWAITING_FIRST_SCHEDULED_RUN'
 
-          actions = []
           if monitor_runs is None:
               actions.append({'workflow':'qualified-best-health-watch-v2.yml','action':'inspect_schedule','status':'failed','detail':monitor_history_error})
           elif monitor_schedule_status in {'STALE', 'MISSING_SCHEDULED_RUN'}:
