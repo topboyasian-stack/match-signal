@@ -100,7 +100,7 @@ def run():
     for workflow_text, group_prefix, name in (
         (capture_workflow, "nba-totals-price-capture-", "price capture"),
         (settlement_workflow, "nba-totals-settlement-ledger-", "settlement"),
-        (probability_workflow, "nba-totals-probability-value-research-", "probability report"),
+        (probability_workflow, "nba-totals-probability-value-research-v2-", "probability report"),
         (live_expansion_workflow, "match-signal-pipeline-", "model refresh"),
     ):
         expected_group = f"group: {group_prefix}{scheduled_lane}"
