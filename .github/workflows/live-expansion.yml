@@ -100,7 +100,8 @@ jobs:
           assert 'data/nba_totals_oos_value_test.json' not in publish, 'Only the dedicated NBA report workflow may publish the OOS artifact.'
           pipeline = Path('scripts/live_expansion_pipeline.py').read_text(encoding='utf-8')
           assert '(DATA / "nba_totals_oos_value_test.json").write_text(' not in pipeline, 'Live expansion must not race the report publisher.'
-          assert 'python scripts/nba_totals_walk_forward.py' not in source, 'The old CLI was a no-op; the report workflow owns evaluation publication.'
+          assert "Evaluate NBA totals on a strict chronological " + "holdout" not in source, 'The no-op evaluator step must stay removed.'
+          assert 'python scripts/nba_totals_walk_forward.py' not in publish, 'The retry publisher must not run a no-op evaluator.'
           assert 'Dispatch NBA totals report refresh after new NBA data is published' in source
           assert 'gh workflow run nba-totals-probability-value.yml --ref main' in source
           assert source.index('name: Commit isolated expansion data') < source.index('name: Dispatch NBA totals report refresh after new NBA data is published')
