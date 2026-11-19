@@ -98,7 +98,8 @@ jobs:
           assert "steps.ere_publication.outputs.ready" in source
           assert "Dispatch NBA totals settlement after new NBA data is published" in publish
           assert "Settle NBA total snapshots against official final ESPN " + "scores" not in source
-          assert 'data/nba_totals_oos_value_test.json' not in publish, 'Only the dedicated NBA report workflow may publish the OOS artifact.'
+          assert 'git add data/nba_totals_oos_value_test.json' not in publish, 'Only the dedicated NBA report workflow may publish the OOS artifact.'
+          assert 'git add data/nba_totals_ledger.json' not in publish, 'Only the settlement workflow may publish the NBA totals ledger.'
           pipeline = Path('scripts/live_expansion_pipeline.py').read_text(encoding='utf-8')
           assert '(DATA / "nba_totals_oos_value_test.json").write_text(' not in pipeline, 'Live expansion must not race the report publisher.'
           assert "Evaluate NBA totals on a strict chronological " + "holdout" not in source, 'The no-op evaluator step must stay removed.'
