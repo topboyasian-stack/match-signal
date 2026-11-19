@@ -90,8 +90,16 @@ jobs:
         id: freshness
         env:
           ACTIVE_CAPTURE_RUNS: ${{ steps.active_capture.outputs.count }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          # Re-read main's committed capture status and active-run count at decision time.
+          # The initial checkout can be stale if a capture finishes while this watchdog starts.
+          gh api "repos/$GITHUB_REPOSITORY/contents/data/nba_totals_price_capture_status.json?ref=main" --jq .content | base64 --decode > /tmp/nba_totals_price_capture_status.latest.json
+          ACTIVE_CAPTURE_RUNS="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/nba-totals-price-capture.yml/runs?branch=main&per_page=20" --jq '[.workflow_runs[] | select(.status == \"queued\" or .status == \"in_progress\")] | length')"
+          export ACTIVE_CAPTURE_RUNS
+          printf 'active_capture_runs=%s\\n' "$ACTIVE_CAPTURE_RUNS" >> "$GITHUB_OUTPUT"
+          echo "Fresh active capture count at decision time: $ACTIVE_CAPTURE_RUNS"
           python - <<'PY' | tee -a "$GITHUB_OUTPUT"
           import json
           import os
@@ -102,7 +110,7 @@ jobs:
           sys.path.insert(0, "scripts")
           from nba_totals_capture_watchdog import capture_age_minutes, should_dispatch_capture
 
-          status = json.loads(Path("data/nba_totals_price_capture_status.json").read_text(encoding="utf-8"))
+          status = json.loads(Path("/tmp/nba_totals_price_capture_status.latest.json").read_text(encoding="utf-8"))
           checked_at = status.get("checked_at")
           now = datetime.now(timezone.utc)
           active = int(os.environ.get("ACTIVE_CAPTURE_RUNS", "0"))

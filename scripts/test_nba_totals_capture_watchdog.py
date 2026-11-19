@@ -236,6 +236,13 @@ def run():
     assert "gh workflow run nba-totals-probability-value.yml --ref main" in watchdog_workflow, (
         "The watchdog must recover missed report refreshes without changing qualification thresholds."
     )
+    capture_decision = watchdog_workflow.split("      - name: Decide whether a recovery capture is needed", 1)[1].split("      - name: Dispatch recovery capture", 1)[0]
+    assert "contents/data/nba_totals_price_capture_status.json?ref=main" in capture_decision and "base64 --decode" in capture_decision, (
+        "Capture recovery must read the latest committed status from main at decision time, not a stale checkout."
+    )
+    assert "ACTIVE_CAPTURE_RUNS=\"$(gh api" in capture_decision and "actions/workflows/nba-totals-price-capture.yml/runs?branch=main&per_page=20" in capture_decision, (
+        "Capture recovery must re-count active runs at decision time to avoid duplicate captures after a run finishes."
+    )
     assert "ACTIVE_CAPTURE_RUNS: ${{ steps.active_capture.outputs.count }}" in watchdog_workflow, (
         "The report freshness decision must know when a fresh immutable quote capture is still running."
     )
