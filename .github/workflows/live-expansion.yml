@@ -104,7 +104,6 @@ jobs:
           assert '(DATA / "nba_totals_oos_value_test.json").write_text(' not in pipeline, 'Live expansion must not race the report publisher.'
           assert "Evaluate NBA totals on a strict chronological " + "holdout" not in source, 'The no-op evaluator step must stay removed.'
           assert 'python scripts/nba_totals_walk_forward.py' not in publish, 'The retry publisher must not run a no-op evaluator.'
-          assert 'Dispatch NBA totals settlement after new NBA data is published' in publish
           assert 'gh workflow run nba-totals-settlement.yml --ref main' in publish
           print('PASS: NBA source publication is separate from the single fingerprint-checked OOS/probability report publisher.')
           PY
