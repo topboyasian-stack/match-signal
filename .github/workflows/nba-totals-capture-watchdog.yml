@@ -96,9 +96,9 @@ jobs:
           # Re-read main's committed capture status and active-run count at decision time.
           # The initial checkout can be stale if a capture finishes while this watchdog starts.
           gh api "repos/$GITHUB_REPOSITORY/contents/data/nba_totals_price_capture_status.json?ref=main" --jq .content | base64 --decode > /tmp/nba_totals_price_capture_status.latest.json
-          ACTIVE_CAPTURE_RUNS="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/nba-totals-price-capture.yml/runs?branch=main&per_page=20" --jq '[.workflow_runs[] | select(.status == \"queued\" or .status == \"in_progress\")] | length')"
+          ACTIVE_CAPTURE_RUNS="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/nba-totals-price-capture.yml/runs?branch=main&per_page=20" --jq '[.workflow_runs[] | select(.status == "queued" or .status == "in_progress")] | length')"
           export ACTIVE_CAPTURE_RUNS
-          printf 'active_capture_runs=%s\\n' "$ACTIVE_CAPTURE_RUNS" >> "$GITHUB_OUTPUT"
+          printf 'active_capture_runs=%s\n' "$ACTIVE_CAPTURE_RUNS" >> "$GITHUB_OUTPUT"
           echo "Fresh active capture count at decision time: $ACTIVE_CAPTURE_RUNS"
           python - <<'PY' | tee -a "$GITHUB_OUTPUT"
           import json
