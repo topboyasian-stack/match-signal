@@ -93,7 +93,7 @@ def sportybet_basketball_feed(max_pages=5):
         if has_more_pages is False:
             break
         # Backward-compatible fallback for older responses without the signal.
-        if not page_events or new_ids == 0:
+        if len(page_events) < 100 or new_ids == 0:
             break
 
     if not events_by_id:
