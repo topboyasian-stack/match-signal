@@ -84,9 +84,16 @@ def sportybet_basketball_feed(max_pages=5):
                     market_map[key] = market
             current["markets"] = list(market_map.values())
 
-        # A short page marks the end of the feed. If pageNum is ignored or a
-        # page repeats old events, stop instead of spending more requests.
-        if len(page_events) < 100 or new_ids == 0:
+        # The public proxy filters the raw multi-sport catalogue to NBA events,
+        # so a short NBA page may still have later raw catalogue pages. Respect
+        # its explicit pagination signal before using filtered results as EOF.
+        has_more_pages = payload.get("catalogue_page_has_more")
+        if has_more_pages is True:
+            continue
+        if has_more_pages is False:
+            break
+        # Backward-compatible fallback for older responses without the signal.
+        if not page_events or new_ids == 0:
             break
 
     if not events_by_id:
