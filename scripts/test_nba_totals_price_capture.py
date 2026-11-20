@@ -47,7 +47,7 @@ class PriceCaptureTests(unittest.TestCase):
     def test_capture_workflow_avoids_unrelated_board_and_builder_recaptures(self):
         workflow_path = Path(__file__).resolve().parents[1] / ".github" / "workflows" / "nba-totals-price-capture.yml"
         workflow = workflow_path.read_text(encoding="utf-8")
-        workflow_run = workflow.split("\\n  workflow_run:\\n", 1)[1].split("\\n  push:\\n", 1)[0]
+        workflow_run = workflow.split("\n  workflow_run:\n", 1)[1].split("\n  push:\n", 1)[0]
         self.assertIn('"Match Signal Live Expansion"', workflow_run)
         self.assertNotIn('"Match Signal Unified Upcoming Board"', workflow_run)
         self.assertNotIn('"Match Signal Builder Production Promotion"', workflow_run)
