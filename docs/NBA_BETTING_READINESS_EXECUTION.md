@@ -567,3 +567,39 @@ Frozen prospective cutoff remains `2026-11-02T02:00:00+00:00`. Priority 15 (coll
 ### Next action
 
 Continue Priority 15 only: collect exact fresh SportyBet Nigeria market-225 snapshots and wait for official ESPN outcomes to add genuinely new unique settled selections. Do not count repeated quote revisions as bets. Keep `RESEARCH_ONLY` and the Basketball ticket gate locked until every documented statistical and production release condition is independently satisfied.
+
+
+## 2026-11-20 continuation checkpoint — current main evidence and capture/report fixes
+
+This checkpoint supersedes earlier sample counts in this document. The frozen prospective cutoff remains `2026-11-02T02:00:00+00:00`. **Priority 15 remains the first unchecked priority. The release decision remains `RESEARCH_ONLY`; Basketball market-225 ticket generation stays locked.**
+
+### Latest evidence
+
+The latest report publication is commit [`10639485dbce7b635f85cb122c0cbb502a6842de`](https://github.com/topboyasian-stack/match-signal/commit/10639485dbce7b635f85cb122c0cbb502a6842de), produced by [NBA research run 44694033779](https://github.com/topboyasian-stack/match-signal/actions/runs/44694033779). The workflow reported matching source fingerprints. Reports: [OOS value test](https://github.com/topboyasian-stack/match-signal/blob/main/data/nba_totals_oos_value_test.json) and [probability/value experiment](https://github.com/topboyasian-stack/match-signal/blob/main/data/nba_totals_probability_value_experiment.json).
+
+- **81** uniquely settled prospective market-225 selections; 37 wins, 44 losses, 0 pushes. All 81 have exact immutable snapshot linkage; no missing or mismatched links. The minimum of 100 is short by **19**; the target of 200 is short by **119**.
+- Flat-stake ROI is **-13.89%**; the bootstrapped 95% ROI lower bound is **-32.70%**; market-favourite benchmark ROI is **+4.41%**; ROI trails that benchmark by **18.30 percentage points**.
+- Probability validation has **134 unique settled fixtures**, exceeding the 30-fixture minimum, but model Brier score **0.258901** and log loss **0.712355** are worse than the market's **0.250327** and **0.693801**.
+- The post-cutoff forecast holdout has **133 games**, MAE **13.6745** versus development baseline **14.4132**, and bias **-1.4698 points**. This forecast-accuracy condition passes.
+- CLV diagnostics contain **65 near-close observations**; mean probability CLV is **-0.001391** and mean line CLV is **-0.4462 points**. Positive genuine closing-line value is not established, and these observations are not authenticated official closing quotes.
+- The latest ledger reports 81 settled v5.1 selections and 37 correct. The latest actual ESPN reconciliation, [run 44693324738](https://github.com/topboyasian-stack/match-signal/actions/runs/44693324738), found zero new settlements. [Run 44693786294](https://github.com/topboyasian-stack/match-signal/actions/runs/44693786294) skipped reconciliation because the ledger had been refreshed within ten minutes.
+
+### Concrete workflow/code fixes and verification
+
+1. [Pagination fix, commit `bce93bccc05951c115a3ff6ecc8b8dbd2505b2bb`](https://github.com/topboyasian-stack/match-signal/commit/bce93bccc05951c115a3ff6ecc8b8dbd2505b2bb): Live Expansion now follows the proxy's `catalogue_page_has_more` signal instead of treating a short NBA-filtered page as end-of-catalogue. The NBA SportyBet regression passed in [run 44692725171](https://github.com/topboyasian-stack/match-signal/actions/runs/44692725171).
+2. [Transient feed retry, commit `09d37a2d532daf65b0155a9810c9e7ceb84ab8e4`](https://github.com/topboyasian-stack/match-signal/commit/09d37a2d532daf65b0155a9810c9e7ceb84ab8e4): a shared bounded retry handles transient HTTP 408/425/429/500/502/503/504 and connection/timeout errors. It re-fetches the feed; it never reuses stale prices. The capture regression simulated 503 then success and passed.
+3. [Capture fan-out fix, commit `d528f68a09012678faed0c34325da27bdcf05740`](https://github.com/topboyasian-stack/match-signal/commit/d528f68a09012678faed0c34325da27bdcf05740): capture is handed off after Live Expansion rather than running concurrently with that writer, and unrelated Unified Upcoming/Builder completions no longer trigger duplicate captures. The final trigger/retry regressions passed in [capture run 44693593765](https://github.com/topboyasian-stack/match-signal/actions/runs/44693593765).
+4. [Report queue recovery, commit `c6e8aec8cdc35c0ff492c34c5169280bcad88796`](https://github.com/topboyasian-stack/match-signal/commit/c6e8aec8cdc35c0ff492c34c5169280bcad88796): moved the report publisher to a fresh v3 concurrency namespace after the v2 publisher repeatedly lost the source-fingerprint race. The latest report run 44694033779 succeeded and published the matching-fingerprint report commit above.
+5. Latest-main fail-closed regressions passed in [run 44694363874](https://github.com/topboyasian-stack/match-signal/actions/runs/44694363874): 12 Node gate tests passed, the Basketball desk contract passed, and the single cross-sport ticket drawer contract passed. Tests confirm research-only NBA totals remain locked, mismatched line/snapshot linkage is rejected, and partial SportyBet acceptance withholds the share code.
+
+Latest capture status at `2026-11-20T07:16:29Z`: no feed error, 9 SportyBet feed events, 9 exact fresh market-225 matches and 9 new immutable snapshots; 35 upcoming model fixtures were not listed in the feed. No odds were inferred for those fixtures. Snapshot total was 11,594, including 11,323 prospective v5 records across 143 fixtures. Continue collection and official ESPN settlement; repeated snapshots remain revisions, not independent bets.
+
+### Production state
+
+The latest successful Cloudflare Pages deployment verified in this run remains [deployment run 44675644024](https://github.com/topboyasian-stack/match-signal/actions/runs/44675644024), source commit [`b4e225cb8abebe6318e397ce890c3a9a5dfaaeed`](https://github.com/topboyasian-stack/match-signal/commit/b4e225cb8abebe6318e397ce890c3a9a5dfaaeed). Its immutable URL is [`https://bf0b1b52.match-signal.pages.dev`](https://bf0b1b52.match-signal.pages.dev); the production alias is [`https://match-signal.pages.dev`](https://match-signal.pages.dev). The deployment run's manual and automated NBA ticket-gate probes returned HTTP 423 `NBA_RELEASE_GATE_LOCKED`, with booking codes withheld. The relevant production booking, Basketball desk and ticket-drawer code blobs match the source commit above.
+
+The static [production verification JSON](https://match-signal.pages.dev/DEPLOY-VERIFY-CLOUDFLARE.json) still reports the older source `5a152144155c9805c21fc6cd2720650df8208d04` and a 04:25 UTC verification timestamp, while the current main [verification artifact](https://github.com/topboyasian-stack/match-signal/blob/main/DEPLOY-VERIFY-CLOUDFLARE.json) records source `b4e225cb8abebe6318e397ce890c3a9a5dfaaeed` and 04:39 UTC. Treat the public static diagnostic as one deployment behind; use the Actions deployment run and its probe logs as the latest verified deployment evidence. No newer successful Pages deployment was found in this run. Builder promotion runs were still active/pending, so no competing deployment was started.
+
+### Next action
+
+Keep Priority 15 first: continue exact SportyBet Nigeria market-225 capture and official ESPN settlement until at least 100 unique prospective settled selections are independently evidenced (target 200). Keep the 15-minute quote-freshness requirement, exact immutable linkage, all ROI/CLV/probability/forecast thresholds, and the fail-closed ticket gate unchanged. Do not enable auto-betting or claim readiness on the strength of tests, report publication, or deployment alone.
