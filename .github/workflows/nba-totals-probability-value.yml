@@ -26,7 +26,7 @@ concurrency:
   # Version the queue namespace to release any orphaned event-driven report run
   # that can otherwise block fresh evidence publication indefinitely. Source-fingerprint
   # checks still prevent stale reports from being published; schedules remain isolated.
-  group: nba-totals-probability-value-research-v2-${{ github.event_name == 'schedule' && 'scheduled' || 'event-driven' }}
+  group: nba-totals-probability-value-research-v3-${{ github.event_name == 'schedule' && 'scheduled' || 'event-driven' }}
   cancel-in-progress: false
 
 jobs:
