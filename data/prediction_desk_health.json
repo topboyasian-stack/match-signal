@@ -1,8 +1,8 @@
 {
   "status": "GENERATED",
-  "generated_at": "2026-11-20T13:41:17.400474+00:00",
+  "generated_at": "2026-11-20T16:11:43.838385+00:00",
   "horizon_days": 7,
-  "event_count": 4867,
+  "event_count": 4754,
   "live_count": 0,
   "pending_settlement_count": 0,
   "publication_filters": {
@@ -10,17 +10,17 @@
     "stale_live_flags_hidden": 0,
     "expired_settled_rows_hidden": 0,
     "virtual_market_rows_held_for_kickoff_window": 0,
-    "virtual_rows_held_for_stale_participant_history": 4824,
-    "virtual_rows_held_for_recent_product_drawdown": 53
+    "virtual_rows_held_for_stale_participant_history": 4695,
+    "virtual_rows_held_for_recent_product_drawdown": 26
   },
   "participant_history_freshness": {
     "fresh": false,
-    "max_age_minutes": 184.3,
+    "max_age_minutes": 334.7,
     "max_age_minutes_allowed": 30,
     "input_age_minutes": {
-      "participant_lifecycle": 184.3,
-      "collector_status": 184.3,
-      "model_evaluation": 181.9
+      "participant_lifecycle": 334.7,
+      "collector_status": 334.7,
+      "model_evaluation": 332.4
     },
     "participant_lifecycle_generated_at": "2026-11-20T10:37:00.453952+00:00",
     "collector_status_updated_at": "2026-11-20T10:37:01.079891+00:00",
@@ -28,6 +28,54 @@
     "reason": "input older than 30 minutes: participant_lifecycle, collector_status, model_evaluation"
   },
   "high_line_under_evidence": [
+    {
+      "product": "efootball_gt",
+      "line": 7.5,
+      "side": "under",
+      "event_rows": 3,
+      "walkforward_n": 31,
+      "walkforward_hit_rate": 0.6451612903225806,
+      "walkforward_brier": 0.2230359235048373,
+      "walkforward_model_variant": "poisson",
+      "qualification_status": "PARTICIPANT_HISTORY_STALE",
+      "betting_qualified": false
+    },
+    {
+      "product": "efootball_gt",
+      "line": 8.5,
+      "side": "under",
+      "event_rows": 7,
+      "walkforward_n": 30,
+      "walkforward_hit_rate": 0.7,
+      "walkforward_brier": 0.2329668812871638,
+      "walkforward_model_variant": "poisson",
+      "qualification_status": "PARTICIPANT_HISTORY_STALE",
+      "betting_qualified": false
+    },
+    {
+      "product": "efootball_gt",
+      "line": 9.5,
+      "side": "under",
+      "event_rows": 5,
+      "walkforward_n": 23,
+      "walkforward_hit_rate": 0.6086956521739131,
+      "walkforward_brier": 0.23942690298785263,
+      "walkforward_model_variant": "poisson",
+      "qualification_status": "PARTICIPANT_HISTORY_STALE",
+      "betting_qualified": false
+    },
+    {
+      "product": "efootball_gt",
+      "line": 6.5,
+      "side": "under",
+      "event_rows": 26,
+      "walkforward_n": 101,
+      "walkforward_hit_rate": 0.5445544554455446,
+      "walkforward_brier": 0.2535004123158333,
+      "walkforward_model_variant": "poisson",
+      "qualification_status": "PARTICIPANT_HISTORY_STALE",
+      "betting_qualified": false
+    },
     {
       "product": "vfootball",
       "line": 6.5,
@@ -75,74 +123,26 @@
       "walkforward_model_variant": null,
       "qualification_status": "PARTICIPANT_HISTORY_STALE",
       "betting_qualified": false
-    },
-    {
-      "product": "efootball_gt",
-      "line": 6.5,
-      "side": "under",
-      "event_rows": 25,
-      "walkforward_n": 101,
-      "walkforward_hit_rate": 0.5445544554455446,
-      "walkforward_brier": 0.2535004123158333,
-      "walkforward_model_variant": "poisson",
-      "qualification_status": "PARTICIPANT_HISTORY_STALE",
-      "betting_qualified": false
-    },
-    {
-      "product": "efootball_gt",
-      "line": 7.5,
-      "side": "under",
-      "event_rows": 3,
-      "walkforward_n": 31,
-      "walkforward_hit_rate": 0.6451612903225806,
-      "walkforward_brier": 0.2230359235048373,
-      "walkforward_model_variant": "poisson",
-      "qualification_status": "PARTICIPANT_HISTORY_STALE",
-      "betting_qualified": false
-    },
-    {
-      "product": "efootball_gt",
-      "line": 8.5,
-      "side": "under",
-      "event_rows": 4,
-      "walkforward_n": 30,
-      "walkforward_hit_rate": 0.7,
-      "walkforward_brier": 0.2329668812871638,
-      "walkforward_model_variant": "poisson",
-      "qualification_status": "PARTICIPANT_HISTORY_STALE",
-      "betting_qualified": false
-    },
-    {
-      "product": "efootball_gt",
-      "line": 9.5,
-      "side": "under",
-      "event_rows": 3,
-      "walkforward_n": 23,
-      "walkforward_hit_rate": 0.6086956521739131,
-      "walkforward_brier": 0.23942690298785263,
-      "walkforward_model_variant": "poisson",
-      "qualification_status": "PARTICIPANT_HISTORY_STALE",
-      "betting_qualified": false
     }
   ],
   "prospective_poisson_shadow_coverage": {
     "efootball_gt": {
-      "efootball_rows": 404,
-      "unique_events": 195,
-      "rows_with_valid_shadow": 76,
-      "unique_events_with_valid_shadow": 25,
+      "efootball_rows": 275,
+      "unique_events": 136,
+      "rows_with_valid_shadow": 39,
+      "unique_events_with_valid_shadow": 13,
       "rejection_reason_counts": {
-        "eligible_leave_one_line_out_fit": 76,
-        "historical_product_fallback_rejected": 328
+        "historical_product_fallback_rejected": 236,
+        "eligible_leave_one_line_out_fit": 39
       },
       "lambda_fit_source_counts_by_side": {
         "over": {
-          "current_market_ladder_leave_one_line_out": 76,
-          "historical_product_lambda_fallback": 328
+          "historical_product_lambda_fallback": 236,
+          "current_market_ladder_leave_one_line_out": 39
         },
         "under": {
-          "current_market_ladder_leave_one_line_out": 76,
-          "historical_product_lambda_fallback": 328
+          "historical_product_lambda_fallback": 236,
+          "current_market_ladder_leave_one_line_out": 39
         }
       },
       "mode": "PAPER_SHADOW_ONLY",
