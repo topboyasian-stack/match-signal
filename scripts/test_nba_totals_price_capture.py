@@ -9,7 +9,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from expansion_pipeline import NBA_TOTALS_MODEL_VERSION
-from live_expansion_pipeline import append_nba_totals_publication_snapshots
+from live_expansion_pipeline import append_nba_totals_publication_snapshots, sportybet_basketball_feed
 from capture_nba_totals_prices import attach_fresh_quote, capture, capture_timestamp, diagnose_fixture_quote, nearby_feed_events, sportybet_basketball_feed_paged
 
 
@@ -140,6 +140,38 @@ class PriceCaptureTests(unittest.TestCase):
         self.assertEqual(len(events), 101)
         duplicate = next(row for row in events if row["event_id"] == "event-0")
         self.assertEqual({market["specifier"] for market in duplicate["markets"]}, {"total=221.5"})
+
+    def test_live_expansion_paginates_after_filtered_short_nba_page(self):
+        # The proxy filters a multi-sport catalogue to NBA events before returning
+        # the page, so a short NBA list does not mean the raw catalogue is exhausted.
+        first_page = [
+            {"event_id": "nba-1", "home": "Boston Celtics", "away": "New York Knicks",
+             "start_time": self.now.isoformat(), "fetched_at": self.now.isoformat(), "markets": []},
+            {"event_id": "nba-2", "home": "Chicago Bulls", "away": "Miami Heat",
+             "start_time": self.now.isoformat(), "fetched_at": self.now.isoformat(), "markets": []},
+        ]
+        second_page = [
+            {"event_id": "nba-3", "home": "Los Angeles Lakers", "away": "Phoenix Suns",
+             "start_time": self.now.isoformat(), "fetched_at": self.now.isoformat(), "markets": []},
+        ]
+
+        class Response:
+            def __init__(self, payload):
+                self.payload = payload
+            def raise_for_status(self):
+                return None
+            def json(self):
+                return self.payload
+
+        with patch("live_expansion_pipeline.S.get", side_effect=[
+            Response({"ok": True, "events": first_page, "catalogue_page_has_more": True}),
+            Response({"ok": True, "events": second_page, "catalogue_page_has_more": False}),
+        ]) as feed_get:
+            events, error = sportybet_basketball_feed(max_pages=5)
+
+        self.assertIsNone(error)
+        self.assertEqual([call.kwargs["params"]["pageNum"] for call in feed_get.call_args_list], [1, 2])
+        self.assertEqual({row["event_id"] for row in events}, {"nba-1", "nba-2", "nba-3"})
 
     def test_feed_continues_after_a_short_nonfinal_page(self):
         first_page = [
