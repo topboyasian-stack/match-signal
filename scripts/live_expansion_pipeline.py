@@ -4,7 +4,7 @@ Keeps the independent model separate from market prices while allowing the
 current-season competitions to generate real, timestamped experimental signals.
 The outputs are explicitly LIVE_EXPERIMENTAL, never live-trading approved.
 """
-import csv, hashlib, io, json, math, re
+import csv, hashlib, io, json, math, re, time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import requests
@@ -20,6 +20,41 @@ NBA_TOURNAMENT_ID = "sr:tournament:132"
 S = requests.Session()
 S.headers.update({"User-Agent": "Mozilla/5.0 (compatible; MatchSignal/1.0)"})
 
+RETRYABLE_SPORTYBET_HTTP_STATUSES = {408, 425, 429, 500, 502, 503, 504}
+
+
+def sportybet_request_page(url, params, timeout=12, max_retries=2):
+    """Retry only transient SportyBet transport/server failures; never reuse old quotes."""
+    retries = max(0, min(3, int(max_retries)))
+    for attempt in range(retries + 1):
+        try:
+            response = S.get(url, params=params, timeout=timeout)
+            raw_status = getattr(response, "status_code", None)
+            try:
+                status = int(raw_status) if raw_status is not None else None
+            except (TypeError, ValueError):
+                status = None
+            if status in RETRYABLE_SPORTYBET_HTTP_STATUSES and attempt < retries:
+                time.sleep(0.25 * (attempt + 1))
+                continue
+            response.raise_for_status()
+            return response, attempt
+        except requests.exceptions.RequestException as exc:
+            error_response = getattr(exc, "response", None)
+            try:
+                error_status = int(getattr(error_response, "status_code", None))
+            except (TypeError, ValueError):
+                error_status = None
+            transient = (
+                isinstance(exc, (requests.Timeout, requests.ConnectionError))
+                or error_status in RETRYABLE_SPORTYBET_HTTP_STATUSES
+            )
+            if transient and attempt < retries:
+                time.sleep(0.25 * (attempt + 1))
+                continue
+            raise
+    raise RuntimeError("SportyBet request retries exhausted without a response")
+
 
 def sportybet_basketball_feed(max_pages=5):
     """Read and merge the seven-day SportyBet basketball feed across all available pages.
@@ -34,12 +69,11 @@ def sportybet_basketball_feed(max_pages=5):
     page_errors = []
     for page in range(1, max(1, int(max_pages)) + 1):
         try:
-            response = S.get(
+            response, _ = sportybet_request_page(
                 url,
                 params={"pageSize": 100, "timeline": 168, "pageNum": page, "tournamentId": NBA_TOURNAMENT_ID},
                 timeout=12,
             )
-            response.raise_for_status()
             payload = response.json()
             if not isinstance(payload, dict) or payload.get("ok") is not True:
                 detail = payload.get("error") if isinstance(payload, dict) else None

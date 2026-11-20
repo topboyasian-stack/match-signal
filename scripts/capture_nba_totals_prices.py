@@ -17,6 +17,7 @@ from live_expansion_pipeline import (
     S,
     sportybet_total_for_fixture,
     nba_team_key,
+    sportybet_request_page,
 )
 
 PREDICTIONS = DATA / "nba_predictions.json"
@@ -34,12 +35,17 @@ def sportybet_basketball_feed_paged(max_pages=25):
     # Guard the request count even if a caller passes an unexpectedly large value.
     for page in range(1, min(25, max(1, int(max_pages))) + 1):
         try:
-            response = S.get(
+            response, retry_count = sportybet_request_page(
                 url,
                 params={"pageSize": 100, "timeline": 168, "pageNum": page, "tournamentId": NBA_TOURNAMENT_ID},
                 timeout=12,
             )
-            response.raise_for_status()
+            if retry_count:
+                page_diagnostics.append({
+                    "collector_page_num": page,
+                    "retry_count": retry_count,
+                    "retry_reason": "transient_http_or_transport",
+                })
             payload = response.json()
             for diagnostic in payload.get("source_diagnostics") or []:
                 if isinstance(diagnostic, dict):

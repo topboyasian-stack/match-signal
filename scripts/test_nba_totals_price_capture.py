@@ -239,6 +239,41 @@ class PriceCaptureTests(unittest.TestCase):
         )
         self.assertEqual({row["event_id"] for row in events}, {"nba-first", "nba-third"})
 
+    def test_feed_retries_transient_503_before_stopping_pagination(self):
+        event = {
+            "event_id": "retry-event", "home": "Boston Celtics", "away": "New York Knicks",
+            "fetched_at": self.now.isoformat(), "markets": [],
+        }
+
+        class Response:
+            def __init__(self, status_code, payload):
+                self.status_code = status_code
+                self.payload = payload
+            def raise_for_status(self):
+                if self.status_code >= 400:
+                    raise RuntimeError("HTTP " + str(self.status_code))
+            def json(self):
+                return self.payload
+
+        with patch("capture_nba_totals_prices.S.get", side_effect=[
+            Response(503, {"ok": False, "error": "temporary upstream failure"}),
+            Response(200, {
+                "ok": True, "events": [event], "catalogue_page_has_more": False,
+                "source_diagnostics": [],
+            }),
+        ]) as feed_get, patch("live_expansion_pipeline.time.sleep") as sleep:
+            events, error, diagnostics = sportybet_basketball_feed_paged(max_pages=3)
+
+        self.assertIsNone(error)
+        self.assertEqual(feed_get.call_count, 2)
+        self.assertEqual([row["event_id"] for row in events], ["retry-event"])
+        self.assertIn({
+            "collector_page_num": 1,
+            "retry_count": 1,
+            "retry_reason": "transient_http_or_transport",
+        }, diagnostics)
+        sleep.assert_called_once()
+
     def test_feed_returns_partial_pages_and_retains_upstream_diagnostics(self):
         class Response:
             def __init__(self, events, ok=True, error=None, source_diagnostics=None):
