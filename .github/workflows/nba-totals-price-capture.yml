@@ -7,13 +7,12 @@ on:
     - cron: '2,12,22,32,42,52 * * * *'
   workflow_dispatch:
   workflow_run:
-    # Re-capture after a model/line refresh, final Builder promotion, or board refresh.
-    # None of these upstream workflows listens for capture completion, so this cannot form a loop.
+    # Live Expansion is the upstream writer for NBA forecast/publication snapshots.
+    # Board, Builder, and Pages completions do not change data/nba_predictions.json;
+    # recapturing on those events creates duplicate quote revisions and report-publish contention.
+    # API-code changes still trigger via push paths; the ten-minute schedule remains the fallback.
     workflows:
       - "Match Signal Live Expansion"
-      - "Match Signal Unified Upcoming Board"
-      - "Match Signal Builder Production Promotion"
-      - "Deploy Match Signal to Cloudflare Pages"
     types: [completed]
   push:
     branches: [main]
