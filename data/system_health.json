@@ -1,14 +1,14 @@
 {
-  "generated_at": "2026-11-21T18:48:40.591336+00:00",
+  "generated_at": "2026-11-21T19:15:41.022225+00:00",
   "status": "FAIL",
-  "critical_issues": 3,
+  "critical_issues": 2,
   "warning_issues": 3,
   "info_issues": 1,
   "checks": [
     {
       "engine": "core_prediction_pipeline",
       "status": "STALE",
-      "age_hours": 6.21,
+      "age_hours": 6.66,
       "threshold_hours": 4
     },
     {
@@ -19,8 +19,8 @@
     },
     {
       "engine": "expansion",
-      "status": "STALE",
-      "age_hours": 6.11,
+      "status": "PASS",
+      "age_hours": 0.12,
       "threshold_hours": 4
     },
     {
@@ -38,21 +38,21 @@
     {
       "engine": "virtual_participant_history",
       "status": "STALE",
-      "max_input_age_minutes": 185.7,
-      "virtual_lab_status_age_minutes": 187.7,
+      "max_input_age_minutes": 212.8,
+      "virtual_lab_status_age_minutes": 214.7,
       "threshold_minutes": 30.0,
       "stale_inputs": []
     },
     {
       "engine": "tennis_forward_discovery",
       "status": "PASS",
-      "age_hours": 6.11,
+      "age_hours": 6.56,
       "threshold_hours": 8
     },
     {
       "engine": "virtual_live_feed",
       "status": "STALE",
-      "age_hours": 6.32,
+      "age_hours": 6.77,
       "threshold_hours": 0.5,
       "heartbeat_source": "virtual_lab_live.json",
       "events_count": 634
@@ -85,8 +85,8 @@
         "nba_totals_desk": {
           "status": "LIVE_EXPERIMENTAL",
           "paper_only": true,
-          "historical_events": 1225,
-          "current_fixtures": 55
+          "historical_events": 1234,
+          "current_fixtures": 46
         },
         "pdl_experimental_prediction_feed": {
           "status": "CURRENT",
@@ -105,22 +105,17 @@
     {
       "code": "STALE_CORE_PREDICTION_PIPELINE",
       "severity": "critical",
-      "detail": "updated_at age 6.21h exceeds 4h"
-    },
-    {
-      "code": "STALE_EXPANSION",
-      "severity": "critical",
-      "detail": "updated_at age 6.11h exceeds 4h"
+      "detail": "updated_at age 6.66h exceeds 4h"
     },
     {
       "code": "VIRTUAL_PARTICIPANT_HISTORY_STALE",
       "severity": "warning",
-      "detail": "input older than 30 minutes: participant_lifecycle, collector_status, model_evaluation; oldest participant/settlement/model input is 185.7 minutes old; virtual_lab_status.json is 187.7 minutes old; current eFootball/virtual predictions must remain withheld until the source collector publishes fresh data"
+      "detail": "input older than 30 minutes: participant_lifecycle, collector_status, model_evaluation; oldest participant/settlement/model input is 212.8 minutes old; virtual_lab_status.json is 214.7 minutes old; current eFootball/virtual predictions must remain withheld until the source collector publishes fresh data"
     },
     {
       "code": "VIRTUAL_LIVE_FEED_STALE",
       "severity": "warning",
-      "detail": "virtual_lab_live.json age 6.32h exceeds 0.50h; a downstream Unified Upcoming refresh cannot substitute for a fresh source snapshot"
+      "detail": "virtual_lab_live.json age 6.77h exceeds 0.50h; a downstream Unified Upcoming refresh cannot substitute for a fresh source snapshot"
     },
     {
       "code": "NBA_LIVE_OBSERVATION_STALE",
@@ -135,17 +130,17 @@
     {
       "code": "PIPELINE_STALE",
       "severity": "critical",
-      "detail": "pipeline_status age 6.21h exceeds 4h"
+      "detail": "pipeline_status age 6.66h exceeds 4h"
     }
   ],
   "policy": "Proactive operational guard. Visibility is never reduced to zero just because an evidence gate is unmet.",
   "paper_only": true,
   "prediction_desk_filters": {
-    "past_kickoff_rows_hidden": 14,
+    "past_kickoff_rows_hidden": 13,
     "stale_live_flags_hidden": 0,
     "expired_settled_rows_hidden": 0,
     "virtual_market_rows_held_for_kickoff_window": 0,
-    "virtual_rows_held_for_stale_participant_history": 4940,
-    "virtual_rows_held_for_recent_product_drawdown": 137
+    "virtual_rows_held_for_stale_participant_history": 4997,
+    "virtual_rows_held_for_recent_product_drawdown": 133
   }
 }
