@@ -233,6 +233,10 @@ jobs:
           for attempt in 1 2 3 4 5; do
             git fetch origin main
             git reset --hard origin/main
+            # The probability report fingerprint includes the OOS report itself.
+            # Overlay its candidate before comparing so a fresh candidate is not
+            # needlessly regenerated against the previous main-branch OOS artifact.
+            cp "$candidate_oos" data/nba_totals_oos_value_test.json
             fingerprint_matches="$(PYTHONPATH=scripts python - "$candidate_probability" <<'PY'
           import json
           import sys

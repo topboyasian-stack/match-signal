@@ -122,6 +122,12 @@ def run():
     assert "source_data_fingerprint" in workflow and "report_source_fingerprint_matches" in workflow, (
         "The workflow must detect source files that changed after a run checked out main."
     )
+    reset_index = workflow.index("git reset --hard origin/main")
+    candidate_oos_index = workflow.index('cp "$candidate_oos" data/nba_totals_oos_value_test.json', reset_index)
+    fingerprint_check_index = workflow.index('fingerprint_matches="$(PYTHONPATH=scripts python - "$candidate_probability"', reset_index)
+    assert reset_index < candidate_oos_index < fingerprint_check_index, (
+        "The candidate OOS report must be overlaid before checking the probability report fingerprint; otherwise every retry compares against the previous OOS artifact."
+    )
     assert "scripts/refresh_nba_totals_oos_report.py" in workflow, (
         "Settlement-only changes must refresh the fixed-cutoff OOS report as well as probability diagnostics."
     )
