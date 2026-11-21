@@ -172,6 +172,30 @@ class LiveBoxscoreProjectionTests(unittest.TestCase):
             self.assertFalse(legacy.exists(), "the raw legacy archive must be removed after compression")
             self.assertEqual(load_observation_history(compressed, legacy), expected)
 
+    def test_sharded_history_round_trips_and_removes_oversized_single_archive(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            compressed = root / "nba_live_observations.json.gz"
+            legacy = root / "nba_live_observations.json"
+            shard_dir = root / "nba_live_observation_shards"
+            expected = {
+                "updated_at": "2026-11-21T07:30:00+00:00",
+                "monitor": "NBA_IN_GAME_BEHAVIOR_V1",
+                "games": {
+                    f"event-{index}": {
+                        "event_id": f"event-{index}",
+                        "snapshots": [{"observed_at": f"2026-11-21T07:{index % 60:02d}:00+00:00", "score": index}]
+                    }
+                    for index in range(100)
+                },
+            }
+            write_observation_history(expected, compressed, legacy, shard_dir=shard_dir)
+            self.assertFalse(compressed.exists(), "the monolithic archive must be removed after sharding")
+            shards = sorted(shard_dir.glob("nba_live_observations_*.json.gz"))
+            self.assertGreater(len(shards), 1, "the history must be partitioned into bounded shards")
+            self.assertTrue(all(path.stat().st_size < 100 * 1024 * 1024 for path in shards))
+            self.assertEqual(load_observation_history(compressed, legacy, shard_dir), expected)
+
     def test_scoreboard_window_uses_eastern_adjacent_days_after_utc_rollover(self):
         now = datetime(2026, 10, 31, 10, 10, tzinfo=timezone.utc)
         calls = []

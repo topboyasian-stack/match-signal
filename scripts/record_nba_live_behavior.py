@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Capture timestamped, research-only NBA in-game team/player behavior snapshots."""
-import gzip, json, math, os, re
+import gzip, hashlib, json, math, os, re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -8,6 +8,8 @@ import requests
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "data" / "nba_live_observations.json.gz"
+SHARD_DIR = ROOT / "data" / "nba_live_observation_shards"
+SHARD_COUNT = 32
 LEGACY_OUT = ROOT / "data" / "nba_live_observations.json"
 CURRENT_OUT = ROOT / "data" / "nba_live_current.json"
 PREDICTIONS = ROOT / "data" / "nba_predictions.json"
@@ -21,17 +23,57 @@ def get(url, params=None):
     return r.json()
 
 
-def load_observation_history(archive_path=OUT, legacy_path=LEGACY_OUT):
-    """Load the compressed 30-day archive, migrating transparently from legacy JSON."""
+def _read_gzip_json(path):
+    try:
+        with gzip.open(path, "rt", encoding="utf-8") as source:
+            payload = json.load(source)
+        return payload if isinstance(payload, dict) else None
+    except (OSError, EOFError, json.JSONDecodeError):
+        return None
+
+
+def load_observation_history(archive_path=OUT, legacy_path=LEGACY_OUT, shard_dir=None):
+    """Load the legacy archive or merge stable compressed shards for the 30-day history."""
+    archive_path = Path(archive_path)
+    legacy_path = Path(legacy_path)
     if archive_path.exists():
-        try:
-            with gzip.open(archive_path, "rt", encoding="utf-8") as source:
-                payload = json.load(source)
-            return payload if isinstance(payload, dict) else {}
-        except (OSError, EOFError, json.JSONDecodeError):
-            # A corrupt/newly truncated compressed archive is not silently treated
-            # as valid history; try the legacy copy only when it still exists.
-            pass
+        payload = _read_gzip_json(archive_path)
+        if payload is not None:
+            return payload
+
+    if shard_dir is None and archive_path == OUT:
+        shard_dir = SHARD_DIR
+    if shard_dir is not None:
+        shard_dir = Path(shard_dir)
+        shard_files = sorted(shard_dir.glob("nba_live_observations_*.json.gz")) if shard_dir.exists() else []
+        if shard_files:
+            merged = {}
+            games = {}
+            for shard_path in shard_files:
+                payload = _read_gzip_json(shard_path)
+                if payload is None:
+                    raise ValueError(f"Invalid NBA live observation shard: {shard_path.name}")
+                for key, value in payload.items():
+                    if key != "games":
+                        merged[key] = value
+                for event_id, game in (payload.get("games") or {}).items():
+                    if event_id not in games:
+                        games[event_id] = game
+                    else:
+                        existing = games[event_id]
+                        snapshots = list(existing.get("snapshots") or [])
+                        seen = {str(row.get("observed_at")) for row in snapshots}
+                        snapshots.extend(
+                            row for row in (game.get("snapshots") or [])
+                            if str(row.get("observed_at")) not in seen
+                        )
+                        snapshots.sort(key=lambda row: str(row.get("observed_at") or ""))
+                        existing["snapshots"] = snapshots
+                        if snapshots:
+                            existing["latest"] = snapshots[-1]
+            merged["games"] = games
+            return merged
+
     if legacy_path.exists():
         try:
             payload = json.loads(legacy_path.read_text(encoding="utf-8"))
@@ -41,18 +83,56 @@ def load_observation_history(archive_path=OUT, legacy_path=LEGACY_OUT):
     return {}
 
 
-def write_observation_history(payload, archive_path=OUT, legacy_path=LEGACY_OUT):
-    """Atomically save compressed history and remove the legacy public-sized JSON."""
-    archive_path.parent.mkdir(parents=True, exist_ok=True)
-    temporary_path = archive_path.with_name(archive_path.name + ".tmp")
+def _write_gzip_json(payload, path):
+    temporary_path = path.with_name(path.name + ".tmp")
     try:
         with gzip.open(temporary_path, "wt", encoding="utf-8", compresslevel=6) as target:
             json.dump(payload, target, indent=2, ensure_ascii=False)
             target.write("\n")
-        temporary_path.replace(archive_path)
+        temporary_path.replace(path)
     finally:
         if temporary_path.exists():
             temporary_path.unlink()
+
+
+def write_observation_history(payload, archive_path=OUT, legacy_path=LEGACY_OUT, shard_dir=None):
+    """Atomically persist the 30-day history in bounded gzip shards for GitHub's file limit."""
+    archive_path = Path(archive_path)
+    legacy_path = Path(legacy_path)
+    if shard_dir is None and archive_path == OUT:
+        shard_dir = SHARD_DIR
+
+    if shard_dir is None:
+        archive_path.parent.mkdir(parents=True, exist_ok=True)
+        _write_gzip_json(payload, archive_path)
+    else:
+        shard_dir = Path(shard_dir)
+        shard_dir.mkdir(parents=True, exist_ok=True)
+        buckets = [{} for _ in range(SHARD_COUNT)]
+        for event_id, game in (payload.get("games") or {}).items():
+            digest = hashlib.sha256(str(event_id).encode("utf-8")).hexdigest()
+            bucket_index = int(digest[:8], 16) % SHARD_COUNT
+            buckets[bucket_index][str(event_id)] = game
+
+        metadata = {key: value for key, value in payload.items() if key != "games"}
+        wanted = set()
+        for index, games in enumerate(buckets):
+            if not games and index != 0:
+                continue
+            shard_name = f"nba_live_observations_{index:02d}.json.gz"
+            shard_path = shard_dir / shard_name
+            shard_payload = dict(metadata)
+            shard_payload["games"] = games
+            _write_gzip_json(shard_payload, shard_path)
+            wanted.add(shard_name)
+
+        for old_shard in shard_dir.glob("nba_live_observations_*.json.gz"):
+            if old_shard.name not in wanted:
+                old_shard.unlink()
+
+        if archive_path.exists():
+            archive_path.unlink()
+
     if legacy_path.exists() and legacy_path != archive_path:
         legacy_path.unlink()
 
