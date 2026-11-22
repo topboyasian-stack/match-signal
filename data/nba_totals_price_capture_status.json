@@ -1,78 +1,94 @@
 {
-  "checked_at": "2026-11-22T18:45:05.204080+00:00",
+  "checked_at": "2026-11-22T19:28:35.588903+00:00",
   "paper_only": true,
   "model_version": "nba-total-v5.1-pace-efficiency-calibrated",
   "source": "SportyBet Nigeria public NBA feed via Match Signal regional proxy",
-  "feed_error": "SportyBet feed unavailable: page 1: 503 Server Error: Service Unavailable for url: https://match-signal.pages.dev/api/sportybet-basketball?pageSize=100&timeline=168&pageNum=1&tournamentId=sr%3Atournament%3A132",
-  "feed_diagnostics": [],
-  "feed_events": 0,
-  "feed_events_with_market_225": 0,
+  "feed_error": null,
+  "feed_diagnostics": [
+    {
+      "collector_page_num": 1,
+      "endpoint": "/api/ng/factsCenter/pcUpcomingEvents",
+      "market_id": "1,18,10,29,11,26,36,14,60100,186,189,202,204,210,219",
+      "page_num": 1,
+      "page_size": 100,
+      "timeline_hours": 168,
+      "source_origin": "https://match-signal-sportybet-proxy.topboyasian.workers.dev",
+      "http_status": 200,
+      "biz_code": 10000,
+      "top_level_keys": [
+        "bizCode",
+        "message",
+        "data"
+      ],
+      "data_keys": [
+        "totalNum",
+        "tournaments"
+      ],
+      "upstream_total_events": 89,
+      "tournament_count": 25,
+      "event_count": 89,
+      "response_shape": "TOURNAMENTS_PRESENT"
+    },
+    {
+      "collector_page_num": 1,
+      "endpoint": "/api/ng/factsCenter/pcUpcomingEvents",
+      "market_id": "225",
+      "page_num": 1,
+      "page_size": 100,
+      "timeline_hours": 168,
+      "source_origin": "https://match-signal-sportybet-proxy.topboyasian.workers.dev",
+      "http_status": 200,
+      "biz_code": 10000,
+      "top_level_keys": [
+        "bizCode",
+        "message",
+        "data"
+      ],
+      "data_keys": [
+        "totalNum",
+        "tournaments"
+      ],
+      "upstream_total_events": 89,
+      "tournament_count": 25,
+      "event_count": 89,
+      "response_shape": "TOURNAMENTS_PRESENT"
+    },
+    {
+      "collector_page_num": 1,
+      "endpoint": "/api/ng/factsCenter/wapConfigurableUpcomingEvents",
+      "market_id": null,
+      "page_num": 1,
+      "page_size": 100,
+      "timeline_hours": 168,
+      "source_origin": "https://match-signal-sportybet-proxy.topboyasian.workers.dev",
+      "http_status": 200,
+      "biz_code": 10000,
+      "top_level_keys": [
+        "bizCode",
+        "message",
+        "data"
+      ],
+      "data_keys": [],
+      "upstream_total_events": null,
+      "tournament_count": 1,
+      "event_count": 10,
+      "response_shape": "FLAT_EVENT_ARRAY_PRESENT"
+    }
+  ],
+  "feed_events": 7,
+  "feed_events_with_market_225": 7,
   "model_predictions_checked": 51,
   "upcoming_v5_predictions": 45,
-  "exact_fresh_market_matches": 0,
-  "prediction_price_updates": 0,
+  "exact_fresh_market_matches": 7,
+  "prediction_price_updates": 7,
   "started_or_finished_skipped": 6,
-  "fresh_price_snapshots_considered": 0,
+  "fresh_price_snapshots_considered": 7,
   "price_match_status_counts": {
-    "SPORTYBET_FIXTURE_NOT_LISTED_IN_FEED": 45
+    "MATCHED": 7,
+    "SPORTYBET_FIXTURE_NOT_LISTED_IN_FEED": 37,
+    "SPORTYBET_START_TIME_MISMATCH_OVER_45_MIN": 1
   },
   "unmatched_fixtures": [
-    {
-      "event_id": "401910029",
-      "home": "Atlanta Hawks",
-      "away": "Detroit Pistons",
-      "start_time": "2026-11-22T20:30:00+00:00",
-      "reason": "SPORTYBET_FIXTURE_NOT_LISTED_IN_FEED",
-      "nearby_feed_candidates": []
-    },
-    {
-      "event_id": "401910030",
-      "home": "Miami Heat",
-      "away": "Oklahoma City Thunder",
-      "start_time": "2026-11-22T23:00:00+00:00",
-      "reason": "SPORTYBET_FIXTURE_NOT_LISTED_IN_FEED",
-      "nearby_feed_candidates": []
-    },
-    {
-      "event_id": "401910031",
-      "home": "Washington Wizards",
-      "away": "Orlando Magic",
-      "start_time": "2026-11-23T00:00:00+00:00",
-      "reason": "SPORTYBET_FIXTURE_NOT_LISTED_IN_FEED",
-      "nearby_feed_candidates": []
-    },
-    {
-      "event_id": "401910032",
-      "home": "Chicago Bulls",
-      "away": "Denver Nuggets",
-      "start_time": "2026-11-23T00:00:00+00:00",
-      "reason": "SPORTYBET_FIXTURE_NOT_LISTED_IN_FEED",
-      "nearby_feed_candidates": []
-    },
-    {
-      "event_id": "401910033",
-      "home": "Utah Jazz",
-      "away": "Dallas Mavericks",
-      "start_time": "2026-11-23T00:00:00+00:00",
-      "reason": "SPORTYBET_FIXTURE_NOT_LISTED_IN_FEED",
-      "nearby_feed_candidates": []
-    },
-    {
-      "event_id": "401910034",
-      "home": "New York Knicks",
-      "away": "Indiana Pacers",
-      "start_time": "2026-11-23T01:00:00+00:00",
-      "reason": "SPORTYBET_FIXTURE_NOT_LISTED_IN_FEED",
-      "nearby_feed_candidates": []
-    },
-    {
-      "event_id": "401910035",
-      "home": "Golden State Warriors",
-      "away": "Boston Celtics",
-      "start_time": "2026-11-23T01:30:00+00:00",
-      "reason": "SPORTYBET_FIXTURE_NOT_LISTED_IN_FEED",
-      "nearby_feed_candidates": []
-    },
     {
       "event_id": "401910036",
       "home": "Charlotte Hornets",
@@ -342,7 +358,7 @@
       "home": "Washington Wizards",
       "away": "Orlando Magic",
       "start_time": "2026-11-28T22:00:00+00:00",
-      "reason": "SPORTYBET_FIXTURE_NOT_LISTED_IN_FEED",
+      "reason": "SPORTYBET_START_TIME_MISMATCH_OVER_45_MIN",
       "nearby_feed_candidates": []
     },
     {
@@ -379,7 +395,7 @@
     }
   ],
   "immutable_snapshot_count_before": 12079,
-  "immutable_snapshot_count_after": 12079,
-  "immutable_snapshots_added": 0,
+  "immutable_snapshot_count_after": 12086,
+  "immutable_snapshots_added": 7,
   "note": "Missing market-225 events are left unpriced. Per-fixture diagnostics distinguish unopened bookmaker markets from identity/time mismatch or an unusable price pair. No substitute bookmaker, old quote, synthetic price, or reconstructed line is inserted."
 }
