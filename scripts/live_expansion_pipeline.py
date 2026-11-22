@@ -579,8 +579,8 @@ def append_nba_totals_publication_snapshots(predictions, path=None, published_at
     path.write_text(json.dumps(existing, indent=2, ensure_ascii=False) + chr(10), encoding="utf-8")
     return {"added": added, "total": len(existing)}
 
-def should_refresh_nba_prediction(old, start, now=None, max_age_hours=6):
-    """Refresh old projections only while the fixture is still pre-game."""
+def should_refresh_nba_prediction(old, start, now=None, max_age_hours=4):
+    """Refresh pre-game projections at four hours old, leaving a two-hour deploy buffer."""
     now = now or NOW
     if not old:
         return True
