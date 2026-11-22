@@ -95,6 +95,14 @@ fresh_snapshot = {
     "totals_model_version": pipeline.NBA_TOTALS_MODEL_VERSION,
     "winner_model_version": pipeline.NBA_WINNER_MODEL_VERSION,
 }
+# The production deployment rejects any upcoming row older than six hours.
+# Refresh at four hours to leave a two-hour buffer for serialized board/Builder
+# promotion rather than letting an otherwise-valid forecast expire in the queue.
+promotion_buffer_snapshot = {
+    "generated_at": (now-timedelta(hours=5)).isoformat(),
+    "totals_model_version": pipeline.NBA_TOTALS_MODEL_VERSION,
+    "winner_model_version": pipeline.NBA_WINNER_MODEL_VERSION,
+}
 stale_snapshot = {
     "generated_at": (now-timedelta(hours=7)).isoformat(),
     "totals_model_version": pipeline.NBA_TOTALS_MODEL_VERSION,
@@ -110,6 +118,7 @@ old_totals_snapshot = {
     "winner_model_version": pipeline.NBA_WINNER_MODEL_VERSION,
 }
 assert pipeline.should_refresh_nba_prediction(fresh_snapshot, start, now) is False
+assert pipeline.should_refresh_nba_prediction(promotion_buffer_snapshot, start, now) is True, "refresh five-hour-old forecasts before serialized promotion can cross the six-hour deployment limit"
 assert pipeline.should_refresh_nba_prediction(stale_snapshot, start, now) is True
 assert pipeline.should_refresh_nba_prediction(stale_snapshot, now-timedelta(minutes=1), now) is False
 assert pipeline.should_refresh_nba_prediction({}, start, now) is True
