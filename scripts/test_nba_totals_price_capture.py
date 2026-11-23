@@ -55,7 +55,7 @@ class PriceCaptureTests(unittest.TestCase):
         push_paths = workflow.split("\n  push:\n", 1)[1].split("\npermissions:\n", 1)[0]
         self.assertIn("'scripts/capture_nba_totals_prices.py'", push_paths)
         self.assertNotIn("'scripts/live_expansion_pipeline.py'", push_paths)
-        self.assertIn("cron: '2,12,22,32,42,52 * * * *'", workflow)
+        self.assertIn("cron: '*/10 * * * *'", workflow)
         self.assertIn("if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'", workflow)
 
     def test_basketball_page_scopes_sportybet_feed_to_nba(self):

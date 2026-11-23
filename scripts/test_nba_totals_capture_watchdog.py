@@ -22,7 +22,7 @@ def run():
     settlement_workflow = (root / ".github/workflows/nba-totals-settlement.yml").read_text(encoding="utf-8")
     probability_workflow = (root / ".github/workflows/nba-totals-probability-value.yml").read_text(encoding="utf-8")
     live_expansion_workflow = (root / ".github/workflows/live-expansion.yml").read_text(encoding="utf-8")
-    assert "cron: '2,12,22,32,42,52 * * * *'" in capture_workflow, (
+    assert "cron: '*/10 * * * *'" in capture_workflow, (
         "NBA SportyBet market-225 capture must run every 10 minutes after the schedule re-arm."
     )
 
