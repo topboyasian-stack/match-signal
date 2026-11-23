@@ -70,9 +70,13 @@ class EfootballResearchRecoveryTests(unittest.TestCase):
         self.assertNotIn('"Match Signal NBA In-Game Behavior Recorder"', trigger_block,
                          "The board must not recursively rerun because the recorder completed.")
 
-    def test_nba_price_capture_runs_after_model_and_board_refresh_without_a_loop(self):
+    def test_nba_price_capture_runs_after_model_refresh_without_board_builder_loop(self):
         self.assertIn('"Match Signal Live Expansion"', NBA_CAPTURE)
-        self.assertIn('"Match Signal Unified Upcoming Board"', NBA_CAPTURE)
+        self.assertNotIn('"Match Signal Unified Upcoming Board"', NBA_CAPTURE,
+                         "Board completions do not change NBA predictions; avoid duplicate quote revisions.")
+        self.assertNotIn('"Match Signal Odds Builder"', NBA_CAPTURE)
+        self.assertNotIn('"Deploy Match Signal to Cloudflare Pages"', NBA_CAPTURE)
+        self.assertIn("cron: '*/10 * * * *'", NBA_CAPTURE)
         capture_job = NBA_CAPTURE.split("  capture:", 1)[1]
         self.assertIn("github.event.workflow_run.conclusion == 'success'", capture_job)
         board_workflow = (ROOT / ".github/workflows/unified-upcoming.yml").read_text(encoding="utf-8")
