@@ -57,6 +57,14 @@ class SnapshotArchiveStagingTests(unittest.TestCase):
         self.assertEqual(gzip.decompress(gzip_path.read_bytes()), self.source_bytes)
         self.assertLess(gzip_path.stat().st_size, 1024 * 1024)
 
+    def test_compressed_output_is_deterministic_for_the_same_immutable_source(self):
+        stage_snapshot_archive(self.source, self.staging, max_bytes=1024 * 1024)
+        first = (self.staging / (self.source.name + ".gz")).read_bytes()
+        shutil.copyfile(self.source, self.staging / self.source.name)
+        stage_snapshot_archive(self.source, self.staging, max_bytes=1024 * 1024)
+        second = (self.staging / (self.source.name + ".gz")).read_bytes()
+        self.assertEqual(first, second, "same immutable source should produce byte-identical gzip output")
+
     def test_oversized_compressed_asset_fails_closed_and_keeps_raw_copy(self):
         with self.assertRaisesRegex(ValueError, "exceed the Pages per-file limit"):
             stage_snapshot_archive(self.source, self.staging, max_bytes=1)
