@@ -338,6 +338,8 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             "league-logos.js",
             "workspace-ui.js",
             "scripts/test_workspace_terminal_design.mjs",
+            "scripts/stage_nba_pages_snapshot_archive.py",
+            "scripts/test_nba_pages_snapshot_archive.py",
             "data/club-logo-registry.json",
             "assets/club-logos/**",
             "data/licenses/**",

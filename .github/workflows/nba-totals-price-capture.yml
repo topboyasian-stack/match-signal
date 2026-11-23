@@ -2,9 +2,10 @@ name: NBA totals SportyBet market-225 price capture
 
 on:
   schedule:
-    # Re-arm schedule delivery after the observed multi-hour gap. The 15-minute
-    # quote-freshness contract and event-driven recovery remain unchanged.
-    - cron: '2,12,22,32,42,52 * * * *'
+    # Canonical ten-minute cadence. A push to this workflow also starts one
+    # immediate capture when re-arming schedule delivery after a missed tick.
+    # The exact-market freshness contract remains 15 minutes and is not relaxed.
+    - cron: '*/10 * * * *'
   workflow_dispatch:
   workflow_run:
     # Live Expansion is the upstream writer for NBA forecast/publication snapshots.

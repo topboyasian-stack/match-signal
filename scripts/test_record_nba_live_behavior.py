@@ -222,5 +222,22 @@ class LiveBoxscoreProjectionTests(unittest.TestCase):
         self.assertEqual(errors[0]["date"], "20261030")
 
 
+class RecorderWorkflowPublicationTests(unittest.TestCase):
+    def test_publish_step_never_adds_missing_legacy_gzip_as_a_required_pathspec(self):
+        workflow_path = Path(__file__).resolve().parents[1] / ".github" / "workflows" / "nba-live-observation.yml"
+        workflow = workflow_path.read_text(encoding="utf-8")
+        add_line = next(line.strip() for line in workflow.splitlines() if line.strip().startswith("git add -A data/nba_live_observation_shards"))
+        self.assertEqual(
+            add_line,
+            "git add -A data/nba_live_observation_shards data/nba_live_current.json data/nba_live_totals_oos.json",
+        )
+        rm_line = next(line.strip() for line in workflow.splitlines() if line.strip().startswith("git rm --ignore-unmatch data/nba_live_observations.json"))
+        self.assertEqual(
+            rm_line,
+            "git rm --ignore-unmatch data/nba_live_observations.json data/nba_live_observations.json.gz",
+            "legacy monolithic files should be removed only when present, without failing collection",
+        )
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
