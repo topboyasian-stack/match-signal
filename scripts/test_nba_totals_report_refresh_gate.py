@@ -164,6 +164,16 @@ def run():
         "Use the explicit post-publication dispatch as the single handoff; do not queue a duplicate automatic workflow_run test."
     )
 
+    settlement_text = (Path(__file__).resolve().parents[1] / ".github/workflows/nba-totals-settlement.yml").read_text(encoding="utf-8")
+    capture_text = (Path(__file__).resolve().parents[1] / ".github/workflows/nba-totals-price-capture.yml").read_text(encoding="utf-8")
+    assert "capture_triggered" in settlement_text and "CAPTURE_TRIGGERED" in settlement_text, (
+        "Capture-triggered settlement dispatches must use the same ledger-age duplicate-suppression gate."
+    )
+    assert "age_minutes >= 10" in settlement_text, "Capture-triggered settlement must be throttled by ledger freshness."
+    assert "gh workflow run nba-totals-settlement.yml --ref main -f capture_triggered=true" in capture_text, (
+        "New exact quote snapshots must explicitly dispatch official ESPN settlement when the ledger is stale."
+    )
+
     print("PASS: quote-revision freshness, source fingerprint race recovery, duplicate suppression, schedule throttle, and missing-report cases.")
 
 
