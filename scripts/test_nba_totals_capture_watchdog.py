@@ -29,8 +29,11 @@ def run():
     assert "actions: write" in capture_workflow, (
         "Capture must be allowed to dispatch a follow-up evidence refresh with GITHUB_TOKEN."
     )
-    assert "Dispatch NBA probability/value refresh when new immutable quotes were added" in capture_workflow, (
-        "Fresh quote revisions must explicitly trigger probability/value report refresh rather than relying only on workflow_run delivery."
+    assert "Dispatch settlement and probability/value refresh after new immutable quotes" in capture_workflow, (
+        "Fresh quote revisions must explicitly trigger settlement and probability/value refresh rather than relying only on workflow_run delivery."
+    )
+    assert "gh workflow run nba-totals-settlement.yml --ref main -f capture_triggered=true" in capture_workflow, (
+        "A stale ESPN ledger must be reconciled after a new exact immutable market-225 quote."
     )
     assert "gh workflow run nba-totals-probability-value.yml --ref main" in capture_workflow and "immutable_snapshots_added" in capture_workflow, (
         "Only a capture that adds immutable market-225 quote snapshots should dispatch the research report."
