@@ -1,4 +1,4 @@
-import { NBA_RELEASE_MODEL, loadNbaReleaseContext, nbaTotalsReleaseQualified, nbaTotalTicketLegQualified } from './sportybet-booking.js';
+import { NBA_RELEASE_MODEL, loadNbaReleasePrecheck, loadNbaReleaseContext, nbaTotalsReleaseQualified, nbaTotalTicketLegQualified } from './sportybet-booking.js';
 
 const ORIGIN = 'https://www.sportybet.com';
 const HEADERS = {
@@ -130,6 +130,10 @@ export async function onRequestPost(context){
     if(ids.some(id=>!id)||new Set(ids).size!==ids.length) return json({ok:false,error:'DUPLICATE_OR_MISSING_EVENT',message:'Each builder must contain different, identified events.'},422);
     let releaseContext;
     try {
+      const precheck=await loadNbaReleasePrecheck();
+      if(!precheck.reportsMeetReleaseCriteria) {
+        return json({ok:false,error:'NBA_RELEASE_GATE_LOCKED',booking_code_withheld:true,message:'NBA totals ticket generation remains locked until fixed-cutoff forecasting, prospective market ROI, snapshot coverage, probability validation and closing-line-value gates all pass. No booking code was generated.'},423);
+      }
       releaseContext=await loadNbaReleaseContext();
     } catch(error) {
       return json({ok:false,error:'NBA_RELEASE_EVIDENCE_UNAVAILABLE',booking_code_withheld:true,message:'NBA release evidence could not be verified. No booking code was generated.'},503);

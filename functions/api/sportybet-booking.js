@@ -89,12 +89,16 @@ function nbaReleaseReportsNewerThanSources(e,p,ledger,captureStatus){
  const evidenceAt=Date.parse(String(e?.generated_at||'')),probabilityAt=Date.parse(String(p?.generated_at||'')),ledgerAt=Date.parse(String(ledger?.updated_at||'')),captureAt=Date.parse(String(captureStatus?.checked_at||'')),now=Date.now();
  return [evidenceAt,probabilityAt,ledgerAt,captureAt].every(Number.isFinite)&&evidenceAt<=now+120000&&probabilityAt<=now+120000&&evidenceAt>=ledgerAt&&probabilityAt>=ledgerAt&&evidenceAt>=captureAt&&probabilityAt>=captureAt;
 }
-export function nbaTotalsReleaseQualified(e,p,sourceEvidenceFresh=false){
+export function nbaTotalsReportsMeetReleaseCriteria(e,p){
  const h=e?.walk_forward?.holdout||{},m=e?.market_holdout||{},c=p?.prospective_pregame_snapshot_coverage||{},pc=p?.prospective_probability_fixture_coverage||{},s=p?.prospective_probability_score_summary||{},v=p?.prospective_clv_diagnostics||{},cal=p?.calibration_protocol||{};
  const probabilitySample=Number(s.n)>=30&&s.sufficient_for_probability_validation===true&&Number(pc.valid_unique_settled_fixtures)>=30&&Number(pc.binary_scored_unique_fixtures)>=30&&Number(pc.snapshot_linkage_failure_count)===0&&pc.cutoff_utc===NBA_RELEASE_CUTOFF&&pc.sample_threshold_met===true;
  const selectionEvidence=Number(c.prospective_settled_selections_with_exact_snapshot_match)>=100&&Number(c.prospective_settled_selections_missing_or_mismatched_snapshot)===0&&Number(c.prospective_settled_unique_market_selections)>=100;
- return !!(sourceEvidenceFresh===true&&e?.paper_only===true&&e?.evaluation_type==='NBA_TOTALS_FIXED_CUTOFF_V2'&&e?.holdout_protocol?.fixed_cutoff_utc===NBA_RELEASE_CUTOFF&&e?.market_id==='225'&&e?.market_definition==='full_game_total_including_overtime'&&e?.model_version===NBA_RELEASE_MODEL&&e?.release_decision==='QUALIFIED'&&Number(h.n)>=100&&Number.isFinite(Number(h.mae))&&Number.isFinite(Number(h.baseline_mae))&&Number(h.mae)<Number(h.baseline_mae)&&Number.isFinite(Number(h.bias))&&Math.abs(Number(h.bias))<=3&&Number(m.n)>=100&&nbaMarketCohortMatchesSnapshotEvidence(e,p)&&Number(m.roi)>0&&Number(m.roi_ci95_lower)>0&&Number(m.roi_vs_market_favorite)>0&&p?.paper_only===true&&p?.experiment==='NBA_TOTALS_EMPIRICAL_RESIDUAL_VALUE_V3'&&p?.model_version===NBA_RELEASE_MODEL&&p?.model_projection_market_blind===true&&p?.prospective_holdout_cutoff_utc===NBA_RELEASE_CUTOFF&&p?.prospective_holdout_used_for_calibration===false&&p?.live_value_decisions_authorized===false&&Number(cal.probability_edge_threshold)===0.04&&Number(cal.expected_value_threshold)===0.03&&c.cutoff_utc===NBA_RELEASE_CUTOFF&&probabilitySample&&selectionEvidence&&p?.prospective_minimum_sample_reached===true&&p?.prospective_probability_validation_sample_met===true&&p?.prospective_clv_release_check_passed===true&&v.positive_clv_release_check_passed===true&&Number(v.near_close_observations)>=1&&Number(v.mean_probability_clv)>0&&Number(v.mean_line_clv_points)>0);
+ return !!(e?.paper_only===true&&e?.evaluation_type==='NBA_TOTALS_FIXED_CUTOFF_V2'&&e?.holdout_protocol?.fixed_cutoff_utc===NBA_RELEASE_CUTOFF&&e?.market_id==='225'&&e?.market_definition==='full_game_total_including_overtime'&&e?.model_version===NBA_RELEASE_MODEL&&e?.release_decision==='QUALIFIED'&&Number(h.n)>=100&&Number.isFinite(Number(h.mae))&&Number.isFinite(Number(h.baseline_mae))&&Number(h.mae)<Number(h.baseline_mae)&&Number.isFinite(Number(h.bias))&&Math.abs(Number(h.bias))<=3&&Number(m.n)>=100&&nbaMarketCohortMatchesSnapshotEvidence(e,p)&&Number(m.roi)>0&&Number(m.roi_ci95_lower)>0&&Number(m.roi_vs_market_favorite)>0&&p?.paper_only===true&&p?.experiment==='NBA_TOTALS_EMPIRICAL_RESIDUAL_VALUE_V3'&&p?.model_version===NBA_RELEASE_MODEL&&p?.model_projection_market_blind===true&&p?.prospective_holdout_cutoff_utc===NBA_RELEASE_CUTOFF&&p?.prospective_holdout_used_for_calibration===false&&p?.live_value_decisions_authorized===false&&Number(cal.probability_edge_threshold)===0.04&&Number(cal.expected_value_threshold)===0.03&&c.cutoff_utc===NBA_RELEASE_CUTOFF&&probabilitySample&&selectionEvidence&&p?.prospective_minimum_sample_reached===true&&p?.prospective_probability_validation_sample_met===true&&p?.prospective_clv_release_check_passed===true&&v.positive_clv_release_check_passed===true&&Number(v.near_close_observations)>=1&&Number(v.mean_probability_clv)>0&&Number(v.mean_line_clv_points)>0);
 }
+export function nbaTotalsReleaseQualified(e,p,sourceEvidenceFresh=false){
+ return sourceEvidenceFresh===true && nbaTotalsReportsMeetReleaseCriteria(e,p);
+}
+
 async function readNbaReleaseJson(path, deadlineAt = null, fingerprintTarget = null){
  const remainingMs = deadlineAt == null ? 10000 : Math.max(250, Math.min(10000, deadlineAt - Date.now()));
  const response=await fetch('https://raw.githubusercontent.com/topboyasian-stack/match-signal/main/'+path+'?v='+Date.now(),{headers:{Accept:'application/json','Cache-Control':'no-cache','Pragma':'no-cache'},signal:AbortSignal.timeout(remainingMs)});
@@ -105,6 +109,13 @@ async function readNbaReleaseJson(path, deadlineAt = null, fingerprintTarget = n
    fingerprintTarget[path]=Array.from(new Uint8Array(digest),b=>b.toString(16).padStart(2,'0')).join('');
   }
  try{return JSON.parse(body);}catch(_){throw new Error(path+' returned non-JSON release evidence (HTTP '+response.status+', content-type '+String(response.headers.get('content-type')||'unknown')+').');}
+}
+export async function loadNbaReleasePrecheck(deadlineAt = null){
+ const [evidence,probability]=await Promise.all([
+  readNbaReleaseJson('data/nba_totals_oos_value_test.json',deadlineAt),
+  readNbaReleaseJson('data/nba_totals_probability_value_experiment.json',deadlineAt)
+ ]);
+ return {evidence,probability,reportsMeetReleaseCriteria:nbaTotalsReportsMeetReleaseCriteria(evidence,probability)};
 }
 export async function loadNbaReleaseContext(deadlineAt = null){
   const sourceFingerprint={};
@@ -1315,8 +1326,16 @@ async function handlePost(context) {
       // independent prospective release gate before provider lookup or share-code creation.
       // Automated NBA Builder batches also gate every Basketball leg. Manual market-219
       // match-winner slips remain a separate path; market-225 totals are never exempt.
-      try { nbaReleaseContext = await loadNbaReleaseContext(requestDeadlineAt); }
-      catch (error) { return json({ ok: false, error: 'NBA_RELEASE_EVIDENCE_UNAVAILABLE', message: 'NBA release evidence could not be verified. No NBA share code was requested.' }, 503); }
+      // Cheap report-only precheck: when any published release predicate fails, reject before
+      // downloading/parsing the large immutable snapshot archive. This can only keep the gate
+      // closed; any possible pass still requires the full current-source fingerprint and snapshots.
+      try {
+        const precheck = await loadNbaReleasePrecheck(requestDeadlineAt);
+        if (!precheck.reportsMeetReleaseCriteria) return json({ ok: false, error: 'NBA_RELEASE_GATE_LOCKED', booking_code_withheld: true, message: 'The independent NBA release gate has not passed. No NBA share code was requested.' }, 423);
+        nbaReleaseContext = await loadNbaReleaseContext(requestDeadlineAt);
+      } catch (error) {
+        return json({ ok: false, error: 'NBA_RELEASE_EVIDENCE_UNAVAILABLE', message: 'NBA release evidence could not be verified. No NBA share code was requested.' }, 503);
+      }
       if (!nbaTotalsReleaseQualified(nbaReleaseContext.evidence, nbaReleaseContext.probability, nbaReleaseContext.sourceEvidenceFresh===true)) return json({ ok: false, error: 'NBA_RELEASE_GATE_LOCKED', booking_code_withheld: true, message: 'The independent NBA release gate has not passed. No NBA share code was requested.' }, 423);
     }
     // Started selections cannot be pre-match bookable. Avoid looking them up

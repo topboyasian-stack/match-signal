@@ -1,7 +1,7 @@
 import test from 'node:test';
 import { createHash } from 'node:crypto';
 import assert from 'node:assert/strict';
-import { onRequest, nbaTotalsReleaseQualified, loadNbaReleaseContext } from '../functions/api/sportybet-booking.js';
+import { onRequest, nbaTotalsReleaseQualified, nbaTotalsReportsMeetReleaseCriteria, loadNbaReleasePrecheck, loadNbaReleaseContext } from '../functions/api/sportybet-booking.js';
 
 const MODEL = 'nba-total-v5.1-pace-efficiency-calibrated';
 const CUTOFF = '2026-11-02T02:00:00+00:00';
@@ -178,6 +178,7 @@ function fixture(espnId, sportybetId, home, away, offsetMinutes = 0) {
 
 test('NBA release gate rejects mismatched ROI and CLV snapshot linkage', () => {
   const bundle = buildEvidence([fixture('audit-check', 'sr:match:audit-check', 'Boston Celtics', 'New York Knicks')]);
+  assert.equal(nbaTotalsReportsMeetReleaseCriteria(bundle.evidence, bundle.probability), true);
   assert.equal(nbaTotalsReleaseQualified(bundle.evidence, bundle.probability, true), true);
   const clvRow = bundle.probability.prospective_clv_diagnostics.fixtures[0];
   const originalSnapshotId = clvRow.opening.snapshot_id;
@@ -188,6 +189,22 @@ test('NBA release gate rejects mismatched ROI and CLV snapshot linkage', () => {
   clvRow.opening.over_odds = 1.92;
   assert.equal(nbaTotalsReleaseQualified(bundle.evidence, bundle.probability), false);
   clvRow.opening.over_odds = originalOdds;
+});
+
+test('NBA research-only precheck stops after the two compact release reports', async () => {
+  const bundle = buildEvidence([fixture('precheck-only', 'sr:match:precheck-only', 'Boston Celtics', 'New York Knicks')]);
+  bundle.evidence.release_decision = 'RESEARCH_ONLY';
+  const mock = installFetchMock({ bundle, events: [] });
+  try {
+    const precheck = await loadNbaReleasePrecheck();
+    assert.equal(precheck.reportsMeetReleaseCriteria, false);
+    assert.equal(mock.calls.raw, 2);
+    assert.equal(mock.calls.event, 0);
+    assert.equal(mock.calls.feed, 0);
+    assert.equal(mock.calls.share, 0);
+  } finally {
+    mock.restore();
+  }
 });
 
 test('NBA release context fails closed when the current ledger changes after the report fingerprint', async () => {
@@ -486,7 +503,7 @@ test('manual NBA market-225 totals stay locked when model evidence is research-o
     assert.equal(body.error, 'NBA_RELEASE_GATE_LOCKED');
     assert.equal(body.booking_code_withheld, true);
     assert.equal(Object.hasOwn(body, 'booking_code'), false);
-    assert.ok(mock.calls.raw > 0, 'manual totals must load independent release evidence');
+    assert.equal(mock.calls.raw, 2, 'research-only precheck reads only the two compact reports, not the large snapshot archive');
     assert.equal(mock.calls.event, 0, 'an unqualified totals slip must be rejected before SportyBet event lookup');
     assert.equal(mock.calls.feed, 0, 'an unqualified totals slip must be rejected before catalogue lookup');
     assert.equal(mock.calls.share, 0, 'an unqualified totals slip must never request a share code');
