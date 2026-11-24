@@ -110,7 +110,7 @@ def run():
         assert expected_group in workflow_text, (
             f"Scheduled {name} must be isolated from event-driven concurrency to prevent cron starvation."
         )
-    watchdog_group = "group: nba-totals-capture-freshness-watchdog-${{ github.event_name == 'schedule' && 'scheduled' || (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && 'recovery' || 'event-driven' }}"
+    watchdog_group = "group: nba-totals-capture-freshness-watchdog-v2-${{ github.event_name == 'schedule' && 'scheduled' || (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && 'recovery' || 'event-driven' }}"
     assert watchdog_group in watchdog_workflow, (
         "Scheduled freshness checks and push/manual schedule-state recovery must each have a protected concurrency lane."
     )
