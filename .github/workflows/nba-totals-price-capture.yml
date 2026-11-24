@@ -122,7 +122,7 @@ jobs:
           echo 'Could not publish NBA totals price capture after retries.' >&2
           exit 1
 
-      - name: Dispatch NBA probability/value refresh when new immutable quotes were added
+      - name: Dispatch settlement and probability/value refresh after new immutable quotes
         if: success()
         env:
           GH_TOKEN: ${{ github.token }}
@@ -135,10 +135,36 @@ jobs:
           print(int(status.get("immutable_snapshots_added") or 0))
           PY
           )"
+          ledger_age_minutes="$(python - <<'PY'
+          import json
+          from datetime import datetime, timezone
+          from pathlib import Path
+          try:
+              ledger = json.loads(Path("data/nba_totals_ledger.json").read_text(encoding="utf-8"))
+              updated = datetime.fromisoformat(str(ledger.get("updated_at", "")).replace("Z", "+00:00"))
+              if updated.tzinfo is None:
+                  updated = updated.replace(tzinfo=timezone.utc)
+              age = (datetime.now(timezone.utc) - updated.astimezone(timezone.utc)).total_seconds() / 60
+              print(f"{max(0.0, age):.2f}")
+          except (OSError, ValueError, TypeError):
+              print("999999")
+          PY
+          )"
           echo "New immutable SportyBet market-225 snapshots: $added"
+          echo "Official ESPN ledger age at capture completion: $ledger_age_minutes minutes"
           if [ "$added" -gt 0 ]; then
+            if python - "$ledger_age_minutes" <<'PY'
+          import sys
+          raise SystemExit(0 if float(sys.argv[1]) >= 10 else 1)
+          PY
+            then
+              gh workflow run nba-totals-settlement.yml --ref main -f capture_triggered=true
+              echo "Dispatched official ESPN settlement because the ledger is at least ten minutes old."
+            else
+              echo "The official ESPN ledger is fresh; the event-driven settlement gate will avoid redundant reconciliation."
+            fi
             gh workflow run nba-totals-probability-value.yml --ref main
             echo "Dispatched probability/value research after new immutable quote evidence."
           else
-            echo "No new immutable quote snapshots; no report refresh dispatch needed."
+            echo "No new immutable quote snapshots; no event-driven settlement/report dispatch needed."
           fi

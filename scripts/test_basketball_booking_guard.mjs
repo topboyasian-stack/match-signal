@@ -192,6 +192,7 @@ test('basketball-specific booking POST refuses to bypass the research-only NBA r
     assert.equal(result.booking_code_withheld, true);
     assert.match(result.message, /fixed-cutoff forecasting.*prospective market ROI/i);
     assert.equal(calls.filter(url => url.includes('/api/sportybet-basketball?')).length, 0);
+    assert.equal(calls.length, 2, 'research-only precheck must not load the large snapshot archive or history');
     assert.equal(calls.some(url => /sportybet\.com/.test(url)), false);
   } finally {
     globalThis.fetch = originalFetch;
