@@ -29,13 +29,22 @@ def capture_age_minutes(checked_at, now):
     return (current - checked).total_seconds() / 60
 
 
-def should_dispatch_capture(checked_at, now, active_capture_runs=0, max_age_minutes=10):
-    """Dispatch only when capture evidence is stale and no capture is already active."""
+def should_dispatch_capture(
+    checked_at,
+    now,
+    active_capture_runs=0,
+    max_age_minutes=10,
+    captured_prediction_sha256=None,
+    current_prediction_sha256=None,
+):
+    """Dispatch when capture is old OR the published prediction source has changed."""
     age = capture_age_minutes(checked_at, now)
-    if age is None or age < -2:
-        stale = True
-    else:
-        stale = age >= float(max_age_minutes)
+    age_stale = age is None or age < -2 or age >= float(max_age_minutes)
+    source_stale = current_prediction_sha256 is not None and (
+        not captured_prediction_sha256
+        or str(captured_prediction_sha256).strip() != str(current_prediction_sha256).strip()
+    )
+    stale = age_stale or source_stale
     try:
         active = int(active_capture_runs)
     except (TypeError, ValueError):

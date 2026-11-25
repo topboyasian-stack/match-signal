@@ -5,6 +5,7 @@ This small scheduled task refreshes only quotes for already-published V5 NBA
 predictions. It never rebuilds the model, changes probabilities, or invents a
 line when SportyBet does not expose the exact fixture and both prices.
 """
+import hashlib
 import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -23,6 +24,11 @@ from live_expansion_pipeline import (
 PREDICTIONS = DATA / "nba_predictions.json"
 SNAPSHOTS = DATA / "nba_totals_publication_snapshots.json"
 STATUS = DATA / "nba_totals_price_capture_status.json"
+
+
+def file_sha256(path):
+    """Return the SHA-256 fingerprint of the exact persisted file bytes."""
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 NBA_TOURNAMENT_ID = "sr:tournament:132"
 
 
@@ -363,6 +369,7 @@ def main():
     PREDICTIONS.write_text(json.dumps(predictions, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     status = {
         "checked_at": now.isoformat(),
+        "prediction_source_sha256": file_sha256(PREDICTIONS),
         "paper_only": True,
         "model_version": NBA_TOTALS_MODEL_VERSION,
         "source": "SportyBet Nigeria public NBA feed via Match Signal regional proxy",

@@ -18,6 +18,7 @@ def dt(value):
 def run():
     root = Path(__file__).resolve().parents[1]
     capture_workflow = (root / ".github/workflows/nba-totals-price-capture.yml").read_text(encoding="utf-8")
+    capture_script = (root / "scripts/capture_nba_totals_prices.py").read_text(encoding="utf-8")
     watchdog_workflow = (root / ".github/workflows/nba-totals-capture-watchdog.yml").read_text(encoding="utf-8")
     settlement_workflow = (root / ".github/workflows/nba-totals-settlement.yml").read_text(encoding="utf-8")
     probability_workflow = (root / ".github/workflows/nba-totals-probability-value.yml").read_text(encoding="utf-8")
@@ -134,6 +135,26 @@ def run():
     assert should_dispatch_capture("2026-11-02T08:29:00Z", now, 0), (
         "A timestamp more than two minutes in the future must fail safe."
     )
+    assert should_dispatch_capture(
+        "2026-11-02T08:24:59Z", now, 0,
+        captured_prediction_sha256="old-prediction-hash",
+        current_prediction_sha256="new-prediction-hash",
+    ), "A new prediction publication must trigger capture even when the last capture timestamp is fresh."
+    assert not should_dispatch_capture(
+        "2026-11-02T08:24:59Z", now, 1,
+        captured_prediction_sha256="old-prediction-hash",
+        current_prediction_sha256="new-prediction-hash",
+    ), "An active capture must still suppress duplicate recovery when the prediction source changed."
+    assert not should_dispatch_capture(
+        "2026-11-02T08:24:59Z", now, 0,
+        captured_prediction_sha256="same-hash",
+        current_prediction_sha256="same-hash",
+    ), "Matching prediction fingerprints must preserve the fresh-capture guard."
+    assert should_dispatch_capture(
+        "2026-11-02T08:24:59Z", now, 0,
+        captured_prediction_sha256=None,
+        current_prediction_sha256="new-prediction-hash",
+    ), "Legacy capture statuses without a prediction fingerprint must fail safe to recapture."
 
 
     model_now = dt("2026-11-02T13:55:00Z")
@@ -242,6 +263,12 @@ def run():
     capture_decision = watchdog_workflow.split("      - name: Decide whether a recovery capture is needed", 1)[1].split("      - name: Dispatch recovery capture", 1)[0]
     assert "contents/data/nba_totals_price_capture_status.json?ref=main" in capture_decision and "base64 --decode" in capture_decision, (
         "Capture recovery must read the latest committed status from main at decision time, not a stale checkout."
+    )
+    assert "contents/data/nba_predictions.json?ref=main" in capture_decision, (
+        "Capture recovery must compare against the latest committed predictions, not only a fresh status timestamp."
+    )
+    assert "prediction_source_sha256" in capture_decision and "current_prediction_sha256" in capture_decision, (
+        "A changed prediction publication must invalidate the previous capture freshness result."
     )
     assert "ACTIVE_CAPTURE_RUNS=\"$(gh api" in capture_decision and "actions/workflows/nba-totals-price-capture.yml/runs?branch=main&per_page=20" in capture_decision, (
         "Capture recovery must re-count active runs at decision time to avoid duplicate captures after a run finishes."

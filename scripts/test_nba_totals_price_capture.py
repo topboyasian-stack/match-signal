@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Regression tests for fresh immutable NBA market-225 price capture."""
 import copy
+import hashlib
 import json
 import tempfile
 import unittest
@@ -10,7 +11,7 @@ from unittest.mock import patch
 
 from expansion_pipeline import NBA_TOTALS_MODEL_VERSION
 from live_expansion_pipeline import append_nba_totals_publication_snapshots, sportybet_basketball_feed
-from capture_nba_totals_prices import attach_fresh_quote, capture, capture_timestamp, diagnose_fixture_quote, nearby_feed_events, sportybet_basketball_feed_paged
+from capture_nba_totals_prices import attach_fresh_quote, capture, capture_timestamp, diagnose_fixture_quote, file_sha256, nearby_feed_events, sportybet_basketball_feed_paged
 
 
 def make_prediction(now, **overrides):
@@ -471,6 +472,13 @@ class PriceCaptureTests(unittest.TestCase):
         self.assertEqual(nearby[0]["home"], "Boston Celtics")
         self.assertTrue(nearby[0]["market_225_present"])
         self.assertLessEqual(nearby[0]["minutes_from_fixture"], 180)
+
+    def test_file_sha256_matches_exact_persisted_bytes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "nba_predictions.json"
+            payload = b'{"event_id":"fresh"}\\n'
+            path.write_bytes(payload)
+            self.assertEqual(file_sha256(path), hashlib.sha256(payload).hexdigest())
 
     def test_capture_time_is_taken_after_feed_response_not_before(self):
         before_response = self.now

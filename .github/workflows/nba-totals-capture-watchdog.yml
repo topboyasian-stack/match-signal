@@ -96,11 +96,13 @@ jobs:
           # Re-read main's committed capture status and active-run count at decision time.
           # The initial checkout can be stale if a capture finishes while this watchdog starts.
           gh api "repos/$GITHUB_REPOSITORY/contents/data/nba_totals_price_capture_status.json?ref=main" --jq .content | base64 --decode > /tmp/nba_totals_price_capture_status.latest.json
+          gh api "repos/$GITHUB_REPOSITORY/contents/data/nba_predictions.json?ref=main" --jq .content | base64 --decode > /tmp/nba_predictions.latest.json
           ACTIVE_CAPTURE_RUNS="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/nba-totals-price-capture.yml/runs?branch=main&per_page=20" --jq '[.workflow_runs[] | select(.status == "queued" or .status == "in_progress")] | length')"
           export ACTIVE_CAPTURE_RUNS
           printf 'active_capture_runs=%s\n' "$ACTIVE_CAPTURE_RUNS" >> "$GITHUB_OUTPUT"
           echo "Fresh active capture count at decision time: $ACTIVE_CAPTURE_RUNS"
           python - <<'PY' | tee -a "$GITHUB_OUTPUT"
+          import hashlib
           import json
           import os
           import sys
@@ -112,18 +114,28 @@ jobs:
 
           status = json.loads(Path("/tmp/nba_totals_price_capture_status.latest.json").read_text(encoding="utf-8"))
           checked_at = status.get("checked_at")
+          captured_prediction_sha256 = status.get("prediction_source_sha256")
+          current_prediction_sha256 = hashlib.sha256(Path("/tmp/nba_predictions.latest.json").read_bytes()).hexdigest()
+          prediction_source_matches = bool(captured_prediction_sha256) and captured_prediction_sha256 == current_prediction_sha256
           now = datetime.now(timezone.utc)
           active = int(os.environ.get("ACTIVE_CAPTURE_RUNS", "0"))
           age = capture_age_minutes(checked_at, now)
-          dispatch = should_dispatch_capture(checked_at, now, active_capture_runs=active, max_age_minutes=10)
+          dispatch = should_dispatch_capture(
+              checked_at, now, active_capture_runs=active, max_age_minutes=10,
+              captured_prediction_sha256=captured_prediction_sha256,
+              current_prediction_sha256=current_prediction_sha256,
+          )
           print(f"dispatch={'true' if dispatch else 'false'}")
           print(f"capture_age_minutes={age:.2f}" if age is not None else "capture_age_minutes=unknown")
-          if dispatch:
+          print(f"prediction_source_matches={'true' if prediction_source_matches else 'false'}")
+          if dispatch and not prediction_source_matches:
+              print("reason=prediction_source_changed_since_capture")
+          elif dispatch:
               print("reason=stale_capture_and_no_active_capture_run")
           elif active:
               print("reason=capture_already_queued_or_running")
           else:
-              print("reason=latest_capture_within_freshness_window")
+              print("reason=capture_and_prediction_source_within_freshness_window")
           PY
 
       - name: Dispatch recovery capture
