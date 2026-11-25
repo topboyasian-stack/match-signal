@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-25T04:31:43.575279+00:00",
+  "generated_at": "2026-11-25T04:36:33.642888+00:00",
   "version": "1.0.0-shadow",
   "mode": "PAPER_RESEARCH_ONLY",
   "status": "SHADOW_RESEARCH_ONLY",
@@ -11,11 +11,11 @@
   "inputs": {
     "history_rows": 30000,
     "normalized_observations": 24343,
-    "builder_generated_at": "2026-11-25T04:31:22.432569+00:00",
+    "builder_generated_at": "2026-11-25T04:36:18.679928+00:00",
     "live_updated_at": "2026-11-25T04:29:10.278919+00:00",
     "live_status": "LIVE",
     "live_events": 413,
-    "desk_events": 1960
+    "desk_events": 1835
   },
   "policy": {
     "anchor_min_probability": 0.8,
@@ -861,7 +861,7 @@
       }
     }
   ],
-  "current_anchor_count": 963,
+  "current_anchor_count": 962,
   "current_anchor_sources": [
     "best_available_legs",
     "desk_directional_anchors"
@@ -889,52 +889,6 @@
         "roi": 0.038667
       },
       "safe_rungs": []
-    },
-    {
-      "source": "best_available_legs",
-      "product": "efootball_gt",
-      "competition": "LaLiga 2x6",
-      "event_id": "sr:match:BAaILMJ4yeeS|44KuGyEcrQ",
-      "match": "Real Madrid (rostyk) vs Atleti (Solya)",
-      "anchor_line": 8.5,
-      "anchor_side": "under",
-      "anchor_model_probability": 0.912773,
-      "anchor_current_odds": 2.4,
-      "start_time": "2026-11-25T04:32:00+00:00",
-      "desk_model_probability": null,
-      "live_snapshot_at": "2026-11-25T04:29:10.278919+00:00",
-      "anchor_historical_evidence": {
-        "scope": "product_line",
-        "n": 103,
-        "wins": 64,
-        "hit_rate": 0.621359,
-        "avg_odds": 1.648155,
-        "roi": 0.019903
-      },
-      "safe_rungs": [
-        {
-          "line": 9.5,
-          "side": "under",
-          "sportybet": {
-            "odds": 1.8,
-            "de_vig_probability": 0.5135135135135135,
-            "fair_odds": 1.1401248591837723,
-            "expected_roi": 0.578774452202226,
-            "edge_vs_de_vig": 0.3635834043766121
-          },
-          "estimated_probability": 0.877097,
-          "historical_evidence": {
-            "scope": "product_line",
-            "n": 82,
-            "wins": 54,
-            "hit_rate": 0.658537,
-            "avg_odds": 1.593049,
-            "roi": 0.039268
-          },
-          "estimation_method": "historical_safe_line_rate_plus_shrunk_anchor_gap",
-          "shadow_value_eligible": true
-        }
-      ]
     },
     {
       "source": "best_available_legs",
@@ -1075,27 +1029,50 @@
       ]
     },
     {
-      "source": "desk_directional_anchors",
+      "source": "best_available_legs",
       "product": "efootball_gt",
-      "competition": "Esoccer H2H GG League",
-      "event_id": "sr:match:D069251126",
-      "match": "Spain (THREAT) vs Portugal (FAITH)",
-      "anchor_line": 4.5,
+      "competition": "Premier League 2x6",
+      "event_id": "sr:match:BAaIOGTwTd2SKN6yZ6FBuyg",
+      "match": "Arsenal (why) vs Chelsea (imagin)",
+      "anchor_line": 8.5,
       "anchor_side": "under",
-      "anchor_model_probability": 0.8433,
-      "anchor_current_odds": 1.24,
-      "start_time": "2026-11-25T04:31:00+00:00",
-      "desk_model_probability": 0.8433,
+      "anchor_model_probability": 0.912773,
+      "anchor_current_odds": 2.2,
+      "start_time": "2026-11-25T05:00:00+00:00",
+      "desk_model_probability": null,
       "live_snapshot_at": "2026-11-25T04:29:10.278919+00:00",
       "anchor_historical_evidence": {
-        "scope": "product_competition_line",
-        "n": 239,
-        "wins": 181,
-        "hit_rate": 0.757322,
-        "avg_odds": 1.338117,
-        "roi": 0.005941
+        "scope": "product_line",
+        "n": 103,
+        "wins": 64,
+        "hit_rate": 0.621359,
+        "avg_odds": 1.648155,
+        "roi": 0.019903
       },
-      "safe_rungs": []
+      "safe_rungs": [
+        {
+          "line": 9.5,
+          "side": "under",
+          "sportybet": {
+            "odds": 1.67,
+            "de_vig_probability": 0.5546666666666668,
+            "fair_odds": 1.1401248591837723,
+            "expected_roi": 0.46475185287650955,
+            "edge_vs_de_vig": 0.3224302512234588
+          },
+          "estimated_probability": 0.877097,
+          "historical_evidence": {
+            "scope": "product_line",
+            "n": 82,
+            "wins": 54,
+            "hit_rate": 0.658537,
+            "avg_odds": 1.593049,
+            "roi": 0.039268
+          },
+          "estimation_method": "historical_safe_line_rate_plus_shrunk_anchor_gap",
+          "shadow_value_eligible": true
+        }
+      ]
     },
     {
       "source": "desk_directional_anchors",
@@ -58798,18 +58775,6 @@
   ],
   "shadow_value_candidates": [
     {
-      "event_id": "sr:match:BAaILMJ4yeeS|44KuGyEcrQ",
-      "match": "Real Madrid (rostyk) vs Atleti (Solya)",
-      "product": "efootball_gt",
-      "anchor_line": 8.5,
-      "anchor_side": "under",
-      "safe_line": 9.5,
-      "estimated_probability": 0.877097,
-      "odds": 1.8,
-      "expected_roi": 0.578774452202226,
-      "edge_vs_de_vig": 0.3635834043766121
-    },
-    {
       "event_id": "sr:match:BAaIOGUBMfx-p66eQoYZe2Q",
       "match": "Liverpool (Frantsuz) vs Chelsea (imagin)",
       "product": "efootball_gt",
@@ -58844,6 +58809,18 @@
       "odds": 1.7,
       "expected_roi": 0.49106476041321345,
       "edge_vs_de_vig": 0.3304302512234589
+    },
+    {
+      "event_id": "sr:match:BAaIOGTwTd2SKN6yZ6FBuyg",
+      "match": "Arsenal (why) vs Chelsea (imagin)",
+      "product": "efootball_gt",
+      "anchor_line": 8.5,
+      "anchor_side": "under",
+      "safe_line": 9.5,
+      "estimated_probability": 0.877097,
+      "odds": 1.67,
+      "expected_roi": 0.46475185287650955,
+      "edge_vs_de_vig": 0.3224302512234588
     }
   ],
   "promotion_gate": {
