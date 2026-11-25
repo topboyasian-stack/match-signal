@@ -1,21 +1,21 @@
 {
-  "status": "VERIFIED",
+  "status": "VERIFIED_WITH_DIAGNOSTIC_INCOMPLETE",
   "core_pages_status": "VERIFIED",
-  "qualified_best_quote_coverage_status": "VALID_ZERO",
-  "qualified_best_candidate_pool_rows": 153,
+  "qualified_best_quote_coverage_status": "INCOMPLETE",
+  "qualified_best_candidate_pool_rows": 0,
   "qualified_best_model_qualified_rows": 0,
-  "booking_api_status": "VERIFIED",
+  "booking_api_status": "FAIL",
   "qualified_alternatives_status": "READY",
-  "qualified_alternatives_count": 37,
+  "qualified_alternatives_count": 38,
   "qualified_alternatives": {
-    "verified_at": "2026-11-25T00:27:52.712Z",
+    "verified_at": "2026-11-25T00:46:22.648Z",
     "endpoint": "/api/public/market-alternatives",
     "api_status": "OK",
     "status": "READY",
-    "alternative_count": 37,
-    "visible_candidate_count": 49,
-    "unique_fixture_count": 33,
-    "builder_qualified_count": 0,
+    "alternative_count": 38,
+    "visible_candidate_count": 50,
+    "unique_fixture_count": 34,
+    "builder_qualified_count": 1,
     "research_only_count": 49,
     "sports": [
       "efootball",
@@ -73,10 +73,10 @@
         "pick": "under",
         "line": 6.5,
         "odds": 1.11,
-        "probability": 0.928904,
+        "probability": 0.937527,
         "start_time": "2026-11-25T20:00Z",
-        "quote_status": "STALE",
-        "qualification_status": "RESEARCH_ONLY_QUOTE_NOT_CURRENT"
+        "quote_status": "FRESH_EXACT",
+        "qualification_status": "RESEARCH_ONLY"
       },
       {
         "sport": "football",
@@ -96,103 +96,62 @@
   },
   "shared_ticket_drawer_status": "READY",
   "provider": "Cloudflare Pages",
-  "source_commit": "402d72dcf3ec01bab6d0ac7eca812638978faf23",
-  "verified_at": "2026-11-25T00:28:36.986854+00:00",
+  "source_commit": "bfa23168c7ad37cd3248cdb837dfc5c8f7d41cae",
+  "verified_at": "2026-11-25T00:47:06.124713+00:00",
   "live_virtual_feed": {
-    "verified_at": "2026-11-25T00:28:36.754Z",
-    "status": "VALID_ZERO_QUALIFIED_CANDIDATES",
-    "coverage_state": "VALID_ZERO",
-    "scan_complete": true,
-    "scan_stop_reason": "no_model_qualified_candidates",
-    "no_model_qualified_candidates": true,
-    "paper_only": true,
-    "candidate_artifact_rows": 175,
-    "candidate_pool_rows_in_next_7_days": 153,
-    "candidate_pool_unique_events_in_next_7_days": 106,
-    "model_qualified_candidate_rows_in_next_7_days": 0,
-    "virtual_candidate_rows_in_next_7_days": 0,
-    "snapshot_gate_qualified_fixtures": 0,
-    "snapshot_gate_diagnostics": {
-      "futureCandidateMarkets": 0,
-      "modelQualifiedMarkets": 0,
-      "freshExactQuoteMarkets": 0,
-      "twoSidedValueMarkets": 0,
-      "edgePassingMarkets": 0,
-      "qualifiedFixtures": 0,
-      "blockerCounts": {}
+    "endpoint": "/api/sportybet-virtual",
+    "verified_at": "2026-11-25T00:47:01.027Z",
+    "status": "LIVE",
+    "events_count": 200,
+    "product_counts": {
+      "efootball_gt": 100,
+      "vfootball": 100
     },
-    "live_source_pages": [
-      {
-        "page": 1,
-        "count": 100,
-        "fetched_at": "2026-11-25T00:28:36.723Z",
-        "status": "LIVE"
+    "source_status": {
+      "efootball_live": {
+        "status": "EMPTY",
+        "events": 0,
+        "latency_ms": 261,
+        "endpoint": "/api/ng/factsCenter/wapConfigurableIndexLiveEvents"
+      },
+      "vfootball_live": {
+        "status": "EMPTY",
+        "events": 0,
+        "latency_ms": 844,
+        "endpoint": "/api/ng/factsCenter/wapConfigurableIndexLiveEvents"
+      },
+      "efootball": {
+        "status": "LIVE",
+        "events": 100,
+        "attempts": 1,
+        "retried": false,
+        "latency_ms": 1513,
+        "endpoint": "/api/ng/factsCenter/pcUpcomingEvents",
+        "primary_endpoint": "/api/ng/factsCenter/pcUpcomingEvents"
+      },
+      "vfootball": {
+        "status": "LIVE",
+        "events": 100,
+        "latency_ms": 2838
       }
-    ],
-    "unique_live_events_seen": 100,
-    "matched_candidate_market_rows": 0,
-    "exact_line_market_rows": 0,
-    "exact_side_price_rows": 0,
-    "rows_with_quote_timestamp": 0,
-    "live_gate_qualified_fixtures": 0,
-    "live_gate_diagnostics": {
-      "futureCandidateMarkets": 0,
-      "modelQualifiedMarkets": 0,
-      "freshExactQuoteMarkets": 0,
-      "twoSidedValueMarkets": 0,
-      "edgePassingMarkets": 0,
-      "qualifiedFixtures": 0,
-      "blockerCounts": {}
     },
-    "matched_event_market_inventory": {
-      "candidate_rows_with_any_live_markets": 0,
-      "observed_market_rows": 0,
-      "candidate_exact_line_totals_market_metadata_matches": 0,
-      "market_id_name_counts": {}
-    },
-    "matched_market_samples": [],
-    "unmatched_samples": [],
-    "qualified_examples": []
+    "errors": []
   },
   "booking_api": {
-    "verified_at": "2026-11-25T00:28:20.572Z",
-    "status": "VOLATILE_MARKET",
-    "http_status": 409,
-    "ok": true,
+    "verified_at": "2026-11-25T00:46:48.773Z",
+    "status": "FAIL",
+    "http_status": 503,
+    "ok": false,
     "batch_id": "DESK-BATCH-01",
     "selection_count": 2,
     "booking_code_available": false,
-    "error": "EFOOTBALL_SLIP_REJECTED_PARTIAL",
-    "message": "At least one eFootball leg failed current SportyBet validation. No share code was created. Refresh the whole ticket and add the current qualified selections again.",
-    "volatile_market": true,
-    "validation": [
-      {
-        "event_id": "sr:match:BAaIOGrzVeeaFzsSXtyT6xQ",
-        "sport": "virtual",
-        "match": "France (v1nn) vs England (cl1vlind)",
-        "market": "virtual_total",
-        "pick": "France (v1nn) vs England (cl1vlind) \u2014 O/U under 6.5",
-        "line": 6.5,
-        "ok": false,
-        "excluded": true,
-        "reason": "Event is no longer present in SportyBet current catalogue."
-      },
-      {
-        "event_id": "sr:match:BAaIOGrkEeqOMmPF6QJZ8Qg",
-        "sport": "virtual",
-        "match": "Spain (A1ose) vs Brazil (RuBIX)",
-        "market": "virtual_total",
-        "pick": "Spain (A1ose) vs Brazil (RuBIX) \u2014 O/U under 6.5",
-        "line": 6.5,
-        "ok": false,
-        "excluded": true,
-        "reason": "Event is no longer present in SportyBet current catalogue."
-      }
-    ]
+    "error": null,
+    "message": null,
+    "volatile_market": false
   },
   "nba_ticket_gate_probe_status": "PASS",
   "nba_ticket_gate_probe": {
-    "verified_at": "2026-11-25T00:28:35.006Z",
+    "verified_at": "2026-11-25T00:47:01.992Z",
     "status": "PASS",
     "probe_type": "manual_and_automated_nba_release_gate",
     "current_main_release_qualified": false,
@@ -217,7 +176,7 @@
         "booking_code_present": false
       },
       {
-        "base": "https://145b9b1e.match-signal.pages.dev",
+        "base": "https://9cc1cf82.match-signal.pages.dev",
         "endpoint_type": "manual_market225_release_gate",
         "http_status": 423,
         "error": "NBA_RELEASE_GATE_LOCKED",
@@ -226,7 +185,7 @@
         "booking_code_present": false
       },
       {
-        "base": "https://145b9b1e.match-signal.pages.dev",
+        "base": "https://9cc1cf82.match-signal.pages.dev",
         "endpoint_type": "automated_basketball_builder",
         "http_status": 423,
         "error": "NBA_RELEASE_GATE_LOCKED",
@@ -243,8 +202,8 @@
     "live_virtual_proxy",
     "virtual_lab_live_snapshot",
     "live_production_data",
-    "booking_api_post",
-    "qualified_best_valid_zero",
+    "booking_api_post_not_verified",
+    "qualified_best_live_quote_diagnostic_incomplete",
     "nba_ticket_gate_fail_closed",
     "qualified_alternatives_live"
   ]
