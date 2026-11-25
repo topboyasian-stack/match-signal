@@ -2,8 +2,8 @@ name: NBA totals SportyBet market-225 price capture
 
 on:
   schedule:
-    # Canonical ten-minute cadence. A push to this workflow also starts one
-    # immediate capture when re-arming schedule delivery after a missed tick.
+    # Canonical ten-minute cadence. A workflow-file push starts one recovery
+    # capture after a missed schedule tick; the 15-minute quote-age contract is unchanged.
     # The exact-market freshness contract remains 15 minutes and is not relaxed.
     - cron: '*/10 * * * *'
   workflow_dispatch:
