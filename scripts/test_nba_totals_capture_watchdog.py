@@ -23,6 +23,10 @@ def run():
     settlement_workflow = (root / ".github/workflows/nba-totals-settlement.yml").read_text(encoding="utf-8")
     probability_workflow = (root / ".github/workflows/nba-totals-probability-value.yml").read_text(encoding="utf-8")
     live_expansion_workflow = (root / ".github/workflows/live-expansion.yml").read_text(encoding="utf-8")
+    assert "'docs/NBA_BETTING_READINESS_EXECUTION.md'" in watchdog_workflow, (
+        "Updating the durable NBA readiness checkpoint must trigger schedule re-arm and stale evidence recovery."
+    )
+
     assert "cron: '*/10 * * * *'" in capture_workflow, (
         "NBA SportyBet market-225 capture must run every 10 minutes after the schedule re-arm."
     )
