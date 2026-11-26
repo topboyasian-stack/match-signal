@@ -250,6 +250,17 @@ class SettlementTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertIn("data/nba_totals_probability_settlements.json", workflow)
         self.assertIn("git add data/nba_totals_ledger.json data/nba_totals_probability_settlements.json", workflow)
+        no_evidence_guard = 'if [ "$evidence_changed" != "true" ]; then'
+        self.assertIn(no_evidence_guard, workflow)
+        self.assertLess(
+            workflow.index(no_evidence_guard),
+            workflow.index("git add data/nba_totals_ledger.json data/nba_totals_probability_settlements.json"),
+            "No-evidence settlement checks must not commit timestamp-only ledger changes.",
+        )
+        self.assertIn(
+            "preserving main ledger timestamps and skipping a no-op commit",
+            workflow,
+        )
         self.assertIn("requests pandas", workflow, "Settlement CI must install pandas required by the import chain.")
         push_paths = workflow.split("  push:", 1)[1].split("permissions:", 1)[0]
         self.assertNotIn(

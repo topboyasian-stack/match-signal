@@ -118,6 +118,10 @@ jobs:
           PY
             )"
             echo "Candidate adds new official settlement evidence: $evidence_changed"
+            if [ "$evidence_changed" != "true" ]; then
+              echo "No new official ESPN settlement evidence; preserving main ledger timestamps and skipping a no-op commit."
+              exit 0
+            fi
             if python - <<'PY'
           import json
           from datetime import datetime
