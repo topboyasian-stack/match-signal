@@ -2,19 +2,13 @@ name: NBA totals SportyBet market-225 price capture
 
 on:
   schedule:
-    # Canonical ten-minute cadence. A workflow-file push starts one recovery
-    # capture after a missed schedule tick; the 15-minute quote-age contract is unchanged.
+    # Canonical ten-minute cadence. The freshness watchdog re-arms this schedule
+    # and dispatches recovery when capture evidence or prediction-source SHA is stale.
+    # This workflow avoids a direct workflow_run trigger; Live Expansion now performs
+    # an explicit post-publication source-hash handoff to prevent duplicate captures.
     # The exact-market freshness contract remains 15 minutes and is not relaxed.
     - cron: '*/10 * * * *'
   workflow_dispatch:
-  workflow_run:
-    # Live Expansion is the upstream writer for NBA forecast/publication snapshots.
-    # Board, Builder, and Pages completions do not change data/nba_predictions.json;
-    # recapturing on those events creates duplicate quote revisions and report-publish contention.
-    # API-code changes still trigger via push paths; the ten-minute schedule remains the fallback.
-    workflows:
-      - "Match Signal Live Expansion"
-    types: [completed]
   push:
     branches: [main]
     paths:
@@ -24,7 +18,6 @@ on:
       - 'scripts/test_nba_totals_price_capture.py'
       - 'scripts/test_nba_sportybet_totals.py'
       - 'functions/api/sportybet-basketball.js'
-      - '.github/workflows/nba-totals-price-capture.yml'
 
 permissions:
   actions: write
@@ -32,13 +25,12 @@ permissions:
 
 concurrency:
   # GitHub permits only one pending run per concurrency group. Keep the cron
-  # lane separate so event-driven board/Builder completions cannot replace it.
+  # lane separate so explicit post-publication recovery captures cannot replace it.
   group: nba-totals-price-capture-${{ github.event_name == 'schedule' && 'scheduled' || 'event-driven' }}
   cancel-in-progress: false
 
 jobs:
   capture:
-    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:

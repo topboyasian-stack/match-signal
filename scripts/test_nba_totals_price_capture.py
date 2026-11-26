@@ -45,19 +45,20 @@ def make_quote(now, **overrides):
 
 
 class PriceCaptureTests(unittest.TestCase):
-    def test_capture_workflow_avoids_unrelated_board_and_builder_recaptures(self):
-        workflow_path = Path(__file__).resolve().parents[1] / ".github" / "workflows" / "nba-totals-price-capture.yml"
+    def test_capture_uses_explicit_post_publication_handoff_without_duplicate_workflow_run(self):
+        root = Path(__file__).resolve().parents[1]
+        workflow_path = root / ".github" / "workflows" / "nba-totals-price-capture.yml"
         workflow = workflow_path.read_text(encoding="utf-8")
-        workflow_run = workflow.split("\n  workflow_run:\n", 1)[1].split("\n  push:\n", 1)[0]
-        self.assertIn('"Match Signal Live Expansion"', workflow_run)
-        self.assertNotIn('"Match Signal Unified Upcoming Board"', workflow_run)
-        self.assertNotIn('"Match Signal Builder Production Promotion"', workflow_run)
-        self.assertNotIn('"Deploy Match Signal to Cloudflare Pages"', workflow_run)
+        self.assertNotIn("\n  workflow_run:\n", workflow)
+        self.assertNotIn("if: github.event_name != 'workflow_run'", workflow)
         push_paths = workflow.split("\n  push:\n", 1)[1].split("\npermissions:\n", 1)[0]
         self.assertIn("'scripts/capture_nba_totals_prices.py'", push_paths)
         self.assertNotIn("'scripts/live_expansion_pipeline.py'", push_paths)
+        self.assertNotIn("'.github/workflows/nba-totals-price-capture.yml'", push_paths)
         self.assertIn("cron: '*/10 * * * *'", workflow)
-        self.assertIn("if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'", workflow)
+        live_expansion = (root / ".github" / "workflows" / "live-expansion.yml").read_text(encoding="utf-8")
+        self.assertIn("Revalidate prediction-source hash and dispatch exact SportyBet market-225 capture", live_expansion)
+        self.assertIn("gh workflow run nba-totals-price-capture.yml --ref main", live_expansion)
 
     def test_basketball_page_scopes_sportybet_feed_to_nba(self):
         root = Path(__file__).resolve().parents[1]
