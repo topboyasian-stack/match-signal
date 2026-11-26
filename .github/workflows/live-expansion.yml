@@ -96,6 +96,10 @@ jobs:
           assert 'Generated files conflict with newer main data; rebuild only on this path.' in publish
           assert publish.index('if git rebase origin/main; then') < publish.index('python scripts/run_live_expansion.py')
           assert "steps.ere_publication.outputs.ready" in source
+          assert "Revalidate prediction-source hash and dispatch exact SportyBet market-225 capture" in publish
+          assert "gh workflow run nba-totals-price-capture.yml --ref main" in publish
+          assert "prediction_source_sha256" in publish and "hashlib.sha256" in publish
+          assert publish.index("Revalidate prediction-source hash and dispatch exact SportyBet market-225 capture") < publish.index("Dispatch NBA totals settlement after new NBA data is published")
           assert "Dispatch NBA totals settlement after new NBA data is published" in publish
           assert "Settle NBA total snapshots against official final ESPN " + "scores" not in source
           assert 'git add data/nba_totals_oos_value_test.json' not in publish, 'Only the dedicated NBA report workflow may publish the OOS artifact.'
@@ -268,6 +272,46 @@ jobs:
           done
           echo "Unable to publish NBA research artifacts after eight retries."
           exit 1
+      - name: Revalidate prediction-source hash and dispatch exact SportyBet market-225 capture
+        if: steps.publish.outputs.nba_changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Wait briefly for any capture that began before this NBA publication to finish.
+          # Then compare its committed prediction-source hash with the newly published file.
+          active=0
+          for attempt in $(seq 1 12); do
+            active="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/nba-totals-price-capture.yml/runs?branch=main&per_page=20" --jq '[.workflow_runs[] | select(.status == "queued" or .status == "in_progress")] | length')"
+            if [ "$active" -eq 0 ]; then break; fi
+            echo "Waiting for active market-225 capture before checking the newly published NBA source ($attempt/12)."
+            sleep 5
+          done
+          if [ "$active" -gt 0 ]; then
+            echo "A market-225 capture is still active; the freshness watchdog will retry source-hash recovery."
+            exit 0
+          fi
+          gh api "repos/$GITHUB_REPOSITORY/contents/data/nba_totals_price_capture_status.json?ref=main" --jq .content | base64 --decode > /tmp/nba_totals_price_capture_status.latest.json
+          gh api "repos/$GITHUB_REPOSITORY/contents/data/nba_predictions.json?ref=main" --jq .content | base64 --decode > /tmp/nba_predictions.latest.json
+          needs_capture="$(python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+          status = json.loads(Path("/tmp/nba_totals_price_capture_status.latest.json").read_text(encoding="utf-8"))
+          captured = str(status.get("prediction_source_sha256") or "").strip()
+          current = hashlib.sha256(Path("/tmp/nba_predictions.latest.json").read_bytes()).hexdigest()
+          print("true" if not captured or captured != current else "false")
+          print(f"prediction_source_matches={str(bool(captured) and captured == current).lower()}")
+          PY
+          )"
+          needs_capture="$(printf '%s\n' "$needs_capture" | head -n 1)"
+          echo "Prediction-source mismatch requires exact market-225 capture: $needs_capture"
+          if [ "$needs_capture" = "true" ]; then
+            gh workflow run nba-totals-price-capture.yml --ref main
+            echo "Dispatched exact SportyBet Nigeria market-225 capture after the new NBA prediction publication."
+          else
+            echo "Latest capture already matches the published NBA prediction source; no duplicate capture dispatched."
+          fi
       - name: Dispatch NBA totals settlement after new NBA data is published
         if: steps.publish.outputs.nba_changed == 'true'
         env:
