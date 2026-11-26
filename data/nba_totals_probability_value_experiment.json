@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-26T00:29:47.926082+00:00",
+  "generated_at": "2026-11-26T00:46:19.527441+00:00",
   "paper_only": true,
   "experiment": "NBA_TOTALS_EMPIRICAL_RESIDUAL_VALUE_V3",
   "model_version": "nba-total-v5.1-pace-efficiency-calibrated",
@@ -4701,13 +4701,56 @@
       "calibration_check": "PASS",
       "decision": "NO BET",
       "decision_is_authorized_for_betting": false
+    },
+    {
+      "event_id": "401909317",
+      "matchup": "Philadelphia 76ers vs Miami Heat",
+      "published_at": "2026-11-24T20:31:47.768876+00:00",
+      "settled_result": "under",
+      "won_by_original_point_edge_pick": true,
+      "research_value_signal_outcome": "NOT_A_SIGNAL",
+      "forecast_total": 235.9514,
+      "sportybet_line": 239.5,
+      "over_odds": 1.9,
+      "under_odds": 1.88,
+      "model_probability": {
+        "over": 0.4742,
+        "under": 0.5258,
+        "push": 0.0
+      },
+      "market_no_vig_probability": {
+        "over": 0.4974,
+        "under": 0.5026
+      },
+      "model_probability_conditional_on_no_push": {
+        "over": 0.4742,
+        "under": 0.5258
+      },
+      "model_probability_edge": {
+        "over": -0.0231,
+        "under": 0.0231
+      },
+      "expected_value_per_unit": {
+        "over": -0.099,
+        "under": -0.0115
+      },
+      "bootstrap_95_lower_bound": {
+        "over_probability_edge": -0.0815,
+        "under_probability_edge": -0.0353,
+        "over_expected_value": -0.21,
+        "under_expected_value": -0.1214,
+        "method": "deterministic paired empirical-residual bootstrap; 4,000 resamples"
+      },
+      "calibration_check": "PASS",
+      "decision": "NO BET",
+      "decision_is_authorized_for_betting": false
     }
   ],
-  "settled_v5_market_count": 105,
+  "settled_v5_market_count": 106,
   "settled_v5_clv_diagnostics": {
     "definition": "Opening immutable v5.1 publication quote vs latest captured exact SportyBet market-225 pregame quote; near-close counts only if quote was observed within 45 minutes of tip. This is not an official bookmaker close.",
     "close_window_minutes": 45,
-    "settled_v5_fixtures_audited": 105,
+    "settled_v5_fixtures_audited": 106,
     "near_close_observations": 80,
     "positive_probability_clv_n": 37,
     "positive_line_clv_n": 27,
@@ -7609,17 +7652,45 @@
         "positive_probability_clv": true,
         "positive_line_clv": true,
         "is_official_bookmaker_close": false
+      },
+      {
+        "event_id": "401909317",
+        "matchup": "Philadelphia 76ers vs Miami Heat",
+        "selected_side": "UNDER",
+        "clv_status": "LATER_PREGAME_CAPTURE_OUTSIDE_CLOSE_WINDOW",
+        "opening": {
+          "snapshot_id": "nba-total-pub:7e58a5e822713dbe5868edc0",
+          "quote_timestamp": "2026-11-24T20:31:46.129000+00:00",
+          "line": 239.5,
+          "over_odds": 1.9,
+          "under_odds": 1.88,
+          "selected_side_no_vig_probability": 0.502646
+        },
+        "latest_pregame": {
+          "snapshot_id": "nba-total-pub:b8540ea20b5cad1a108ada00",
+          "quote_timestamp": "2026-11-25T20:11:39.825000+00:00",
+          "minutes_before_start": 108.336,
+          "line": 237.5,
+          "over_odds": 1.93,
+          "under_odds": 1.92,
+          "selected_side_no_vig_probability": 0.501299
+        },
+        "selected_side_no_vig_probability_clv": -0.001347,
+        "selected_side_line_clv_points": -2.0,
+        "positive_probability_clv": false,
+        "positive_line_clv": false,
+        "is_official_bookmaker_close": false
       }
     ],
     "sample_is_sufficient_for_release": false
   },
   "settled_v5_probability_score_summary": {
-    "n": 105,
+    "n": 106,
     "pushes_excluded_from_binary_metrics": 0,
-    "model_brier": 0.265641,
-    "market_no_vig_brier": 0.249736,
-    "model_log_loss": 0.726995,
-    "market_no_vig_log_loss": 0.69262,
+    "model_brier": 0.265257,
+    "market_no_vig_brier": 0.249714,
+    "model_log_loss": 0.726201,
+    "market_no_vig_log_loss": 0.692576,
     "over_probability_buckets": [
       {
         "range": "0.3-0.4",
@@ -7629,9 +7700,9 @@
       },
       {
         "range": "0.4-0.5",
-        "n": 48,
-        "mean_model_over_probability": 0.4615,
-        "observed_over_rate": 0.6042
+        "n": 49,
+        "mean_model_over_probability": 0.4618,
+        "observed_over_rate": 0.5918
       },
       {
         "range": "0.6-0.7",
@@ -7653,12 +7724,12 @@
   "prospective_pregame_snapshot_coverage": {
     "cutoff_utc": "2026-11-02T02:00:00+00:00",
     "snapshot_source": "data/nba_totals_publication_snapshots.json",
-    "prospective_v5_snapshot_records": 12890,
+    "prospective_v5_snapshot_records": 12895,
     "prospective_unique_fixtures_with_any_snapshot": 178,
-    "prospective_verified_fresh_market_225_snapshot_records": 12890,
+    "prospective_verified_fresh_market_225_snapshot_records": 12895,
     "prospective_unique_fixtures_with_verified_fresh_market_225_snapshot": 178,
-    "prospective_settled_unique_market_selections": 105,
-    "prospective_settled_selections_with_exact_snapshot_match": 105,
+    "prospective_settled_unique_market_selections": 106,
+    "prospective_settled_selections_with_exact_snapshot_match": 106,
     "prospective_settled_selections_missing_or_mismatched_snapshot": 0,
     "snapshot_linkage_failures": [],
     "target_unique_settled_selections_for_roi": 100,
@@ -7668,11 +7739,11 @@
   "prospective_probability_fixture_coverage": {
     "cutoff_utc": "2026-11-02T02:00:00+00:00",
     "source": "data/nba_totals_probability_settlements.json",
-    "candidate_unique_events": 169,
-    "valid_unique_settled_fixtures": 169,
-    "binary_scored_unique_fixtures": 169,
+    "candidate_unique_events": 170,
+    "valid_unique_settled_fixtures": 170,
+    "binary_scored_unique_fixtures": 170,
     "push_fixtures_excluded_from_binary_scores": 0,
-    "neutral_no_bet_fixtures_included": 108,
+    "neutral_no_bet_fixtures_included": 109,
     "directional_selection_fixtures_also_tracked_in_bet_ledger": 61,
     "snapshot_linkage_failures": [],
     "snapshot_linkage_failure_count": 0,
@@ -10552,15 +10623,32 @@
       "line": 231.5,
       "pick": "under",
       "probability_validation_only": true
+    },
+    {
+      "event_id": "401909317",
+      "settled_result": "under",
+      "model_probability": {
+        "over": 0.5223367697594502,
+        "under": 0.47766323024054985,
+        "push": 0.0
+      },
+      "market_no_vig_probability": {
+        "over": 0.5066312997347481,
+        "under": 0.49336870026525204
+      },
+      "publication_snapshot_id": "nba-total-pub:ea6858efdbe96d4b16792047",
+      "line": 237.5,
+      "pick": null,
+      "probability_validation_only": true
     }
   ],
   "prospective_probability_score_summary": {
-    "n": 169,
+    "n": 170,
     "pushes_excluded_from_binary_metrics": 0,
-    "model_brier": 0.259988,
-    "market_no_vig_brier": 0.250531,
-    "model_log_loss": 0.714577,
-    "market_no_vig_log_loss": 0.694208,
+    "model_brier": 0.260063,
+    "market_no_vig_brier": 0.250567,
+    "model_log_loss": 0.71472,
+    "market_no_vig_log_loss": 0.694281,
     "over_probability_buckets": [
       {
         "range": "0.3-0.4",
@@ -10576,9 +10664,9 @@
       },
       {
         "range": "0.5-0.6",
-        "n": 100,
-        "mean_model_over_probability": 0.5495,
-        "observed_over_rate": 0.52
+        "n": 101,
+        "mean_model_over_probability": 0.5492,
+        "observed_over_rate": 0.5149
       },
       {
         "range": "0.6-0.7",
@@ -10600,7 +10688,7 @@
   "prospective_clv_diagnostics": {
     "definition": "Opening immutable v5.1 publication quote vs latest captured exact SportyBet market-225 pregame quote; near-close counts only if quote was observed within 45 minutes of tip. This is not an official bookmaker close.",
     "close_window_minutes": 45,
-    "settled_v5_fixtures_audited": 105,
+    "settled_v5_fixtures_audited": 106,
     "near_close_observations": 80,
     "positive_probability_clv_n": 37,
     "positive_line_clv_n": 27,
@@ -13502,6 +13590,34 @@
         "positive_probability_clv": true,
         "positive_line_clv": true,
         "is_official_bookmaker_close": false
+      },
+      {
+        "event_id": "401909317",
+        "matchup": "Philadelphia 76ers vs Miami Heat",
+        "selected_side": "UNDER",
+        "clv_status": "LATER_PREGAME_CAPTURE_OUTSIDE_CLOSE_WINDOW",
+        "opening": {
+          "snapshot_id": "nba-total-pub:7e58a5e822713dbe5868edc0",
+          "quote_timestamp": "2026-11-24T20:31:46.129000+00:00",
+          "line": 239.5,
+          "over_odds": 1.9,
+          "under_odds": 1.88,
+          "selected_side_no_vig_probability": 0.502646
+        },
+        "latest_pregame": {
+          "snapshot_id": "nba-total-pub:b8540ea20b5cad1a108ada00",
+          "quote_timestamp": "2026-11-25T20:11:39.825000+00:00",
+          "minutes_before_start": 108.336,
+          "line": 237.5,
+          "over_odds": 1.93,
+          "under_odds": 1.92,
+          "selected_side_no_vig_probability": 0.501299
+        },
+        "selected_side_no_vig_probability_clv": -0.001347,
+        "selected_side_line_clv_points": -2.0,
+        "positive_probability_clv": false,
+        "positive_line_clv": false,
+        "is_official_bookmaker_close": false
       }
     ],
     "sample_is_sufficient_for_release": false,
@@ -13519,95 +13635,11 @@
   "historical_market_line_backtest_available": false,
   "upcoming_exact_fresh_market_225_value_diagnostics": [
     {
-      "event_id": "401909319",
-      "matchup": "New York Knicks vs Cleveland Cavaliers",
-      "start_time": "2026-11-26T00:30:00+00:00",
-      "quote_timestamp": "2026-11-26T00:28:13.755000+00:00",
-      "quote_age_minutes": 1.5695,
-      "forecast_total": 222.1925,
-      "sportybet_line": 220.5,
-      "over_odds": 1.94,
-      "under_odds": 1.9,
-      "model_probability": {
-        "over": 0.5773,
-        "under": 0.4227,
-        "push": 0.0
-      },
-      "market_no_vig_probability": {
-        "over": 0.4948,
-        "under": 0.5052
-      },
-      "model_probability_conditional_on_no_push": {
-        "over": 0.5773,
-        "under": 0.4227
-      },
-      "model_probability_edge": {
-        "over": 0.0825,
-        "under": -0.0825
-      },
-      "expected_value_per_unit": {
-        "over": 0.12,
-        "under": -0.1969
-      },
-      "bootstrap_95_lower_bound": {
-        "over_probability_edge": 0.0241,
-        "under_probability_edge": -0.1375,
-        "over_expected_value": 0.0067,
-        "under_expected_value": -0.3014,
-        "method": "deterministic paired empirical-residual bootstrap; 4,000 resamples"
-      },
-      "calibration_check": "PASS",
-      "decision": "NO BET",
-      "decision_is_authorized_for_betting": false
-    },
-    {
-      "event_id": "401909320",
-      "matchup": "Oklahoma City Thunder vs Minnesota Timberwolves",
-      "start_time": "2026-11-26T00:30:00+00:00",
-      "quote_timestamp": "2026-11-26T00:28:13.755000+00:00",
-      "quote_age_minutes": 1.5695,
-      "forecast_total": 222.9322,
-      "sportybet_line": 222.5,
-      "over_odds": 1.89,
-      "under_odds": 1.96,
-      "model_probability": {
-        "over": 0.5636,
-        "under": 0.4364,
-        "push": 0.0
-      },
-      "market_no_vig_probability": {
-        "over": 0.5091,
-        "under": 0.4909
-      },
-      "model_probability_conditional_on_no_push": {
-        "over": 0.5636,
-        "under": 0.4364
-      },
-      "model_probability_edge": {
-        "over": 0.0545,
-        "under": -0.0545
-      },
-      "expected_value_per_unit": {
-        "over": 0.0652,
-        "under": -0.1446
-      },
-      "bootstrap_95_lower_bound": {
-        "over_probability_edge": -0.0039,
-        "under_probability_edge": -0.1095,
-        "over_expected_value": -0.0453,
-        "under_expected_value": -0.2524,
-        "method": "deterministic paired empirical-residual bootstrap; 4,000 resamples"
-      },
-      "calibration_check": "PASS",
-      "decision": "NO BET",
-      "decision_is_authorized_for_betting": false
-    },
-    {
       "event_id": "401909321",
       "matchup": "Memphis Grizzlies vs LA Clippers",
       "start_time": "2026-11-26T01:00:00+00:00",
-      "quote_timestamp": "2026-11-26T00:28:13.755000+00:00",
-      "quote_age_minutes": 1.5695,
+      "quote_timestamp": "2026-11-26T00:43:47.191000+00:00",
+      "quote_age_minutes": 2.5389,
       "forecast_total": 229.3533,
       "sportybet_line": 227.5,
       "over_odds": 1.89,
@@ -13648,8 +13680,8 @@
       "event_id": "401909322",
       "matchup": "Milwaukee Bucks vs Brooklyn Nets",
       "start_time": "2026-11-26T01:00:00+00:00",
-      "quote_timestamp": "2026-11-26T00:28:13.755000+00:00",
-      "quote_age_minutes": 1.5695,
+      "quote_timestamp": "2026-11-26T00:43:47.191000+00:00",
+      "quote_age_minutes": 2.5389,
       "forecast_total": 230.9195,
       "sportybet_line": 233.5,
       "over_odds": 1.89,
@@ -13690,8 +13722,8 @@
       "event_id": "401909323",
       "matchup": "Houston Rockets vs Phoenix Suns",
       "start_time": "2026-11-26T01:30:00+00:00",
-      "quote_timestamp": "2026-11-26T00:28:13.755000+00:00",
-      "quote_age_minutes": 1.5695,
+      "quote_timestamp": "2026-11-26T00:43:47.191000+00:00",
+      "quote_age_minutes": 2.5389,
       "forecast_total": 227.6465,
       "sportybet_line": 222.5,
       "over_odds": 1.89,
@@ -13732,8 +13764,8 @@
       "event_id": "401909324",
       "matchup": "Golden State Warriors vs Sacramento Kings",
       "start_time": "2026-11-26T03:00:00+00:00",
-      "quote_timestamp": "2026-11-26T00:28:13.755000+00:00",
-      "quote_age_minutes": 1.5695,
+      "quote_timestamp": "2026-11-26T00:43:47.191000+00:00",
+      "quote_age_minutes": 2.5389,
       "forecast_total": 221.3817,
       "sportybet_line": 215.5,
       "over_odds": 1.92,
@@ -13774,38 +13806,38 @@
       "event_id": "401909325",
       "matchup": "Portland Trail Blazers vs San Antonio Spurs",
       "start_time": "2026-11-26T03:00:00+00:00",
-      "quote_timestamp": "2026-11-26T00:28:13.755000+00:00",
-      "quote_age_minutes": 1.5695,
+      "quote_timestamp": "2026-11-26T00:43:47.191000+00:00",
+      "quote_age_minutes": 2.5389,
       "forecast_total": 223.4548,
-      "sportybet_line": 225.5,
-      "over_odds": 1.93,
-      "under_odds": 1.92,
+      "sportybet_line": 227.5,
+      "over_odds": 1.96,
+      "under_odds": 1.88,
       "model_probability": {
-        "over": 0.5223,
-        "under": 0.4777,
+        "over": 0.4639,
+        "under": 0.5361,
         "push": 0.0
       },
       "market_no_vig_probability": {
-        "over": 0.4987,
-        "under": 0.5013
+        "over": 0.4896,
+        "under": 0.5104
       },
       "model_probability_conditional_on_no_push": {
-        "over": 0.5223,
-        "under": 0.4777
+        "over": 0.4639,
+        "under": 0.5361
       },
       "model_probability_edge": {
-        "over": 0.0236,
-        "under": -0.0236
+        "over": -0.0257,
+        "under": 0.0257
       },
       "expected_value_per_unit": {
-        "over": 0.0081,
-        "under": -0.0829
+        "over": -0.0907,
+        "under": 0.0078
       },
       "bootstrap_95_lower_bound": {
-        "over_probability_edge": -0.0313,
-        "under_probability_edge": -0.0821,
-        "over_expected_value": -0.098,
-        "under_expected_value": -0.1951,
+        "over_probability_edge": -0.0806,
+        "under_probability_edge": -0.0328,
+        "over_expected_value": -0.1985,
+        "under_expected_value": -0.102,
         "method": "deterministic paired empirical-residual bootstrap; 4,000 resamples"
       },
       "calibration_check": "PASS",
@@ -13813,12 +13845,12 @@
       "decision_is_authorized_for_betting": false
     }
   ],
-  "upcoming_value_diagnostics_count": 7,
+  "upcoming_value_diagnostics_count": 5,
   "upcoming_predictions_without_exact_fresh_pair": 50,
-  "prospective_settled_market_bets_after_cutoff": 105,
+  "prospective_settled_market_bets_after_cutoff": 106,
   "prospective_minimum_sample_reached": true,
-  "prospective_probability_scored_unique_fixtures": 169,
-  "prospective_probability_settled_unique_fixtures": 169,
+  "prospective_probability_scored_unique_fixtures": 170,
+  "prospective_probability_settled_unique_fixtures": 170,
   "prospective_probability_validation_sample_met": true,
   "live_value_decisions_authorized": false,
   "release_decision": "RESEARCH_ONLY",
@@ -13826,11 +13858,11 @@
   "market_prices_used_as_model_inputs": false,
   "source_data_fingerprint": {
     "data/nba_history.json": "c0acd21476ccc4c44deb07965b13c7bd6f8f8cce4e0f190c14c5155c9edae65a",
-    "data/nba_predictions.json": "40f740634916888b2dd3b8ca744a584ee70ed3c3ed5168dd204e528d35dca8ac",
-    "data/nba_totals_ledger.json": "1bde6b5ca88c7090dfc030ff897794985ac97b263dbfedc52c4f87fc79f4968e",
-    "data/nba_totals_publication_snapshots.json": "24be733e752ae0bcd9dc14d431e29ab792b6168e5cd4af95b68ea65e838ca47a",
-    "data/nba_totals_probability_settlements.json": "c860972bd365a6bf2d5615e405ca2da7983172b97f2fdd1f1c5679c83c5ed4aa",
-    "data/nba_totals_price_capture_status.json": "553f636ae57124dda21c531b90faf4c4d23bacbfbdca9cc725fa3ac0c53d0180",
-    "data/nba_totals_oos_value_test.json": "096ff256ec9bc83e09a012404d4f94817b5bd49e863e5bfa0ff304f0befe7739"
+    "data/nba_predictions.json": "d2a8b887c87c9b00d7753928c7ea62415213f78917d3aa867163821a972f458d",
+    "data/nba_totals_ledger.json": "30e822d7ecfe2270c595f1f3a32d1a5fa0da7e8c0f15ddaa436dde90d82125a3",
+    "data/nba_totals_publication_snapshots.json": "d79bd3dbc938a889bdef97965058fa62ad77a3bd104421ceb84cfe4ab6a4354b",
+    "data/nba_totals_probability_settlements.json": "7c209ce6f6564175229bda827631ef4da62270650e4f5fa4351185f82b0a734c",
+    "data/nba_totals_price_capture_status.json": "48444c34a1a752cd619834b991c6b6679b8439294f5ec88ac596f6e8df0b65c5",
+    "data/nba_totals_oos_value_test.json": "8c2a14022f971ee41e685f3ce2f20a0640c09535cbbf7233421080be24b0a699"
   }
 }
