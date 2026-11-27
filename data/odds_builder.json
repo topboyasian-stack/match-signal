@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-27T12:45:13.469567+00:00",
+  "generated_at": "2026-11-27T12:50:04.009294+00:00",
   "engine_version": "V6.1-RESEARCH-GATED",
   "mode": "PAPER_ONLY",
   "target_legs": "Upcoming Desk is primary only after its own settled-ticket sample (n≥10) and realized flat-stake ROI ≥2% pass; otherwise use a separately qualified fallback or NO_BET. Desk 2–4 legs target 3.00x–4.00x with exact-line walk-forward and fresh-price gates; standard fallback 2.80x minimum / 2.80x preferred; compact eFootball 2.00x+ only when all gates pass",
@@ -73,8 +73,8 @@
       "source": "canonical_predictions",
       "stats": {
         "provider": "SportyBet NG",
-        "fetched_at": "2026-11-27T12:44:35.527360+00:00",
-        "football_events": 1774,
+        "fetched_at": "2026-11-27T12:49:15.004695+00:00",
+        "football_events": 1777,
         "tennis_events": 110,
         "matched": 55,
         "unmatched": 54,
@@ -83,7 +83,7 @@
         "per_sport": {
           "football": {
             "predictions_seen": 109,
-            "events_fetched": 1774,
+            "events_fetched": 1777,
             "matched_events": 55,
             "unmatched_events": 54,
             "winner_market_available": 55,
@@ -556,22 +556,23 @@
   "candidate_diagnostics": {
     "football_candidates": 21,
     "tennis_candidates": 0,
-    "virtual_candidates": 219,
+    "virtual_candidates": 312,
     "virtual_gate_diagnostics": {
-      "seen": 311,
-      "qualified": 311,
+      "seen": 413,
+      "qualified": 413,
       "evidence_pass": 0,
-      "rejected_evidence": 423,
+      "rejected_evidence": 543,
       "rejected_ticket_performance": 0,
       "rejected_results_first": 0,
-      "current_feed_events": 549,
+      "current_feed_events": 663,
       "model_templates": 20,
-      "current_market_candidates": 622,
-      "evidence_value_candidates": 199,
+      "current_market_candidates": 826,
+      "evidence_value_candidates": 277,
       "reasons": {
-        "efootball_evidence_value_lane": 199,
-        "recent_evidence_below_threshold": 348,
-        "efootball_recent_last20_below_threshold": 75
+        "efootball_evidence_value_lane": 277,
+        "recent_evidence_below_threshold": 450,
+        "efootball_recent_last20_below_threshold": 93,
+        "no_exact_line_model": 6
       },
       "virtual_scope_policy": {
         "active_products": [
@@ -584,8 +585,8 @@
         ],
         "research_only_counts": {
           "vfootball": {
-            "market_rows": 3850,
-            "unique_events": 385
+            "market_rows": 4479,
+            "unique_events": 452
           },
           "zoom": {
             "market_rows": 0,
@@ -732,42 +733,44 @@
       ],
       "discovery_universe": {
         "scope": "all current SportyBet eFootball events and every observed O/U line inside the Builder horizon",
-        "events_scanned": 164,
-        "product_line_pairs_scanned": 10,
+        "events_scanned": 211,
+        "product_line_pairs_scanned": 12,
         "modelable_product_line_side_pairs": 20,
-        "product_line_side_pairs_without_8_settled_observations": 0,
+        "product_line_side_pairs_without_8_settled_observations": 4,
         "score_derived_modelable_product_line_side_pairs": 4,
         "note": "No-evidence lines remain discovery-only. Thin eFootball half-line keys may use one outcome per unique settled score when fewer than 8 direct exact-line/side rows exist; current exact-line SportyBet price and all existing gates remain mandatory."
       },
       "current_product_counts": {
-        "efootball_gt": 311
+        "efootball_gt": 413
       },
       "current_market_line_counts": {
-        "efootball_gt|1.5": 23,
-        "efootball_gt|2.5": 71,
-        "efootball_gt|3.5": 75,
-        "efootball_gt|5.5": 43,
-        "efootball_gt|6.5": 23,
-        "efootball_gt|4.5": 51,
-        "efootball_gt|7.5": 7,
-        "efootball_gt|9.5": 8,
-        "efootball_gt|10.5": 3,
-        "efootball_gt|8.5": 7
+        "efootball_gt|1.5": 35,
+        "efootball_gt|2.5": 86,
+        "efootball_gt|4.5": 64,
+        "efootball_gt|5.5": 52,
+        "efootball_gt|3.5": 93,
+        "efootball_gt|6.5": 35,
+        "efootball_gt|7.5": 17,
+        "efootball_gt|8.5": 12,
+        "efootball_gt|9.5": 12,
+        "efootball_gt|6": 2,
+        "efootball_gt|7": 1,
+        "efootball_gt|10.5": 4
       },
       "price_snapshot_sources": {
-        "fresh_direct_sportybet_match": 311
+        "fresh_direct_sportybet_match": 413
       },
       "live_quote_refresh": {
         "source": null,
-        "live_events": 669,
-        "matched_by_id": 4163,
-        "matched_by_match": 20,
+        "live_events": 658,
+        "matched_by_id": 4835,
+        "matched_by_match": 0,
         "matched_by_participant_time": 0,
-        "unmatched": 722
+        "unmatched": 161
       },
       "upcoming_desk_research": {
         "enabled": true,
-        "candidate_count": 20,
+        "candidate_count": 35,
         "min_desk_probability": 0.6,
         "min_raw_model_probability": 0.65,
         "min_walkforward_n": 100,
@@ -776,24 +779,26 @@
         "max_combined_odds": 4.0,
         "max_legs": 4,
         "rejections": {
-          "outside_active_efootball_scope": 3850,
-          "desk_probability_below_0_60": 117,
-          "model_competition_not_qualified": 96,
-          "insufficient_exact_line_walkforward_sample": 40,
-          "raw_model_probability_below_0_65": 36,
-          "outside_builder_horizon": 22,
-          "recent_settled_line_side_loss_streak": 2
+          "outside_active_efootball_scope": 4479,
+          "model_competition_not_qualified": 146,
+          "desk_probability_below_0_60": 133,
+          "insufficient_exact_line_walkforward_sample": 42,
+          "raw_model_probability_below_0_65": 41,
+          "outside_builder_horizon": 21,
+          "recent_settled_line_side_loss_streak": 13,
+          "desk_calibration_not_active": 2,
+          "missing_probability_exact_line_or_price": 1
         },
         "policy": "paper-only Desk lane; base model and model-qualified competition + active Desk calibration + >=100 exact-line walk-forward rows at >=60%; exact-line research can cross the official raw model-line allowlist without changing official qualification; current SportyBet quote and standard Builder price/edge gates remain mandatory"
       },
       "quote_join": {
-        "live_events": 669,
-        "live_match_keys": 660,
-        "live_pair_keys": 639,
-        "matched_by_id": 4163,
-        "matched_by_match": 20,
+        "live_events": 658,
+        "live_match_keys": 649,
+        "live_pair_keys": 628,
+        "matched_by_id": 4835,
+        "matched_by_match": 0,
         "matched_by_participant_time": 0,
-        "unmatched": 722,
+        "unmatched": 161,
         "samples": [
           {
             "event_id": "sr:match:77183896",
@@ -822,20 +827,20 @@
       "current_feed_is_price_authority": true,
       "price_authority": "fresh SportyBet snapshot collected in-process immediately before Builder qualification"
     },
-    "evaluated": 240,
+    "evaluated": 333,
     "individual_leg_diagnostics": {
-      "builder_eligible_leg_count": 166,
-      "efootball_exact_evidence_leg_candidates": 135,
-      "efootball_exact_evidence_at_65_percent_floor": 90,
-      "efootball_exact_evidence_below_65_percent_floor": 45,
+      "builder_eligible_leg_count": 213,
+      "efootball_exact_evidence_leg_candidates": 179,
+      "efootball_exact_evidence_at_65_percent_floor": 112,
+      "efootball_exact_evidence_below_65_percent_floor": 67,
       "efootball_exact_evidence_min_probability": 0.65,
       "standard_construction_min_probability": 0.8,
       "ticket_qualification_independent": true,
       "note": "Individual leg eligibility is not a qualified ticket. Whole-ticket odds, ROI, timing, correlation, exact evidence, and current quote gates still apply."
     },
     "rejections": {
-      "REJECTED": 74,
-      "LIVE_VALUE": 166
+      "REJECTED": 120,
+      "LIVE_VALUE": 213
     },
     "selection_diversity": {
       "participant_correlation_skips": 0,
@@ -878,7 +883,7 @@
       "upcoming_desk_research_diagnostics": {
         "enabled": true,
         "source": "Unified Upcoming selected-side desk-calibrated probability + exact-line walk-forward holdout",
-        "candidate_count": 17,
+        "candidate_count": 20,
         "raw_min_probability": 0.65,
         "desk_min_probability": 0.6,
         "walkforward_min_n": 100,
@@ -889,11 +894,11 @@
         "max_legs": 4,
         "max_batches": 4,
         "open_ticket_event_count": 7,
-        "combinations_checked": 3196,
-        "rejected_correlated": 2258,
-        "rejected_kickoff_span": 888,
-        "rejected_outside_odds": 48,
-        "rejected_conservative_roi": 2,
+        "combinations_checked": 6175,
+        "rejected_correlated": 3924,
+        "rejected_kickoff_span": 2161,
+        "rejected_outside_odds": 87,
+        "rejected_conservative_roi": 3,
         "batches_selected": 0,
         "reason": "no_desk_combination_reached_odds_and_conservative_roi_gates",
         "leg_rejections": {},
@@ -1104,7 +1109,7 @@
       },
       "construction_shape_diagnostics_scope": "historical eFootball GT/Adriatic ticket shapes are diagnostics only and do not override live quote, probability, correlation, odds, ROI, or promotion gates",
       "high_confidence_diagnostics": {
-        "eligible_legs": 3,
+        "eligible_legs": 4,
         "candidate_combinations": 0,
         "batches_selected": 0,
         "max_batches": 4,
@@ -1171,10 +1176,22 @@
           "policy": "Promotion requires the lane's full realized ROI and an adequate, profitable sample of settled tickets whose fixtures do not overlap any other settled Builder ticket. Overlapping tickets remain in the realized ROI but do not inflate independent evidence."
         }
       },
-      "secondary_pool_eligible_legs": 166,
+      "secondary_pool_eligible_legs": 213,
       "secondary_efootball_diagnostics": {
-        "pool_size": 107,
+        "pool_size": 132,
         "top_legs": [
+          {
+            "match": "Real Madrid (dm1trena) vs Atleti (Edwardson)",
+            "event_id": "sr:match:BAaIYS68zcACpNV81acZhGA",
+            "product": "efootball_gt",
+            "market": "virtual_total",
+            "line": 5.5,
+            "side": "over",
+            "p": 0.689655,
+            "odds": 2.8,
+            "start": "2026-11-27T13:04:00+00:00",
+            "ev": 0.931034
+          },
           {
             "match": "Paris (Uruchi) vs Real Madrid (pimchik)",
             "event_id": "sr:match:BAaIX36vRfDCjKxOoE4CTOA",
@@ -1222,6 +1239,18 @@
             "odds": 2.75,
             "start": "2026-11-27T21:42:00+00:00",
             "ev": 0.896551
+          },
+          {
+            "match": "Real Madrid (dm1trena) vs Barcelona (Revange)",
+            "event_id": "sr:match:BAaIYS688fHiiEbBrMnxswg",
+            "product": "efootball_gt",
+            "market": "virtual_total",
+            "line": 4.5,
+            "side": "under",
+            "p": 0.684211,
+            "odds": 2.65,
+            "start": "2026-11-27T13:28:00+00:00",
+            "ev": 0.813159
           },
           {
             "match": "Aston Villa (pikalicaaa) vs Roma (Sena)",
@@ -1284,6 +1313,30 @@
             "ev": 0.778949
           },
           {
+            "match": "Bologna (vladl3n) vs Juventus (Kril)",
+            "event_id": "sr:match:BAaIXll4QfZajF57mgZlSLg",
+            "product": "efootball_gt",
+            "market": "virtual_total",
+            "line": 8.5,
+            "side": "over",
+            "p": 0.764706,
+            "odds": 2.3,
+            "start": "2026-11-27T12:54:00+00:00",
+            "ev": 0.758824
+          },
+          {
+            "match": "Atleti (Edwardson) vs Barcelona (Revange)",
+            "event_id": "sr:match:BAaIYS-gDfuWh9Zh-LXGv1w",
+            "product": "efootball_gt",
+            "market": "virtual_total",
+            "line": 5.5,
+            "side": "over",
+            "p": 0.689655,
+            "odds": 2.55,
+            "start": "2026-11-27T12:52:00+00:00",
+            "ev": 0.75862
+          },
+          {
             "match": "Porto (Firminho) vs Fenerbahce (Linox)",
             "event_id": "sr:match:BAaIaj4|0fJW0vu7twU446w",
             "product": "efootball_gt",
@@ -1294,6 +1347,18 @@
             "odds": 2.55,
             "start": "2026-11-27T14:37:00+00:00",
             "ev": 0.75862
+          },
+          {
+            "match": "Man Utd (Lumix) vs Brighton (Ganger_29)",
+            "event_id": "sr:match:BAaIYQ-mxccKoBKBa6DoBlA",
+            "product": "efootball_gt",
+            "market": "virtual_total",
+            "line": 4.5,
+            "side": "under",
+            "p": 0.684211,
+            "odds": 2.55,
+            "start": "2026-11-27T13:22:00+00:00",
+            "ev": 0.744738
           },
           {
             "match": "Bayern Munchen (Sheva) vs Atleti (Bob)",
@@ -1354,77 +1419,17 @@
             "odds": 2.5,
             "start": "2026-11-27T13:40:00+00:00",
             "ev": 0.710527
-          },
-          {
-            "match": "Paris (Mapiston) vs Atleti (Bob)",
-            "event_id": "sr:match:BAaIX25lcfhqNE5N6bDLIIg",
-            "product": "efootball_gt",
-            "market": "virtual_total",
-            "line": 4.5,
-            "side": "under",
-            "p": 0.684211,
-            "odds": 2.5,
-            "start": "2026-11-27T14:25:00+00:00",
-            "ev": 0.710527
-          },
-          {
-            "match": "Real Madrid (Stasyan) vs Bayern Munchen (Sheva)",
-            "event_id": "sr:match:BAaIX25pMdeu57O800T7NYQ",
-            "product": "efootball_gt",
-            "market": "virtual_total",
-            "line": 5.5,
-            "side": "over",
-            "p": 0.689655,
-            "odds": 2.4,
-            "start": "2026-11-27T14:07:00+00:00",
-            "ev": 0.655172
-          },
-          {
-            "match": "Bayern Munchen (Sheva) vs Real Madrid (Stasyan)",
-            "event_id": "sr:match:BAaIX26Yvdqe56zKksb83pQ",
-            "product": "efootball_gt",
-            "market": "virtual_total",
-            "line": 5.5,
-            "side": "over",
-            "p": 0.689655,
-            "odds": 2.4,
-            "start": "2026-11-27T14:52:00+00:00",
-            "ev": 0.655172
-          },
-          {
-            "match": "England (Piljar) vs Argentina (steeffant)",
-            "event_id": "sr:match:BAaIajxbVeqGyNiTtf9F1Cw",
-            "product": "efootball_gt",
-            "market": "virtual_total",
-            "line": 8.5,
-            "side": "over",
-            "p": 0.764706,
-            "odds": 2.15,
-            "start": "2026-11-27T13:30:00+00:00",
-            "ev": 0.644118
-          },
-          {
-            "match": "Spain (Lufy) vs France (Buu)",
-            "event_id": "sr:match:BAaIajvSpcFmnuFYvslMrVQ",
-            "product": "efootball_gt",
-            "market": "virtual_total",
-            "line": 10.5,
-            "side": "under",
-            "p": 0.947541,
-            "odds": 1.7,
-            "start": "2026-11-27T13:30:00+00:00",
-            "ev": 0.61082
           }
         ],
         "pair_scan": {
-          "pairs_total": 5671,
-          "odds_reach_pairs": 4119,
-          "correlation_rejections": 603,
-          "kickoff_span_rejections": 1811,
-          "calibration_hold_rejections": 1296,
-          "calibration_held_pairs_with_positive_raw_independence_roi": 1296,
-          "roi_rejections": 370,
-          "fully_qualified_pairs": 39
+          "pairs_total": 8646,
+          "odds_reach_pairs": 6236,
+          "correlation_rejections": 644,
+          "kickoff_span_rejections": 2543,
+          "calibration_hold_rejections": 2488,
+          "calibration_held_pairs_with_positive_raw_independence_roi": 2488,
+          "roi_rejections": 508,
+          "fully_qualified_pairs": 53
         },
         "best_pair": [
           {
@@ -1490,6 +1495,36 @@
           {
             "legs": [
               {
+                "match": "Bologna (vladl3n) vs Juventus (Kril)",
+                "event_id": "sr:match:BAaIXll4QfZajF57mgZlSLg",
+                "product": "efootball_gt",
+                "market": "virtual_total",
+                "line": 8.5,
+                "side": "over",
+                "p": 0.764706,
+                "odds": 2.3,
+                "start": "2026-11-27T12:54:00+00:00"
+              },
+              {
+                "match": "FC Seoul (Virtual_15) vs Al Hilal (Virtual_11)",
+                "event_id": "sr:match:BAaIRTI81c9CPeyQCrKKVZA",
+                "product": "efootball_gt",
+                "market": "virtual_total",
+                "line": 1.5,
+                "side": "over",
+                "p": 0.8436,
+                "odds": 1.36,
+                "start": "2026-11-27T14:16:00+00:00"
+              }
+            ],
+            "combined_odds": 3.128,
+            "combined_probability": 0.354694,
+            "roi": 0.109483,
+            "span_minutes": 82.0
+          },
+          {
+            "legs": [
+              {
                 "match": "Paris (Uruchi) vs Real Madrid (pimchik)",
                 "event_id": "sr:match:BAaIX36vRfDCjKxOoE4CTOA",
                 "product": "efootball_gt",
@@ -1546,41 +1581,22 @@
             "combined_probability": 0.277825,
             "roi": 0.104632,
             "span_minutes": 253.0
-          },
-          {
-            "legs": [
-              {
-                "match": "Liverpool (bucho55) vs Paris (Uruchi)",
-                "event_id": "sr:match:BAaIX37OUcVCyzqbv7cWwqQ",
-                "product": "efootball_gt",
-                "market": "virtual_total",
-                "line": 5.5,
-                "side": "over",
-                "p": 0.689655,
-                "odds": 2.75,
-                "start": "2026-11-27T20:57:00+00:00"
-              },
-              {
-                "match": "Botafogo (Virtual_12) vs Barcelona SC (Virtual_16)",
-                "event_id": "sr:match:BAaIRTNLqeIO|gogoKkd6xg",
-                "product": "efootball_gt",
-                "market": "virtual_total",
-                "line": 1.5,
-                "side": "over",
-                "p": 0.8436,
-                "odds": 1.44,
-                "start": "2026-11-27T19:22:00+00:00"
-              }
-            ],
-            "combined_odds": 3.96,
-            "combined_probability": 0.277825,
-            "roi": 0.100187,
-            "span_minutes": 95.0
           }
         ],
         "shadow_only_candidates": [
           {
             "legs": [
+              {
+                "match": "Real Madrid (dm1trena) vs Atleti (Edwardson)",
+                "event_id": "sr:match:BAaIYS68zcACpNV81acZhGA",
+                "product": "efootball_gt",
+                "market": "virtual_total",
+                "line": 5.5,
+                "side": "over",
+                "p": 0.689655,
+                "odds": 2.8,
+                "start": "2026-11-27T13:04:00+00:00"
+              },
               {
                 "match": "Aston Villa (pikalicaaa) vs Roma (Sena)",
                 "event_id": "sr:match:BAaIaj7sbctqL-XmUmGVexQ",
@@ -1591,6 +1607,29 @@
                 "p": 0.684211,
                 "odds": 2.65,
                 "start": "2026-11-27T14:37:00+00:00"
+              }
+            ],
+            "combined_odds": 7.42,
+            "raw_independence_probability": 0.47187,
+            "raw_independence_expected_roi": 2.501275,
+            "span_minutes": 93.0,
+            "qualification_status": "SHADOW_ONLY_NOT_QUALIFIED",
+            "ticket_calibration_ready": false,
+            "blocking_reason": "settled_lane_roi_not_positive",
+            "warning": "Raw independence estimate is diagnostic only; it does not qualify a ticket or establish profitability."
+          },
+          {
+            "legs": [
+              {
+                "match": "Real Madrid (dm1trena) vs Atleti (Edwardson)",
+                "event_id": "sr:match:BAaIYS68zcACpNV81acZhGA",
+                "product": "efootball_gt",
+                "market": "virtual_total",
+                "line": 5.5,
+                "side": "over",
+                "p": 0.689655,
+                "odds": 2.8,
+                "start": "2026-11-27T13:04:00+00:00"
               },
               {
                 "match": "Juventus (mixes) vs B Dortmund (Joop)",
@@ -1604,10 +1643,10 @@
                 "start": "2026-11-27T14:52:00+00:00"
               }
             ],
-            "combined_odds": 7.022,
-            "raw_independence_probability": 0.468145,
-            "raw_independence_expected_roi": 2.287548,
-            "span_minutes": 15.0,
+            "combined_odds": 7.42,
+            "raw_independence_probability": 0.47187,
+            "raw_independence_expected_roi": 2.501275,
+            "span_minutes": 108.0,
             "qualification_status": "SHADOW_ONLY_NOT_QUALIFIED",
             "ticket_calibration_ready": false,
             "blocking_reason": "settled_lane_roi_not_positive",
@@ -1616,15 +1655,15 @@
           {
             "legs": [
               {
-                "match": "Juventus (mixes) vs B Dortmund (Joop)",
-                "event_id": "sr:match:BAaIaj5wUdpCWlMhSIdC8Ww",
+                "match": "Real Madrid (dm1trena) vs Atleti (Edwardson)",
+                "event_id": "sr:match:BAaIYS68zcACpNV81acZhGA",
                 "product": "efootball_gt",
                 "market": "virtual_total",
-                "line": 4.5,
-                "side": "under",
-                "p": 0.684211,
-                "odds": 2.65,
-                "start": "2026-11-27T14:52:00+00:00"
+                "line": 5.5,
+                "side": "over",
+                "p": 0.689655,
+                "odds": 2.8,
+                "start": "2026-11-27T13:04:00+00:00"
               },
               {
                 "match": "Salzburg (Lukapaja) vs Roma (Sena)",
@@ -1638,10 +1677,10 @@
                 "start": "2026-11-27T15:01:00+00:00"
               }
             ],
-            "combined_odds": 6.89,
-            "raw_independence_probability": 0.468145,
-            "raw_independence_expected_roi": 2.225519,
-            "span_minutes": 9.0,
+            "combined_odds": 7.28,
+            "raw_independence_probability": 0.47187,
+            "raw_independence_expected_roi": 2.435214,
+            "span_minutes": 117.0,
             "qualification_status": "SHADOW_ONLY_NOT_QUALIFIED",
             "ticket_calibration_ready": false,
             "blocking_reason": "settled_lane_roi_not_positive",
@@ -1650,15 +1689,49 @@
           {
             "legs": [
               {
-                "match": "Aston Villa (pikalicaaa) vs Roma (Sena)",
-                "event_id": "sr:match:BAaIaj7sbctqL-XmUmGVexQ",
+                "match": "Real Madrid (dm1trena) vs Atleti (Edwardson)",
+                "event_id": "sr:match:BAaIYS68zcACpNV81acZhGA",
                 "product": "efootball_gt",
                 "market": "virtual_total",
-                "line": 4.5,
-                "side": "under",
-                "p": 0.684211,
-                "odds": 2.65,
-                "start": "2026-11-27T14:37:00+00:00"
+                "line": 5.5,
+                "side": "over",
+                "p": 0.689655,
+                "odds": 2.8,
+                "start": "2026-11-27T13:04:00+00:00"
+              },
+              {
+                "match": "Bologna (vladl3n) vs Juventus (Kril)",
+                "event_id": "sr:match:BAaIXll4QfZajF57mgZlSLg",
+                "product": "efootball_gt",
+                "market": "virtual_total",
+                "line": 8.5,
+                "side": "over",
+                "p": 0.764706,
+                "odds": 2.3,
+                "start": "2026-11-27T12:54:00+00:00"
+              }
+            ],
+            "combined_odds": 6.44,
+            "raw_independence_probability": 0.527383,
+            "raw_independence_expected_roi": 2.396347,
+            "span_minutes": 10.0,
+            "qualification_status": "SHADOW_ONLY_NOT_QUALIFIED",
+            "ticket_calibration_ready": false,
+            "blocking_reason": "settled_lane_roi_not_positive",
+            "warning": "Raw independence estimate is diagnostic only; it does not qualify a ticket or establish profitability."
+          },
+          {
+            "legs": [
+              {
+                "match": "Real Madrid (dm1trena) vs Atleti (Edwardson)",
+                "event_id": "sr:match:BAaIYS68zcACpNV81acZhGA",
+                "product": "efootball_gt",
+                "market": "virtual_total",
+                "line": 5.5,
+                "side": "over",
+                "p": 0.689655,
+                "odds": 2.8,
+                "start": "2026-11-27T13:04:00+00:00"
               },
               {
                 "match": "Porto (Firminho) vs Fenerbahce (Linox)",
@@ -1672,78 +1745,10 @@
                 "start": "2026-11-27T14:37:00+00:00"
               }
             ],
-            "combined_odds": 6.757,
-            "raw_independence_probability": 0.47187,
-            "raw_independence_expected_roi": 2.188662,
-            "span_minutes": 0.0,
-            "qualification_status": "SHADOW_ONLY_NOT_QUALIFIED",
-            "ticket_calibration_ready": false,
-            "blocking_reason": "settled_lane_roi_not_positive",
-            "warning": "Raw independence estimate is diagnostic only; it does not qualify a ticket or establish profitability."
-          },
-          {
-            "legs": [
-              {
-                "match": "Juventus (mixes) vs B Dortmund (Joop)",
-                "event_id": "sr:match:BAaIaj5wUdpCWlMhSIdC8Ww",
-                "product": "efootball_gt",
-                "market": "virtual_total",
-                "line": 4.5,
-                "side": "under",
-                "p": 0.684211,
-                "odds": 2.65,
-                "start": "2026-11-27T14:52:00+00:00"
-              },
-              {
-                "match": "Porto (Firminho) vs Fenerbahce (Linox)",
-                "event_id": "sr:match:BAaIaj4|0fJW0vu7twU446w",
-                "product": "efootball_gt",
-                "market": "virtual_total",
-                "line": 5.5,
-                "side": "over",
-                "p": 0.689655,
-                "odds": 2.55,
-                "start": "2026-11-27T14:37:00+00:00"
-              }
-            ],
-            "combined_odds": 6.757,
-            "raw_independence_probability": 0.47187,
-            "raw_independence_expected_roi": 2.188662,
-            "span_minutes": 15.0,
-            "qualification_status": "SHADOW_ONLY_NOT_QUALIFIED",
-            "ticket_calibration_ready": false,
-            "blocking_reason": "settled_lane_roi_not_positive",
-            "warning": "Raw independence estimate is diagnostic only; it does not qualify a ticket or establish profitability."
-          },
-          {
-            "legs": [
-              {
-                "match": "Aston Villa (pikalicaaa) vs Roma (Sena)",
-                "event_id": "sr:match:BAaIaj7sbctqL-XmUmGVexQ",
-                "product": "efootball_gt",
-                "market": "virtual_total",
-                "line": 4.5,
-                "side": "under",
-                "p": 0.684211,
-                "odds": 2.65,
-                "start": "2026-11-27T14:37:00+00:00"
-              },
-              {
-                "match": "Bayern Munchen (Sheva) vs Atleti (Bob)",
-                "event_id": "sr:match:BAaIX2789fia4MirqJUJMCQ",
-                "product": "efootball_gt",
-                "market": "virtual_total",
-                "line": 4.5,
-                "side": "under",
-                "p": 0.684211,
-                "odds": 2.55,
-                "start": "2026-11-27T14:16:00+00:00"
-              }
-            ],
-            "combined_odds": 6.757,
-            "raw_independence_probability": 0.468145,
-            "raw_independence_expected_roi": 2.16349,
-            "span_minutes": 21.0,
+            "combined_odds": 7.14,
+            "raw_independence_probability": 0.475624,
+            "raw_independence_expected_roi": 2.395955,
+            "span_minutes": 93.0,
             "qualification_status": "SHADOW_ONLY_NOT_QUALIFIED",
             "ticket_calibration_ready": false,
             "blocking_reason": "settled_lane_roi_not_positive",
@@ -1822,7 +1827,7 @@
           "policy": "Promotion requires the lane's full realized ROI and an adequate, profitable sample of settled tickets whose fixtures do not overlap any other settled Builder ticket. Overlapping tickets remain in the realized ROI but do not inflate independent evidence."
         }
       },
-      "mixed_pool_eligible_legs": 135,
+      "mixed_pool_eligible_legs": 179,
       "mixed_max_kickoff_span_minutes": 360,
       "mixed_diagnostics": {
         "vfootball_pool": 0,
@@ -2624,8 +2629,8 @@
   "candidates_considered": {
     "football": 21,
     "tennis": 0,
-    "virtual": 219,
-    "all_built": 240
+    "virtual": 312,
+    "all_built": 333
   },
   "qualified_legs": [],
   "best_available_legs": [
@@ -2682,7 +2687,7 @@
       "product": null,
       "edge_percent": 2.78,
       "odds_fresh": true,
-      "market_odds_age_seconds": 20.0,
+      "market_odds_age_seconds": 26.9,
       "data_quality": 0.75,
       "uncertainty": 0.167,
       "market_complete": true,
@@ -2705,7 +2710,7 @@
         "confidence": 0.0,
         "reason": "not_virtual"
       },
-      "market_odds_timestamp": "2026-11-27T12:45:08.895941+00:00",
+      "market_odds_timestamp": "2026-11-27T12:49:57.384361+00:00",
       "sportybet_event_id": "sr:match:72478736",
       "sportybet_market_id": "18",
       "sportybet_specifier": "total=0.5",
@@ -2721,7 +2726,7 @@
         "model_probability": 0.978539,
         "model_probability_source": "Poisson total-goals probability from existing published expected-goals projection",
         "sportybet_market_id": "18",
-        "quote_timestamp": "2026-11-27T12:45:08.895941+00:00",
+        "quote_timestamp": "2026-11-27T12:49:57.384361+00:00",
         "paper_only": true,
         "real_money_execution": false
       }
@@ -2779,7 +2784,7 @@
       "product": null,
       "edge_percent": 3.56,
       "odds_fresh": true,
-      "market_odds_age_seconds": 20.0,
+      "market_odds_age_seconds": 27.0,
       "data_quality": 0.75,
       "uncertainty": 0.158,
       "market_complete": true,
@@ -2802,7 +2807,7 @@
         "confidence": 0.0,
         "reason": "not_virtual"
       },
-      "market_odds_timestamp": "2026-11-27T12:45:08.862023+00:00",
+      "market_odds_timestamp": "2026-11-27T12:49:57.335787+00:00",
       "sportybet_event_id": "sr:match:72036314",
       "sportybet_market_id": "18",
       "sportybet_specifier": "total=5.5",
@@ -2818,7 +2823,7 @@
         "model_probability": 0.951971,
         "model_probability_source": "Poisson total-goals probability from existing published expected-goals projection",
         "sportybet_market_id": "18",
-        "quote_timestamp": "2026-11-27T12:45:08.862023+00:00",
+        "quote_timestamp": "2026-11-27T12:49:57.335787+00:00",
         "paper_only": true,
         "real_money_execution": false
       }
@@ -2897,7 +2902,7 @@
       "product": "efootball_gt",
       "edge_percent": 40.09,
       "odds_fresh": true,
-      "market_odds_age_seconds": 15.4,
+      "market_odds_age_seconds": 20.3,
       "data_quality": 0.75,
       "uncertainty": 0.157,
       "market_complete": true,
@@ -3008,7 +3013,7 @@
         "historical_breaks": 0,
         "reason": "no_current_opposite_side_streak_break"
       },
-      "market_odds_timestamp": "2026-11-27T12:45:13.840930+00:00",
+      "market_odds_timestamp": "2026-11-27T12:50:04.461162+00:00",
       "sportybet_event_id": "sr:match:BAaIajvSpcFmnuFYvslMrVQ",
       "sportybet_market_id": "18",
       "sportybet_specifier": "total=10.5",
@@ -3089,7 +3094,7 @@
       "product": "efootball_gt",
       "edge_percent": 37.72,
       "odds_fresh": true,
-      "market_odds_age_seconds": 15.4,
+      "market_odds_age_seconds": 20.3,
       "data_quality": 0.75,
       "uncertainty": 0.157,
       "market_complete": true,
@@ -3200,7 +3205,7 @@
         "historical_breaks": 0,
         "reason": "no_current_opposite_side_streak_break"
       },
-      "market_odds_timestamp": "2026-11-27T12:45:13.840930+00:00",
+      "market_odds_timestamp": "2026-11-27T12:50:04.461162+00:00",
       "sportybet_event_id": "sr:match:BAaIajv00cuq1wxC-JyxRgA",
       "sportybet_market_id": "18",
       "sportybet_specifier": "total=10.5",
@@ -3281,7 +3286,7 @@
       "product": "efootball_gt",
       "edge_percent": 33.22,
       "odds_fresh": true,
-      "market_odds_age_seconds": 15.4,
+      "market_odds_age_seconds": 20.3,
       "data_quality": 0.75,
       "uncertainty": 0.157,
       "market_complete": true,
@@ -3392,7 +3397,7 @@
         "historical_breaks": 0,
         "reason": "no_current_opposite_side_streak_break"
       },
-      "market_odds_timestamp": "2026-11-27T12:45:13.840930+00:00",
+      "market_odds_timestamp": "2026-11-27T12:50:04.461162+00:00",
       "sportybet_event_id": "sr:match:BAaIajwAVf46EgCDBsY0zMw",
       "sportybet_market_id": "18",
       "sportybet_specifier": "total=10.5",
@@ -3747,7 +3752,7 @@
       "product": null,
       "edge_percent": 2.32,
       "odds_fresh": true,
-      "market_odds_age_seconds": 20.1,
+      "market_odds_age_seconds": 27.0,
       "data_quality": 0.75,
       "uncertainty": 0.164,
       "market_complete": true,
@@ -3770,7 +3775,7 @@
         "confidence": 0.0,
         "reason": "not_virtual"
       },
-      "market_odds_timestamp": "2026-11-27T12:45:08.828703+00:00",
+      "market_odds_timestamp": "2026-11-27T12:49:57.288111+00:00",
       "sportybet_event_id": "sr:match:72513342",
       "sportybet_market_id": "18",
       "sportybet_specifier": "total=0.5",
@@ -3786,7 +3791,7 @@
         "model_probability": 0.968089,
         "model_probability_source": "Poisson total-goals probability from existing published expected-goals projection",
         "sportybet_market_id": "18",
-        "quote_timestamp": "2026-11-27T12:45:08.828703+00:00",
+        "quote_timestamp": "2026-11-27T12:49:57.288111+00:00",
         "paper_only": true,
         "real_money_execution": false
       }
@@ -3844,7 +3849,7 @@
       "product": null,
       "edge_percent": 3.23,
       "odds_fresh": true,
-      "market_odds_age_seconds": 20.1,
+      "market_odds_age_seconds": 27.0,
       "data_quality": 0.75,
       "uncertainty": 0.125,
       "market_complete": true,
@@ -3867,7 +3872,7 @@
         "confidence": 0.0,
         "reason": "not_virtual"
       },
-      "market_odds_timestamp": "2026-11-27T12:45:08.828703+00:00",
+      "market_odds_timestamp": "2026-11-27T12:49:57.288111+00:00",
       "sportybet_event_id": "sr:match:72513342",
       "sportybet_market_id": "18",
       "sportybet_specifier": "total=1.5",
@@ -3883,7 +3888,7 @@
         "model_probability": 0.858161,
         "model_probability_source": "Poisson total-goals probability from existing published expected-goals projection",
         "sportybet_market_id": "18",
-        "quote_timestamp": "2026-11-27T12:45:08.828703+00:00",
+        "quote_timestamp": "2026-11-27T12:49:57.288111+00:00",
         "paper_only": true,
         "real_money_execution": false
       }
@@ -3941,7 +3946,7 @@
       "product": null,
       "edge_percent": 4.54,
       "odds_fresh": true,
-      "market_odds_age_seconds": 20.1,
+      "market_odds_age_seconds": 27.0,
       "data_quality": 0.75,
       "uncertainty": 0.059,
       "market_complete": true,
@@ -3964,7 +3969,7 @@
         "confidence": 0.0,
         "reason": "not_virtual"
       },
-      "market_odds_timestamp": "2026-11-27T12:45:08.828703+00:00",
+      "market_odds_timestamp": "2026-11-27T12:49:57.288111+00:00",
       "sportybet_event_id": "sr:match:72513342",
       "sportybet_market_id": "18",
       "sportybet_specifier": "total=2.5",
@@ -3980,7 +3985,7 @@
         "model_probability": 0.668822,
         "model_probability_source": "Poisson total-goals probability from existing published expected-goals projection",
         "sportybet_market_id": "18",
-        "quote_timestamp": "2026-11-27T12:45:08.828703+00:00",
+        "quote_timestamp": "2026-11-27T12:49:57.288111+00:00",
         "paper_only": true,
         "real_money_execution": false
       }
@@ -4038,7 +4043,7 @@
       "product": null,
       "edge_percent": -2.32,
       "odds_fresh": true,
-      "market_odds_age_seconds": 20.1,
+      "market_odds_age_seconds": 27.0,
       "data_quality": 0.75,
       "uncertainty": 0.083,
       "market_complete": true,
@@ -4061,7 +4066,7 @@
         "confidence": 0.0,
         "reason": "not_virtual"
       },
-      "market_odds_timestamp": "2026-11-27T12:45:08.828703+00:00",
+      "market_odds_timestamp": "2026-11-27T12:49:57.288111+00:00",
       "sportybet_event_id": "sr:match:72513342",
       "sportybet_market_id": "18",
       "sportybet_specifier": "total=4.5",
@@ -4077,7 +4082,7 @@
         "model_probability": 0.735825,
         "model_probability_source": "Poisson total-goals probability from existing published expected-goals projection",
         "sportybet_market_id": "18",
-        "quote_timestamp": "2026-11-27T12:45:08.828703+00:00",
+        "quote_timestamp": "2026-11-27T12:49:57.288111+00:00",
         "paper_only": true,
         "real_money_execution": false
       }
@@ -4135,7 +4140,7 @@
       "product": null,
       "edge_percent": -0.24,
       "odds_fresh": true,
-      "market_odds_age_seconds": 20.1,
+      "market_odds_age_seconds": 27.0,
       "data_quality": 0.75,
       "uncertainty": 0.128,
       "market_complete": true,
@@ -4158,7 +4163,7 @@
         "confidence": 0.0,
         "reason": "not_virtual"
       },
-      "market_odds_timestamp": "2026-11-27T12:45:08.828703+00:00",
+      "market_odds_timestamp": "2026-11-27T12:49:57.288111+00:00",
       "sportybet_event_id": "sr:match:72513342",
       "sportybet_market_id": "18",
       "sportybet_specifier": "total=5.5",
@@ -4174,7 +4179,7 @@
         "model_probability": 0.864822,
         "model_probability_source": "Poisson total-goals probability from existing published expected-goals projection",
         "sportybet_market_id": "18",
-        "quote_timestamp": "2026-11-27T12:45:08.828703+00:00",
+        "quote_timestamp": "2026-11-27T12:49:57.288111+00:00",
         "paper_only": true,
         "real_money_execution": false
       }
@@ -4232,7 +4237,7 @@
       "product": null,
       "edge_percent": 38.38,
       "odds_fresh": true,
-      "market_odds_age_seconds": 20.1,
+      "market_odds_age_seconds": 27.0,
       "data_quality": 0.75,
       "uncertainty": 0.095,
       "market_complete": true,
@@ -4255,7 +4260,7 @@
         "confidence": 0.0,
         "reason": "not_virtual"
       },
-      "market_odds_timestamp": "2026-11-27T12:45:08.828703+00:00",
+      "market_odds_timestamp": "2026-11-27T12:49:57.288111+00:00",
       "sportybet_event_id": "sr:match:72513342",
       "sportybet_market_id": "10",
       "sportybet_specifier": null,
@@ -4271,7 +4276,7 @@
         "model_probability": 0.771555,
         "model_probability_source": "sum of independently published 1X2 probabilities",
         "sportybet_market_id": "10",
-        "quote_timestamp": "2026-11-27T12:45:08.828703+00:00",
+        "quote_timestamp": "2026-11-27T12:49:57.288111+00:00",
         "paper_only": true,
         "real_money_execution": false
       }
@@ -4329,7 +4334,7 @@
       "product": null,
       "edge_percent": 38.51,
       "odds_fresh": true,
-      "market_odds_age_seconds": 20.1,
+      "market_odds_age_seconds": 27.0,
       "data_quality": 0.75,
       "uncertainty": 0.093,
       "market_complete": true,
@@ -4352,7 +4357,7 @@
         "confidence": 0.0,
         "reason": "not_virtual"
       },
-      "market_odds_timestamp": "2026-11-27T12:45:08.828703+00:00",
+      "market_odds_timestamp": "2026-11-27T12:49:57.288111+00:00",
       "sportybet_event_id": "sr:match:72513342",
       "sportybet_market_id": "10",
       "sportybet_specifier": null,
@@ -4368,7 +4373,7 @@
         "model_probability": 0.766556,
         "model_probability_source": "sum of independently published 1X2 probabilities",
         "sportybet_market_id": "10",
-        "quote_timestamp": "2026-11-27T12:45:08.828703+00:00",
+        "quote_timestamp": "2026-11-27T12:49:57.288111+00:00",
         "paper_only": true,
         "real_money_execution": false
       }
@@ -4426,7 +4431,7 @@
       "product": null,
       "edge_percent": 0.84,
       "odds_fresh": true,
-      "market_odds_age_seconds": 20.0,
+      "market_odds_age_seconds": 27.0,
       "data_quality": 0.75,
       "uncertainty": 0.149,
       "market_complete": true,
@@ -4449,7 +4454,7 @@
         "confidence": 0.0,
         "reason": "not_virtual"
       },
-      "market_odds_timestamp": "2026-11-27T12:45:08.862023+00:00",
+      "market_odds_timestamp": "2026-11-27T12:49:57.335787+00:00",
       "sportybet_event_id": "sr:match:72036314",
       "sportybet_market_id": "18",
       "sportybet_specifier": "total=0.5",
@@ -4465,7 +4470,7 @@
         "model_probability": 0.924694,
         "model_probability_source": "Poisson total-goals probability from existing published expected-goals projection",
         "sportybet_market_id": "18",
-        "quote_timestamp": "2026-11-27T12:45:08.862023+00:00",
+        "quote_timestamp": "2026-11-27T12:49:57.335787+00:00",
         "paper_only": true,
         "real_money_execution": false
       }
@@ -4523,7 +4528,7 @@
       "product": null,
       "edge_percent": -1.81,
       "odds_fresh": true,
-      "market_odds_age_seconds": 20.0,
+      "market_odds_age_seconds": 27.0,
       "data_quality": 0.75,
       "uncertainty": 0.08,
       "market_complete": true,
@@ -4546,7 +4551,7 @@
         "confidence": 0.0,
         "reason": "not_virtual"
       },
-      "market_odds_timestamp": "2026-11-27T12:45:08.862023+00:00",
+      "market_odds_timestamp": "2026-11-27T12:49:57.335787+00:00",
       "sportybet_event_id": "sr:match:72036314",
       "sportybet_market_id": "18",
       "sportybet_specifier": "total=1.5",
@@ -4562,7 +4567,7 @@
         "model_probability": 0.729939,
         "model_probability_source": "Poisson total-goals probability from existing published expected-goals projection",
         "sportybet_market_id": "18",
-        "quote_timestamp": "2026-11-27T12:45:08.862023+00:00",
+        "quote_timestamp": "2026-11-27T12:49:57.335787+00:00",
         "paper_only": true,
         "real_money_execution": false
       }
@@ -4620,7 +4625,7 @@
       "product": null,
       "edge_percent": 4.03,
       "odds_fresh": true,
-      "market_odds_age_seconds": 20.0,
+      "market_odds_age_seconds": 27.0,
       "data_quality": 0.75,
       "uncertainty": 0.084,
       "market_complete": true,
@@ -4643,7 +4648,7 @@
         "confidence": 0.0,
         "reason": "not_virtual"
       },
-      "market_odds_timestamp": "2026-11-27T12:45:08.862023+00:00",
+      "market_odds_timestamp": "2026-11-27T12:49:57.335787+00:00",
       "sportybet_event_id": "sr:match:72036314",
       "sportybet_market_id": "18",
       "sportybet_specifier": "total=3.5",
@@ -4659,7 +4664,7 @@
         "model_probability": 0.739001,
         "model_probability_source": "Poisson total-goals probability from existing published expected-goals projection",
         "sportybet_market_id": "18",
-        "quote_timestamp": "2026-11-27T12:45:08.862023+00:00",
+        "quote_timestamp": "2026-11-27T12:49:57.335787+00:00",
         "paper_only": true,
         "real_money_execution": false
       }
@@ -4717,7 +4722,7 @@
       "product": null,
       "edge_percent": 3.68,
       "odds_fresh": true,
-      "market_odds_age_seconds": 20.0,
+      "market_odds_age_seconds": 27.0,
       "data_quality": 0.75,
       "uncertainty": 0.133,
       "market_complete": true,
@@ -4740,7 +4745,7 @@
         "confidence": 0.0,
         "reason": "not_virtual"
       },
-      "market_odds_timestamp": "2026-11-27T12:45:08.862023+00:00",
+      "market_odds_timestamp": "2026-11-27T12:49:57.335787+00:00",
       "sportybet_event_id": "sr:match:72036314",
       "sportybet_market_id": "18",
       "sportybet_specifier": "total=4.5",
@@ -4756,7 +4761,7 @@
         "model_probability": 0.879368,
         "model_probability_source": "Poisson total-goals probability from existing published expected-goals projection",
         "sportybet_market_id": "18",
-        "quote_timestamp": "2026-11-27T12:45:08.862023+00:00",
+        "quote_timestamp": "2026-11-27T12:49:57.335787+00:00",
         "paper_only": true,
         "real_money_execution": false
       }
@@ -4814,7 +4819,7 @@
       "product": null,
       "edge_percent": 3.56,
       "odds_fresh": true,
-      "market_odds_age_seconds": 20.0,
+      "market_odds_age_seconds": 27.0,
       "data_quality": 0.75,
       "uncertainty": 0.158,
       "market_complete": true,
@@ -4837,7 +4842,7 @@
         "confidence": 0.0,
         "reason": "not_virtual"
       },
-      "market_odds_timestamp": "2026-11-27T12:45:08.862023+00:00",
+      "market_odds_timestamp": "2026-11-27T12:49:57.335787+00:00",
       "sportybet_event_id": "sr:match:72036314",
       "sportybet_market_id": "18",
       "sportybet_specifier": "total=5.5",
@@ -4853,7 +4858,7 @@
         "model_probability": 0.951971,
         "model_probability_source": "Poisson total-goals probability from existing published expected-goals projection",
         "sportybet_market_id": "18",
-        "quote_timestamp": "2026-11-27T12:45:08.862023+00:00",
+        "quote_timestamp": "2026-11-27T12:49:57.335787+00:00",
         "paper_only": true,
         "real_money_execution": false
       }
@@ -4911,7 +4916,7 @@
       "product": null,
       "edge_percent": 36.89,
       "odds_fresh": true,
-      "market_odds_age_seconds": 20.0,
+      "market_odds_age_seconds": 27.0,
       "data_quality": 0.75,
       "uncertainty": 0.08,
       "market_complete": true,
@@ -4934,7 +4939,7 @@
         "confidence": 0.0,
         "reason": "not_virtual"
       },
-      "market_odds_timestamp": "2026-11-27T12:45:08.862023+00:00",
+      "market_odds_timestamp": "2026-11-27T12:49:57.335787+00:00",
       "sportybet_event_id": "sr:match:72036314",
       "sportybet_market_id": "10",
       "sportybet_specifier": null,
@@ -4950,7 +4955,7 @@
         "model_probability": 0.727825,
         "model_probability_source": "sum of independently published 1X2 probabilities",
         "sportybet_market_id": "10",
-        "quote_timestamp": "2026-11-27T12:45:08.862023+00:00",
+        "quote_timestamp": "2026-11-27T12:49:57.335787+00:00",
         "paper_only": true,
         "real_money_execution": false
       }
@@ -5008,7 +5013,7 @@
       "product": null,
       "edge_percent": 31.66,
       "odds_fresh": true,
-      "market_odds_age_seconds": 20.0,
+      "market_odds_age_seconds": 27.0,
       "data_quality": 0.75,
       "uncertainty": 0.061,
       "market_complete": true,
@@ -5031,7 +5036,7 @@
         "confidence": 0.0,
         "reason": "not_virtual"
       },
-      "market_odds_timestamp": "2026-11-27T12:45:08.862023+00:00",
+      "market_odds_timestamp": "2026-11-27T12:49:57.335787+00:00",
       "sportybet_event_id": "sr:match:72036314",
       "sportybet_market_id": "10",
       "sportybet_specifier": null,
@@ -5047,7 +5052,7 @@
         "model_probability": 0.675615,
         "model_probability_source": "sum of independently published 1X2 probabilities",
         "sportybet_market_id": "10",
-        "quote_timestamp": "2026-11-27T12:45:08.862023+00:00",
+        "quote_timestamp": "2026-11-27T12:49:57.335787+00:00",
         "paper_only": true,
         "real_money_execution": false
       }
@@ -5105,7 +5110,7 @@
       "product": null,
       "edge_percent": 2.78,
       "odds_fresh": true,
-      "market_odds_age_seconds": 20.0,
+      "market_odds_age_seconds": 26.9,
       "data_quality": 0.75,
       "uncertainty": 0.167,
       "market_complete": true,
@@ -5128,7 +5133,7 @@
         "confidence": 0.0,
         "reason": "not_virtual"
       },
-      "market_odds_timestamp": "2026-11-27T12:45:08.895941+00:00",
+      "market_odds_timestamp": "2026-11-27T12:49:57.384361+00:00",
       "sportybet_event_id": "sr:match:72478736",
       "sportybet_market_id": "18",
       "sportybet_specifier": "total=0.5",
@@ -5144,7 +5149,7 @@
         "model_probability": 0.978539,
         "model_probability_source": "Poisson total-goals probability from existing published expected-goals projection",
         "sportybet_market_id": "18",
-        "quote_timestamp": "2026-11-27T12:45:08.895941+00:00",
+        "quote_timestamp": "2026-11-27T12:49:57.384361+00:00",
         "paper_only": true,
         "real_money_execution": false
       }
@@ -5202,7 +5207,7 @@
       "product": null,
       "edge_percent": 3.75,
       "odds_fresh": true,
-      "market_odds_age_seconds": 20.0,
+      "market_odds_age_seconds": 26.9,
       "data_quality": 0.75,
       "uncertainty": 0.139,
       "market_complete": true,
@@ -5225,7 +5230,7 @@
         "confidence": 0.0,
         "reason": "not_virtual"
       },
-      "market_odds_timestamp": "2026-11-27T12:45:08.895941+00:00",
+      "market_odds_timestamp": "2026-11-27T12:49:57.384361+00:00",
       "sportybet_event_id": "sr:match:72478736",
       "sportybet_market_id": "18",
       "sportybet_specifier": "total=1.5",
@@ -5241,7 +5246,7 @@
         "model_probability": 0.896095,
         "model_probability_source": "Poisson total-goals probability from existing published expected-goals projection",
         "sportybet_market_id": "18",
-        "quote_timestamp": "2026-11-27T12:45:08.895941+00:00",
+        "quote_timestamp": "2026-11-27T12:49:57.384361+00:00",
         "paper_only": true,
         "real_money_execution": false
       }
@@ -5299,7 +5304,7 @@
       "product": null,
       "edge_percent": 5.9,
       "odds_fresh": true,
-      "market_odds_age_seconds": 20.0,
+      "market_odds_age_seconds": 26.9,
       "data_quality": 0.75,
       "uncertainty": 0.083,
       "market_complete": true,
@@ -5322,7 +5327,7 @@
         "confidence": 0.0,
         "reason": "not_virtual"
       },
-      "market_odds_timestamp": "2026-11-27T12:45:08.895941+00:00",
+      "market_odds_timestamp": "2026-11-27T12:49:57.384361+00:00",
       "sportybet_event_id": "sr:match:72478736",
       "sportybet_market_id": "18",
       "sportybet_specifier": "total=2.5",
@@ -5338,7 +5343,7 @@
         "model_probability": 0.737741,
         "model_probability_source": "Poisson total-goals probability from existing published expected-goals projection",
         "sportybet_market_id": "18",
-        "quote_timestamp": "2026-11-27T12:45:08.895941+00:00",
+        "quote_timestamp": "2026-11-27T12:49:57.384361+00:00",
         "paper_only": true,
         "real_money_execution": false
       }
@@ -5396,7 +5401,7 @@
       "product": null,
       "edge_percent": -4.84,
       "odds_fresh": true,
-      "market_odds_age_seconds": 20.0,
+      "market_odds_age_seconds": 26.9,
       "data_quality": 0.75,
       "uncertainty": 0.056,
       "market_complete": true,
@@ -5419,7 +5424,7 @@
         "confidence": 0.0,
         "reason": "not_virtual"
       },
-      "market_odds_timestamp": "2026-11-27T12:45:08.895941+00:00",
+      "market_odds_timestamp": "2026-11-27T12:49:57.384361+00:00",
       "sportybet_event_id": "sr:match:72478736",
       "sportybet_market_id": "18",
       "sportybet_specifier": "total=4.5",
@@ -5435,7 +5440,7 @@
         "model_probability": 0.65977,
         "model_probability_source": "Poisson total-goals probability from existing published expected-goals projection",
         "sportybet_market_id": "18",
-        "quote_timestamp": "2026-11-27T12:45:08.895941+00:00",
+        "quote_timestamp": "2026-11-27T12:49:57.384361+00:00",
         "paper_only": true,
         "real_money_execution": false
       }
@@ -5493,7 +5498,7 @@
       "product": null,
       "edge_percent": -2.15,
       "odds_fresh": true,
-      "market_odds_age_seconds": 20.0,
+      "market_odds_age_seconds": 26.9,
       "data_quality": 0.75,
       "uncertainty": 0.108,
       "market_complete": true,
@@ -5516,7 +5521,7 @@
         "confidence": 0.0,
         "reason": "not_virtual"
       },
-      "market_odds_timestamp": "2026-11-27T12:45:08.895941+00:00",
+      "market_odds_timestamp": "2026-11-27T12:49:57.384361+00:00",
       "sportybet_event_id": "sr:match:72478736",
       "sportybet_market_id": "18",
       "sportybet_specifier": "total=5.5",
@@ -5532,7 +5537,7 @@
         "model_probability": 0.809386,
         "model_probability_source": "Poisson total-goals probability from existing published expected-goals projection",
         "sportybet_market_id": "18",
-        "quote_timestamp": "2026-11-27T12:45:08.895941+00:00",
+        "quote_timestamp": "2026-11-27T12:49:57.384361+00:00",
         "paper_only": true,
         "real_money_execution": false
       }
@@ -5590,7 +5595,7 @@
       "product": null,
       "edge_percent": 31.74,
       "odds_fresh": true,
-      "market_odds_age_seconds": 20.0,
+      "market_odds_age_seconds": 26.9,
       "data_quality": 0.75,
       "uncertainty": 0.059,
       "market_complete": true,
@@ -5613,7 +5618,7 @@
         "confidence": 0.0,
         "reason": "not_virtual"
       },
-      "market_odds_timestamp": "2026-11-27T12:45:08.895941+00:00",
+      "market_odds_timestamp": "2026-11-27T12:49:57.384361+00:00",
       "sportybet_event_id": "sr:match:72478736",
       "sportybet_market_id": "10",
       "sportybet_specifier": null,
@@ -5629,7 +5634,7 @@
         "model_probability": 0.668016,
         "model_probability_source": "sum of independently published 1X2 probabilities",
         "sportybet_market_id": "10",
-        "quote_timestamp": "2026-11-27T12:45:08.895941+00:00",
+        "quote_timestamp": "2026-11-27T12:49:57.384361+00:00",
         "paper_only": true,
         "real_money_execution": false
       }
