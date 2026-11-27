@@ -846,3 +846,12 @@ This checkpoint supersedes the previous pending-recovery section. Frozen cutoff 
 1. This checkpoint push intentionally triggers the watchdog and NBA ticket regression again. Verify both on the new main SHA; with capture status still fresh, the watchdog must not dispatch a duplicate capture.
 2. Continue the staggered exact-market capture and official ESPN settlement schedules; inspect the next successful capture and settlement handoff and refresh reports only when evidence changes or the report freshness gate requires it.
 3. Keep Priority 16 and the closing-line-value priority unchecked. Preserve `RESEARCH_ONLY`, the frozen cutoff, the exact SportyBet Nigeria market-225/15-minute rule, immutable snapshot linkage, and official ESPN settlement. Do not tune against the prospective cohort, substitute odds, count repeated quotes as bets, relax thresholds, or enable auto-betting.
+
+
+## 2026-11-27 schedule-delivery hardening — Autopilot completion fallback
+
+The capture workflow remains active and declares the ten-minute schedule, but the inspected run history had no scheduled capture at 08:50Z or 09:00Z; the latest capture was still workflow-dispatch run 2598 (status checked 08:48:49Z). The watchdog's scheduled ticks were also absent after the earlier delivery gap. The existing watchdog watched Live Expansion, Unified Upcoming Board, Pages, settlement, capture, and research completions, but not the frequently running **Match Signal Autopilot Refresh**. Autopilot run [45969868504](https://github.com/topboyasian-stack/match-signal/actions/runs/45969868504) completed at 08:59:52Z after being started by a workflow-run event, making its completion a useful independent recovery signal.
+
+**Workflow change:** `.github/workflows/nba-totals-capture-watchdog.yml` now watches `Match Signal Autopilot Refresh` in both the `workflow_run.workflows` list and the job-level allowlist. `scripts/test_nba_totals_capture_watchdog.py` asserts both the trigger registration and allowlist entry. The watchdog still uses the committed capture status, exact prediction-source fingerprint, active-run counts, and existing cooldowns; this does not relax the 15-minute quote rule or create duplicate eligible selections.
+
+The checkpoint push for this change is expected to trigger the watchdog and ticket regression. Because capture status is now stale, verify that one recovery capture is dispatched, that any second recovery signal sees the active capture and suppresses duplication, and that the updated watchdog regression passes.

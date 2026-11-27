@@ -264,10 +264,14 @@ def run():
     assert '"NBA totals probability and value research"' in watchdog_workflow, (
         "A successful report refresh must also run the freshness watchdog so a missed capture schedule can recover."
     )
+    assert '"Match Signal Autopilot Refresh"' in watchdog_workflow, (
+        "Autopilot completion must wake freshness recovery when scheduled capture delivery is delayed."
+    )
     # Any completed watched source is a recovery signal, including failed,
     # cancelled, or skipped runs; freshness checks suppress unnecessary retries.
     for workflow_name in (
         "Match Signal Live Expansion",
+        "Match Signal Autopilot Refresh",
         "Match Signal Unified Upcoming Board",
         "Deploy Match Signal to Cloudflare Pages",
         "NBA totals settlement ledger",
