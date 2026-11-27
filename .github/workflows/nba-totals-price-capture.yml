@@ -144,14 +144,49 @@ jobs:
           )"
           echo "New immutable SportyBet market-225 snapshots: $added"
           echo "Official ESPN ledger age at capture completion: $ledger_age_minutes minutes"
+          # The watchdog may already have dispatched settlement recovery for this
+          # stale ledger. Avoid queuing a second ESPN reconciliation from capture.
+          gh api "repos/$GITHUB_REPOSITORY/actions/workflows/nba-totals-settlement.yml/runs?branch=main&per_page=20" --jq '[.workflow_runs[] | {status, conclusion, updated_at}]' > /tmp/nba_totals_settlement_runs.json
+          python - <<'PY' > /tmp/nba_totals_settlement_run_counts.txt
+          import json
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          runs = json.loads(Path("/tmp/nba_totals_settlement_runs.json").read_text(encoding="utf-8"))
+          now = datetime.now(timezone.utc)
+          active = 0
+          recent_successful = 0
+          for run in runs:
+              if run.get("status") in {"queued", "in_progress"}:
+                  active += 1
+                  continue
+              if run.get("status") != "completed" or run.get("conclusion") != "success":
+                  continue
+              try:
+                  updated = datetime.fromisoformat(str(run.get("updated_at", "")).replace("Z", "+00:00"))
+                  if updated.tzinfo is None:
+                      updated = updated.replace(tzinfo=timezone.utc)
+                  age_minutes = (now - updated.astimezone(timezone.utc)).total_seconds() / 60
+                  if -2 <= age_minutes <= 10:
+                      recent_successful += 1
+              except (TypeError, ValueError):
+                  continue
+          print(active, recent_successful)
+          PY
+          read -r active_settlement_runs recent_successful_settlement_runs < /tmp/nba_totals_settlement_run_counts.txt
+          echo "Active official ESPN settlement runs: $active_settlement_runs"
+          echo "Successful ESPN settlement runs completed within 10 minutes: $recent_successful_settlement_runs"
+
           if [ "$added" -gt 0 ]; then
-            if python - "$ledger_age_minutes" <<'PY'
+            if [ "$active_settlement_runs" -gt 0 ] || [ "$recent_successful_settlement_runs" -gt 0 ]; then
+              echo "Skipping redundant official ESPN settlement dispatch; a settlement run is active or completed recently."
+            elif python - "$ledger_age_minutes" <<'PY'
           import sys
           raise SystemExit(0 if float(sys.argv[1]) >= 10 else 1)
           PY
             then
               gh workflow run nba-totals-settlement.yml --ref main -f capture_triggered=true
-              echo "Dispatched official ESPN settlement because the ledger is at least ten minutes old."
+              echo "Dispatched official ESPN settlement because the ledger is at least ten minutes old and no recent settlement run exists."
             else
               echo "The official ESPN ledger is fresh; the event-driven settlement gate will avoid redundant reconciliation."
             fi
