@@ -30,6 +30,7 @@ on:
       - "scripts/test_nba_sportybet_totals.py"
       - "scripts/nba_totals_walk_forward.py"
       - "scripts/nba_totals_probability_value_experiment.py"
+      - "scripts/verify_nba_totals_report_fingerprint.py"
       - "scripts/capture_nba_totals_prices.py"
       - "scripts/settle_nba_totals.py"
       - "basketball-live.js"
@@ -368,6 +369,24 @@ jobs:
           echo "builder_run_id=$builder_run_id" >> "$GITHUB_OUTPUT"
           echo "builder_head_sha=$builder_head_sha" >> "$GITHUB_OUTPUT"
           echo "Post-build board's Builder run $builder_run_id succeeded."
+      - name: Wait for current NBA report fingerprint before Pages dispatch
+        timeout-minutes: 6
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 30); do
+            git fetch origin main
+            git reset --hard origin/main
+            if python scripts/verify_nba_totals_report_fingerprint.py; then
+              echo "Current NBA totals report fingerprint verified before Pages dispatch."
+              exit 0
+            fi
+            if [ "$attempt" -lt 30 ]; then
+              echo "NBA totals report fingerprint is stale at attempt $attempt/30; waiting 10 seconds for the report publisher." >&2
+              sleep 10
+            fi
+          done
+          echo "Refusing Pages deployment because the NBA totals report fingerprint still differs from latest main." >&2
+          exit 1
       - name: Dispatch Cloudflare Pages after post-build board and Builder publication
         env:
           GH_TOKEN: ${{ github.token }}
