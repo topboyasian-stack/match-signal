@@ -71,14 +71,28 @@ class EfootballResearchRecoveryTests(unittest.TestCase):
                          "The board must not recursively rerun because the recorder completed.")
 
     def test_nba_price_capture_runs_after_model_refresh_without_board_builder_loop(self):
-        self.assertIn('"Match Signal Live Expansion"', NBA_CAPTURE)
+        # Capture deliberately has no workflow_run trigger. Live Expansion performs a
+        # source-hash handoff after publishing predictions, preventing duplicate quote
+        # revisions and keeping scheduled capture isolated from event-driven recovery.
+        self.assertNotIn("workflow_run:", NBA_CAPTURE,
+                         "Do not add a direct capture workflow_run trigger; use the guarded source-hash handoff.")
         self.assertNotIn('"Match Signal Unified Upcoming Board"', NBA_CAPTURE,
                          "Board completions do not change NBA predictions; avoid duplicate quote revisions.")
         self.assertNotIn('"Match Signal Odds Builder"', NBA_CAPTURE)
         self.assertNotIn('"Deploy Match Signal to Cloudflare Pages"', NBA_CAPTURE)
         self.assertIn("cron: '*/10 * * * *'", NBA_CAPTURE)
-        capture_job = NBA_CAPTURE.split("  capture:", 1)[1]
-        self.assertIn("github.event.workflow_run.conclusion == 'success'", capture_job)
+        self.assertIn("nba-totals-price-capture-", NBA_CAPTURE)
+        self.assertIn("github.event_name == 'schedule' && 'scheduled' || 'event-driven'", NBA_CAPTURE)
+
+        live_expansion_workflow = (ROOT / ".github/workflows/live-expansion.yml").read_text(encoding="utf-8")
+        self.assertIn("Revalidate prediction-source hash and dispatch exact SportyBet market-225 capture",
+                      live_expansion_workflow)
+        self.assertIn("gh workflow run nba-totals-price-capture.yml --ref main", live_expansion_workflow)
+        self.assertIn("prediction_source_sha256", live_expansion_workflow)
+        self.assertIn("hashlib.sha256", live_expansion_workflow)
+        self.assertIn("Latest capture already matches the published NBA prediction source; no duplicate capture dispatched.",
+                      live_expansion_workflow)
+
         board_workflow = (ROOT / ".github/workflows/unified-upcoming.yml").read_text(encoding="utf-8")
         trigger_block = board_workflow.split("  workflow_run:", 1)[1].split("  schedule:", 1)[0]
         self.assertNotIn('"NBA totals SportyBet market-225 price capture"', trigger_block,
