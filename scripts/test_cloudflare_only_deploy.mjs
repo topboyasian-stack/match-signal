@@ -110,6 +110,13 @@ const cloudflare = fs.readFileSync(path.join(workflowsDir, "cloudflare-pages.yml
 assert.match(cloudflare, /name:\s*Deploy Match Signal to Cloudflare Pages/);
 assert.match(cloudflare, /https:\/\/match-signal\.pages\.dev/);
 assert.ok(
+  cloudflare.includes("      - 'data/nba_totals_oos_value_test.json'") &&
+    cloudflare.includes("      - 'data/nba_totals_probability_value_experiment.json'") &&
+    cloudflare.includes("|data/nba_totals_oos_value_test.json|") &&
+    cloudflare.includes("|data/nba_totals_probability_value_experiment.json|"),
+  "The fixed-cutoff NBA research reports must trigger and be approved for current Pages deployment.",
+);
+assert.ok(
   cloudflare.includes("|scripts/predict_today.py|") &&
     cloudflare.includes("|scripts/test_predict_today_market_matching.py|") &&
     cloudflare.includes("|.github/workflows/efootball-recent-evidence-regression.yml|") &&
