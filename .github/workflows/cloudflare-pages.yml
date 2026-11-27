@@ -7,9 +7,10 @@ on:
   # refresh board -> build/publish Odds Builder -> refresh board from that artifact
   # -> rebuild/publish Builder -> deploy and verify Pages. Do not deploy on the
   # initial board completion because its Builder artifact may still be stale.
-  # Fixed-cutoff NBA OOS/probability reports are report-only static artifacts and
-  # may deploy directly after publication; existing board/Builder freshness checks
-  # still fail closed if those production inputs are stale. Shared booking stays ordered.
+  # Fixed-cutoff NBA OOS/probability report JSONs are read-only static artifacts.
+  # Their publication can deploy directly; existing board/Builder freshness checks
+  # still fail closed if those production inputs are stale. Builder-owned changes
+  # and shared booking remain ordered through Builder Production Promotion.
   # This workflow file itself is intentionally excluded from direct promotion; changes to it go through Builder Production Promotion.
   push:
     branches: [main]
