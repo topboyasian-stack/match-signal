@@ -2,6 +2,7 @@
 
 from datetime import datetime, timezone
 from pathlib import Path
+import json
 import tempfile
 
 from nba_totals_report_refresh_gate import (
@@ -11,6 +12,7 @@ from nba_totals_report_refresh_gate import (
     should_refresh_report,
     source_data_fingerprint,
 )
+from verify_nba_totals_report_fingerprint import verify as verify_nba_totals_report_fingerprint
 
 
 def dt(value):
@@ -71,6 +73,21 @@ def run():
         assert not report_source_fingerprint_matches(
             {"source_data_fingerprint": first_fingerprint}, second_fingerprint
         )
+        report_path = root / "data/nba_totals_probability_value_experiment.json"
+        report_path.write_text(
+            json.dumps({"source_data_fingerprint": second_fingerprint}),
+            encoding="utf-8",
+        )
+        verifier_ok, verifier_mismatches = verify_nba_totals_report_fingerprint(root)
+        assert verifier_ok and not verifier_mismatches, (
+            "The production verifier must accept an exact match to the current source files."
+        )
+        changed_path.write_text("version-three", encoding="utf-8")
+        verifier_ok, verifier_mismatches = verify_nba_totals_report_fingerprint(root)
+        assert not verifier_ok and any(
+            "nba_totals_probability_settlements.json" in mismatch
+            for mismatch in verifier_mismatches
+        ), "The production verifier must reject source changes made after report publication."
 
     now = dt("2026-11-02T06:53:45Z")
     prior_report = dt("2026-11-02T06:49:43Z")
@@ -195,7 +212,7 @@ def run():
         "A report publication race must be retried for a bounded period, then fail closed instead of deploying stale reports."
     )
 
-    print("PASS: quote-revision freshness, source fingerprint race recovery, duplicate suppression, schedule throttle, and missing-report cases.")
+    print("PASS: quote-revision freshness, source fingerprint race recovery, production deployment fingerprint verification, duplicate suppression, schedule throttle, and missing-report cases.")
 
 
 if __name__ == "__main__":
