@@ -174,6 +174,27 @@ def run():
         "New exact quote snapshots must explicitly dispatch official ESPN settlement when the ledger is stale."
     )
 
+    promotion_workflow = (Path(__file__).resolve().parents[1] / ".github/workflows/builder-production-promotion.yml").read_text(encoding="utf-8")
+    fingerprint_guard_name = "Wait for current NBA report fingerprint before Pages dispatch"
+    assert fingerprint_guard_name in promotion_workflow, (
+        "Production promotion must wait for the latest NBA report fingerprint before deploying static artifacts."
+    )
+    assert "python scripts/verify_nba_totals_report_fingerprint.py" in promotion_workflow, (
+        "The production promotion must use the same source-fingerprint contract as the report publisher."
+    )
+    fingerprint_guard_index = promotion_workflow.index(fingerprint_guard_name)
+    pages_dispatch_index = promotion_workflow.index("Dispatch Cloudflare Pages after post-build board and Builder publication")
+    assert fingerprint_guard_index < pages_dispatch_index, (
+        "The NBA report fingerprint guard must run before Pages dispatch, not after deployment."
+    )
+    fingerprint_guard = promotion_workflow[fingerprint_guard_index:pages_dispatch_index]
+    assert "git fetch origin main" in fingerprint_guard and "git reset --hard origin/main" in fingerprint_guard, (
+        "The promotion must re-read latest main while waiting for a concurrent report publication."
+    )
+    assert "seq 1 30" in fingerprint_guard and "sleep 10" in fingerprint_guard, (
+        "A report publication race must be retried for a bounded period, then fail closed instead of deploying stale reports."
+    )
+
     print("PASS: quote-revision freshness, source fingerprint race recovery, duplicate suppression, schedule throttle, and missing-report cases.")
 
 
