@@ -65,6 +65,12 @@ def run():
     assert "steps.persist.outputs.changed == 'true'" in settlement_workflow, (
         "Settlement should dispatch a report only when new ledger artifacts were published."
     )
+    assert "last_successful_at" in watchdog_workflow and "LAST_SUCCESSFUL_SETTLEMENT_AT" in watchdog_workflow, (
+        "The watchdog must inspect the most recent successful ESPN settlement run before retrying a stale ledger."
+    )
+    assert "last_successful_settlement_at=last_successful" in watchdog_workflow and "retry_cooldown_minutes=10" in watchdog_workflow, (
+        "A recent successful no-op settlement must suppress immediate workflow_run retry loops."
+    )
     assert 'echo "changed=false" >> "$GITHUB_OUTPUT"' in settlement_workflow and 'echo "changed=$evidence_changed" >> "$GITHUB_OUTPUT"' in settlement_workflow, (
         "The settlement publication output must distinguish new settled records from timestamp-only checks."
     )
@@ -180,6 +186,14 @@ def run():
     assert not should_dispatch_settlement(
         "2026-11-02T13:00:00Z", model_now, active_settlement_runs=1, max_age_minutes=15
     ), "An active settlement run must suppress duplicate settlement recovery."
+    assert not should_dispatch_settlement(
+        "2026-11-02T13:00:00Z", model_now, active_settlement_runs=0, max_age_minutes=15,
+        last_successful_settlement_at="2026-11-02T13:50:00Z",
+    ), "A recent successful no-op settlement must suppress immediate retry loops."
+    assert should_dispatch_settlement(
+        "2026-11-02T13:00:00Z", model_now, active_settlement_runs=0, max_age_minutes=15,
+        last_successful_settlement_at="2026-11-02T13:44:00Z",
+    ), "A stale ledger may recover again after the ten-minute settlement retry cooldown."
     assert should_dispatch_settlement(None, model_now, active_settlement_runs=0), (
         "A missing settlement ledger timestamp must fail safe to official settlement recovery."
     )

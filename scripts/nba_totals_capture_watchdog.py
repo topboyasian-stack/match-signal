@@ -80,15 +80,26 @@ def should_dispatch_settlement(
     now,
     active_settlement_runs=0,
     max_age_minutes=15,
+    last_successful_settlement_at=None,
+    retry_cooldown_minutes=10,
 ):
-    """Recover official ESPN settlement polling when the ledger has gone stale."""
+    """Recover official ESPN settlement without looping on successful no-op reconciliations."""
     age = capture_age_minutes(ledger_updated_at, now)
     stale = age is None or age < -2 or age >= float(max_age_minutes)
     try:
         active = int(active_settlement_runs)
     except (TypeError, ValueError):
         active = 1
-    return stale and active <= 0
+    if active > 0 or not stale:
+        return False
+
+    # A no-op ESPN reconciliation intentionally preserves ledger.updated_at.
+    # Use the latest successful Actions run as a short retry cooldown so its
+    # workflow_run event cannot immediately dispatch the same stale-ledger job.
+    last_success_age = capture_age_minutes(last_successful_settlement_at, now)
+    if last_success_age is not None and -2 <= last_success_age < float(retry_cooldown_minutes):
+        return False
+    return True
 
 
 def settlement_evidence_changed(candidate_ledger, live_ledger, candidate_probability, live_probability):

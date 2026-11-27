@@ -245,13 +245,17 @@ jobs:
         run: |
           set -euo pipefail
           active="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/nba-totals-settlement.yml/runs?branch=main&per_page=20" --jq '[.workflow_runs[] | select(.status == "queued" or .status == "in_progress")] | length')"
+          last_successful_at="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/nba-totals-settlement.yml/runs?branch=main&per_page=20" --jq '[.workflow_runs[] | select(.status == "completed" and .conclusion == "success") | .updated_at] | first // ""')"
           echo "count=$active" >> "$GITHUB_OUTPUT"
+          echo "last_successful_at=$last_successful_at" >> "$GITHUB_OUTPUT"
           echo "Active official ESPN settlement runs: $active"
+          echo "Most recent successful ESPN settlement completion: ${last_successful_at:-unknown}"
 
       - name: Decide whether official ESPN settlement is stale
         id: settlement_freshness
         env:
           ACTIVE_SETTLEMENT_RUNS: ${{ steps.active_settlement.outputs.count }}
+          LAST_SUCCESSFUL_SETTLEMENT_AT: ${{ steps.active_settlement.outputs.last_successful_at }}
         run: |
           set -euo pipefail
           python - <<'PY' | tee -a "$GITHUB_OUTPUT"
@@ -271,19 +275,25 @@ jobs:
           updated_at = ledger.get("updated_at")
           now = datetime.now(timezone.utc)
           active = int(os.environ.get("ACTIVE_SETTLEMENT_RUNS", "0"))
+          last_successful = os.environ.get("LAST_SUCCESSFUL_SETTLEMENT_AT", "").strip() or None
           age = capture_age_minutes(updated_at, now)
+          last_success_age = capture_age_minutes(last_successful, now)
           dispatch = should_dispatch_settlement(
-              updated_at, now, active_settlement_runs=active, max_age_minutes=15
+              updated_at, now, active_settlement_runs=active, max_age_minutes=15,
+              last_successful_settlement_at=last_successful, retry_cooldown_minutes=10,
           )
           print(f"dispatch={'true' if dispatch else 'false'}")
           print(f"ledger_age_minutes={age:.2f}" if age is not None else "ledger_age_minutes=unknown")
           print(f"active_settlement_runs={active}")
+          print(f"last_successful_settlement_age_minutes={last_success_age:.2f}" if last_success_age is not None else "last_successful_settlement_age_minutes=unknown")
           if dispatch:
-              print("reason=ledger_stale_and_no_active_settlement_run")
+              print("reason=ledger_stale_and_no_active_settlement_run_after_retry_cooldown")
           elif active:
               print("reason=settlement_already_queued_or_running")
+          elif last_success_age is not None and -2 <= last_success_age < 10:
+              print("reason=recent_successful_settlement_cooldown")
           else:
-              print("reason=settlement_ledger_within_15_minute_window")
+              print("reason=settlement_ledger_within_15_minute_window_or_retry_cooldown")
           PY
 
       - name: Dispatch stale official ESPN settlement recovery
