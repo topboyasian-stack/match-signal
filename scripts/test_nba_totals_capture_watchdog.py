@@ -40,6 +40,15 @@ def run():
     assert "gh workflow run nba-totals-settlement.yml --ref main -f capture_triggered=true" in capture_workflow, (
         "A stale ESPN ledger must be reconciled after a new exact immutable market-225 quote."
     )
+    assert "active_settlement_runs" in capture_workflow and "recent_successful_settlement_runs" in capture_workflow, (
+        "Capture must suppress duplicate ESPN dispatch when the watchdog already has an active or recently completed settlement run."
+    )
+    assert "updated_at" in capture_workflow and "age_minutes <= 10" in capture_workflow, (
+        "Capture must check the timestamp of recent successful settlement runs, not only the stale ledger timestamp."
+    )
+    assert "Skipping redundant official ESPN settlement dispatch" in capture_workflow, (
+        "A duplicate capture-triggered settlement must be explicitly skipped and diagnosed."
+    )
     assert "gh workflow run nba-totals-probability-value.yml --ref main" in capture_workflow and "immutable_snapshots_added" in capture_workflow, (
         "Only a capture that adds immutable market-225 quote snapshots should dispatch the research report."
     )
