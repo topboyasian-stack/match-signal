@@ -341,6 +341,8 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
             "scripts/stage_nba_pages_snapshot_archive.py",
             "scripts/test_nba_pages_snapshot_archive.py",
             "data/club-logo-registry.json",
+            "data/nba_totals_oos_value_test.json",
+            "data/nba_totals_probability_value_experiment.json",
             "assets/club-logos/**",
             "data/licenses/**",
         }
