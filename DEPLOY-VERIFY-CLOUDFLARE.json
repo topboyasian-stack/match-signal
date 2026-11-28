@@ -1,22 +1,22 @@
 {
-  "status": "VERIFIED_WITH_DIAGNOSTIC_INCOMPLETE",
+  "status": "VERIFIED",
   "core_pages_status": "VERIFIED",
   "qualified_best_quote_coverage_status": "VALID_ZERO",
-  "qualified_best_candidate_pool_rows": 255,
+  "qualified_best_candidate_pool_rows": 257,
   "qualified_best_model_qualified_rows": 0,
-  "booking_api_status": "NO_FUTURE_BATCH",
+  "booking_api_status": "VERIFIED",
   "qualified_alternatives_status": "READY",
-  "qualified_alternatives_count": 129,
+  "qualified_alternatives_count": 174,
   "qualified_alternatives": {
-    "verified_at": "2026-11-28T17:44:31.426Z",
+    "verified_at": "2026-11-28T19:23:10.781Z",
     "endpoint": "/api/public/market-alternatives",
     "api_status": "OK",
     "status": "READY",
-    "alternative_count": 129,
-    "visible_candidate_count": 137,
-    "unique_fixture_count": 90,
-    "builder_qualified_count": 2,
-    "research_only_count": 135,
+    "alternative_count": 174,
+    "visible_candidate_count": 182,
+    "unique_fixture_count": 134,
+    "builder_qualified_count": 23,
+    "research_only_count": 159,
     "sports": [
       "efootball",
       "football"
@@ -31,7 +31,7 @@
         "pick": "over",
         "line": 0.5,
         "odds": 1.04,
-        "probability": 0.959311,
+        "probability": 0.959303,
         "start_time": "2026-11-28T19:45Z",
         "quote_status": "STALE",
         "qualification_status": "RESEARCH_ONLY_QUOTE_NOT_CURRENT"
@@ -44,11 +44,11 @@
         "market": "total",
         "pick": "under",
         "line": 5.5,
-        "odds": 1.07,
+        "odds": 1.08,
         "probability": 0.894409,
         "start_time": "2026-11-28T19:45Z",
-        "quote_status": "STALE",
-        "qualification_status": "RESEARCH_ONLY_QUOTE_NOT_CURRENT"
+        "quote_status": "FRESH_EXACT",
+        "qualification_status": "RESEARCH_ONLY"
       },
       {
         "sport": "football",
@@ -72,7 +72,7 @@
         "market": "total",
         "pick": "over",
         "line": 0.5,
-        "odds": 1.07,
+        "odds": 1.06,
         "probability": 0.922362,
         "start_time": "2026-11-28T19:45Z",
         "quote_status": "STALE",
@@ -86,7 +86,7 @@
         "market": "total",
         "pick": "under",
         "line": 5.5,
-        "odds": 1.22,
+        "odds": 1.23,
         "probability": 0.867173,
         "start_time": "2026-11-28T20:00Z",
         "quote_status": "FRESH_EXACT",
@@ -96,19 +96,19 @@
   },
   "shared_ticket_drawer_status": "READY",
   "provider": "Cloudflare Pages",
-  "source_commit": "41544ddd19de3b993f6382679da4f454619b0669",
-  "verified_at": "2026-11-28T17:45:12.115612+00:00",
+  "source_commit": "108bf9199e99578e5d58440977918d0ea1b012e3",
+  "verified_at": "2026-11-28T19:24:26.454312+00:00",
   "live_virtual_feed": {
-    "verified_at": "2026-11-28T17:45:11.733Z",
+    "verified_at": "2026-11-28T19:24:26.132Z",
     "status": "VALID_ZERO_QUALIFIED_CANDIDATES",
     "coverage_state": "VALID_ZERO",
     "scan_complete": true,
     "scan_stop_reason": "no_model_qualified_candidates",
     "no_model_qualified_candidates": true,
     "paper_only": true,
-    "candidate_artifact_rows": 279,
-    "candidate_pool_rows_in_next_7_days": 255,
-    "candidate_pool_unique_events_in_next_7_days": 143,
+    "candidate_artifact_rows": 282,
+    "candidate_pool_rows_in_next_7_days": 257,
+    "candidate_pool_unique_events_in_next_7_days": 141,
     "model_qualified_candidate_rows_in_next_7_days": 0,
     "virtual_candidate_rows_in_next_7_days": 0,
     "snapshot_gate_qualified_fixtures": 0,
@@ -125,7 +125,7 @@
       {
         "page": 1,
         "count": 100,
-        "fetched_at": "2026-11-28T17:45:11.705Z",
+        "fetched_at": "2026-11-28T19:24:26.112Z",
         "status": "LIVE"
       }
     ],
@@ -155,19 +155,44 @@
     "qualified_examples": []
   },
   "booking_api": {
-    "verified_at": "2026-11-28T17:45:04.845Z",
-    "status": "NO_FUTURE_BATCH",
-    "http_status": null,
-    "ok": false,
-    "batch_id": null,
-    "selection_count": 0,
+    "verified_at": "2026-11-28T19:23:44.514Z",
+    "status": "VOLATILE_MARKET",
+    "http_status": 409,
+    "ok": true,
+    "batch_id": "DESK-BATCH-03",
+    "selection_count": 2,
     "booking_code_available": false,
-    "error": null,
-    "message": null
+    "error": "EFOOTBALL_SLIP_REJECTED_PARTIAL",
+    "message": "At least one eFootball leg failed current SportyBet validation. No share code was created. Refresh the whole ticket and add the current qualified selections again.",
+    "volatile_market": true,
+    "validation": [
+      {
+        "event_id": "sr:match:BAaIisPNdcJaV-KNQuFScaw",
+        "sport": "virtual",
+        "match": "Spain (Upcake22) vs Brazil (Wboy)",
+        "market": "virtual_total",
+        "pick": "Spain (Upcake22) vs Brazil (Wboy) \u2014 O/U under 5.5",
+        "line": 5.5,
+        "ok": false,
+        "excluded": true,
+        "reason": "Event is no longer present in SportyBet current catalogue."
+      },
+      {
+        "event_id": "sr:match:BAaIisGGPcwGZdb8EkXMt9A",
+        "sport": "virtual",
+        "match": "Salzburg (dor1an) vs Porto (RuBIX)",
+        "market": "virtual_total",
+        "pick": "Salzburg (dor1an) vs Porto (RuBIX) \u2014 O/U under 5.5",
+        "line": 5.5,
+        "ok": false,
+        "excluded": true,
+        "reason": "Event is no longer present in SportyBet current catalogue."
+      }
+    ]
   },
   "nba_ticket_gate_probe_status": "PASS",
   "nba_ticket_gate_probe": {
-    "verified_at": "2026-11-28T17:45:09.335Z",
+    "verified_at": "2026-11-28T19:24:23.870Z",
     "status": "PASS",
     "probe_type": "manual_and_automated_nba_release_gate",
     "current_main_release_qualified": false,
@@ -192,7 +217,7 @@
         "booking_code_present": false
       },
       {
-        "base": "https://25138a62.match-signal.pages.dev",
+        "base": "https://507d8779.match-signal.pages.dev",
         "endpoint_type": "manual_market225_release_gate",
         "http_status": 423,
         "error": "NBA_RELEASE_GATE_LOCKED",
@@ -201,7 +226,7 @@
         "booking_code_present": false
       },
       {
-        "base": "https://25138a62.match-signal.pages.dev",
+        "base": "https://507d8779.match-signal.pages.dev",
         "endpoint_type": "automated_basketball_builder",
         "http_status": 423,
         "error": "NBA_RELEASE_GATE_LOCKED",
@@ -218,7 +243,7 @@
     "live_virtual_proxy",
     "virtual_lab_live_snapshot",
     "live_production_data",
-    "booking_api_post_not_verified",
+    "booking_api_post",
     "qualified_best_valid_zero",
     "nba_ticket_gate_fail_closed",
     "qualified_alternatives_live"
