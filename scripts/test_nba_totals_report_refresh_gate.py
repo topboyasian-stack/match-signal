@@ -75,14 +75,14 @@ def run():
             {"source_data_fingerprint": first_fingerprint}, second_fingerprint
         )
         # A data-identical report from an older evaluator must still be rejected.
-                changed_code = root / "scripts/nba_totals_walk_forward.py"
-                changed_code.write_text("evaluator-version-two", encoding="utf-8")
-                third_fingerprint = source_data_fingerprint(root)
-                assert third_fingerprint != second_fingerprint
-                assert not report_source_fingerprint_matches(
-                    {"source_data_fingerprint": second_fingerprint}, third_fingerprint
-                ), "Evaluator-code changes must invalidate previously generated reports."
-        
+        changed_code = root / "scripts/nba_totals_walk_forward.py"
+        changed_code.write_text("evaluator-version-two", encoding="utf-8")
+        third_fingerprint = source_data_fingerprint(root)
+        assert third_fingerprint != second_fingerprint
+        assert not report_source_fingerprint_matches(
+            {"source_data_fingerprint": second_fingerprint}, third_fingerprint
+        ), "Evaluator-code changes must invalidate previously generated reports."
+
         report_path = root / "data/nba_totals_probability_value_experiment.json"
         report_path.write_text(
             json.dumps({"source_data_fingerprint": third_fingerprint}),
