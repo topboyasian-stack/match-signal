@@ -5,10 +5,36 @@ from unittest.mock import patch
 import nba_totals_walk_forward as evaluator
 from nba_totals_walk_forward import (
     build_forecasts, clean_history, evaluate, market_metrics, publication_capture_metrics,
-    verified_market_records, split_at_fixed_cutoff, market_record_audit,
+    roi_grade_market_candidates, verified_market_records, split_at_fixed_cutoff, market_record_audit,
     EVALUATION_CUTOFF_UTC,
 )
 from expansion_pipeline import (NBA_TOTALS_MODEL_VERSION, NBA_TOTALS_PACE_BLEND_WEIGHT, NBA_TOTALS_BIAS_CORRECTION)
+
+
+def immutable_snapshot_from_record(row):
+    market = {
+        "market_id": row["market_id"],
+        "source": row["market_source"],
+        "sportybet_event_id": row["sportybet_event_id"],
+        "quote_capture_basis": row["quote_capture_basis"],
+        "quote_timestamp": row["quote_timestamp"],
+        "line": row["line"],
+        "over_odds": row["over_odds"],
+        "under_odds": row["under_odds"],
+        "pick": row["pick"],
+        "expected_total": row["expected_total"],
+    }
+    return {
+        "event_id": row["event_id"],
+        "totals_model_version": row["totals_model_version"],
+        "published_at": row["published_at"],
+        "start_time": row["start_time"],
+        "publication_snapshot_id": row["publication_snapshot_id"],
+        "publication_snapshot_verified": True,
+        "publication_snapshot_kind": "immutable_sportybet_market_225_revision",
+        "expected_total": row["expected_total"],
+        "markets": {"total_ou": market},
+    }
 
 
 def game(event_id, day, home, away, hs, aws):
@@ -147,6 +173,8 @@ def test_market_evidence_rejects_unverified_and_old_model_records():
         "quote_capture_basis": "SportyBet API response observed_at",
         "settlement_source": "ESPN official scoreboard event ID",
         "published_at": published.isoformat(), "start_time": "2026-01-01T11:00:00+00:00",
+        "expected_total": 205.0, "publication_snapshot_id": "nba-total-pub:g1",
+        "publication_snapshot_kind": "immutable_sportybet_market_225_revision",
         "quote_timestamp": "2026-01-01T09:55:00+00:00", "line": 200.5,
         "over_odds": 1.9, "under_odds": 1.9, "final_score": [110, 100],
         "final_total": 210, "result": "over", "pick": "over", "event_id": "g1",
@@ -154,13 +182,55 @@ def test_market_evidence_rejects_unverified_and_old_model_records():
     invalid = dict(good, publication_snapshot_verified=False)
     old_model = dict(good, totals_model_version="old-model")
     untraceable = dict(good, sportybet_event_id=None)
-    assert verified_market_records([good, invalid, old_model, untraceable]) == [good]
+    snapshot = immutable_snapshot_from_record(good)
+    assert roi_grade_market_candidates([good, invalid, old_model, untraceable]) == [good]
+    assert verified_market_records([good, invalid, old_model, untraceable], [snapshot]) == [good]
     metrics = market_metrics([good, dict(good, event_id="g2", pick="under")])
     assert metrics["by_pick"]["over"]["n"] == 1
     assert metrics["by_pick"]["over"]["accuracy"] == 1.0
     assert metrics["by_pick"]["under"]["n"] == 1
     assert metrics["by_pick"]["under"]["accuracy"] == 0.0
 
+
+
+def test_market_roi_requires_exact_unique_immutable_snapshot_linkage():
+    row = {
+        "totals_model_version": NBA_TOTALS_MODEL_VERSION,
+        "settled": True, "publication_snapshot_verified": True, "roi_eligible": True,
+        "quote_fresh_at_publication": True, "price_pair_valid": True, "price_source_verified": True,
+        "market_id": "225", "market_source": "SportyBet Nigeria",
+        "sportybet_event_id": "sr:match:snapshot-linkage",
+        "quote_capture_basis": "SportyBet API response observed_at",
+        "settlement_source": "ESPN official scoreboard event ID; final score includes overtime",
+        "published_at": "2026-11-03T10:00:00+00:00",
+        "start_time": "2026-11-03T11:00:00+00:00",
+        "quote_timestamp": "2026-11-03T09:55:00+00:00",
+        "line": 200.5, "over_odds": 1.9, "under_odds": 1.9,
+        "final_score": [110, 100], "final_total": 210,
+        "result": "over", "pick": "over", "event_id": "snapshot-linkage",
+        "expected_total": 205.0, "player_1": "Team A", "player_2": "Team B",
+        "publication_snapshot_id": "nba-total-pub:snapshot-linkage",
+        "publication_snapshot_kind": "immutable_sportybet_market_225_revision",
+    }
+    snapshot = immutable_snapshot_from_record(row)
+    assert verified_market_records([row], [snapshot]) == [row]
+    assert verified_market_records([row], []) == [], "Missing archive linkage must fail closed"
+
+    altered_row = dict(row, over_odds=2.01)
+    assert verified_market_records([altered_row], [snapshot]) == [], (
+        "settlement odds must match the exact immutable snapshot"
+    )
+
+    altered_snapshot = {
+        **snapshot,
+        "markets": {"total_ou": {**snapshot["markets"]["total_ou"], "under_odds": 2.01}},
+    }
+    assert verified_market_records([row], [altered_snapshot]) == [], (
+        "snapshot price fields must match the settled ledger row"
+    )
+    assert verified_market_records([row], [snapshot, dict(snapshot)]) == [], (
+        "duplicate snapshot IDs cannot establish immutable linkage"
+    )
 
 
 def test_publication_capture_is_separate_from_settlement_and_roi():
@@ -289,6 +359,7 @@ def test_fixed_holdout_cutoff_unique_fixture_and_market_audit():
         "result": "over", "pick": "over", "event_id": "fixed-past",
         "expected_total": 205.0, "player_1": "Team A", "player_2": "Team B",
         "publication_snapshot_id": "nba-total-pub:fixed-past",
+        "publication_snapshot_kind": "immutable_sportybet_market_225_revision",
     }
     duplicate = dict(
         base,
@@ -307,7 +378,8 @@ def test_fixed_holdout_cutoff_unique_fixture_and_market_audit():
         publication_snapshot_id="nba-total-pub:fixed-future",
     )
 
-    eligible = verified_market_records([base, duplicate, future])
+    snapshots = [immutable_snapshot_from_record(row) for row in (base, duplicate, future)]
+    eligible = verified_market_records([base, duplicate, future], snapshots)
     assert [row["event_id"] for row in eligible] == ["fixed-past", "fixed-future"], (
         "multiple price revisions for one fixture must never become multiple settled bets"
     )
@@ -316,10 +388,12 @@ def test_fixed_holdout_cutoff_unique_fixture_and_market_audit():
     assert [row["event_id"] for row in development] == ["fixed-past"]
     assert [row["event_id"] for row in holdout] == ["fixed-future"]
 
-    result = evaluate([], [base, duplicate, future])
+    result = evaluate([], [base, duplicate, future], snapshots=snapshots)
     assert result["market_development_records"] == 1
     assert result["market_holdout_publications"] == 1
     assert result["market_holdout"]["n"] == 1
+    assert result["market_snapshot_linkage"]["exact_snapshot_linked_unique_fixtures"] == 2
+    assert result["market_snapshot_linkage"]["missing_or_mismatched_snapshot_event_ids"] == []
     assert result["release_decision"] == "RESEARCH_ONLY"
 
     audit = market_record_audit(eligible)
@@ -346,8 +420,9 @@ if __name__ == "__main__":
     test_same_date_games_share_a_prior_only_history_snapshot()
     test_evaluator_uses_the_same_frozen_v51_parameters_as_live_model()
     test_market_evidence_rejects_unverified_and_old_model_records()
+    test_market_roi_requires_exact_unique_immutable_snapshot_linkage()
     test_publication_capture_is_separate_from_settlement_and_roi()
     test_capture_status_is_partial_until_every_v5_forecast_has_a_frozen_price_pair()
     test_fixed_holdout_cutoff_unique_fixture_and_market_audit()
     test_evaluator_never_promotes_without_market_holdout()
-    print("NBA totals walk-forward regression tests: PASS (8 groups)")
+    print("NBA totals walk-forward regression tests: PASS (9 groups)")
