@@ -1,26 +1,26 @@
 {
-  "generated_at": "2026-11-28T04:05:43.643162+00:00",
+  "generated_at": "2026-11-28T04:12:08.838623+00:00",
   "status": "FAIL",
-  "critical_issues": 2,
-  "warning_issues": 2,
+  "critical_issues": 3,
+  "warning_issues": 3,
   "info_issues": 1,
   "checks": [
     {
       "engine": "core_prediction_pipeline",
       "status": "STALE",
-      "age_hours": 4.06,
+      "age_hours": 4.17,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.15,
+      "age_hours": 0.07,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
-      "status": "PASS",
-      "age_hours": 3.99,
+      "status": "STALE",
+      "age_hours": 4.1,
       "threshold_hours": 4
     },
     {
@@ -38,21 +38,21 @@
     {
       "engine": "virtual_participant_history",
       "status": "PASS",
-      "max_input_age_minutes": 22.0,
-      "virtual_lab_status_age_minutes": 23.4,
+      "max_input_age_minutes": 28.4,
+      "virtual_lab_status_age_minutes": 29.8,
       "threshold_minutes": 30.0,
       "stale_inputs": []
     },
     {
       "engine": "tennis_forward_discovery",
       "status": "PASS",
-      "age_hours": 3.99,
+      "age_hours": 4.1,
       "threshold_hours": 8
     },
     {
       "engine": "virtual_live_feed",
-      "status": "PASS",
-      "age_hours": 0.46,
+      "status": "STALE",
+      "age_hours": 0.57,
       "threshold_hours": 0.5,
       "heartbeat_source": "virtual_lab_live.json",
       "events_count": 455
@@ -105,7 +105,17 @@
     {
       "code": "STALE_CORE_PREDICTION_PIPELINE",
       "severity": "critical",
-      "detail": "updated_at age 4.06h exceeds 4h"
+      "detail": "updated_at age 4.17h exceeds 4h"
+    },
+    {
+      "code": "STALE_EXPANSION",
+      "severity": "critical",
+      "detail": "updated_at age 4.10h exceeds 4h"
+    },
+    {
+      "code": "VIRTUAL_LIVE_FEED_STALE",
+      "severity": "warning",
+      "detail": "virtual_lab_live.json age 0.57h exceeds 0.50h; a downstream Unified Upcoming refresh cannot substitute for a fresh source snapshot"
     },
     {
       "code": "NBA_LIVE_OBSERVATION_STALE",
@@ -125,7 +135,7 @@
     {
       "code": "PIPELINE_STALE",
       "severity": "critical",
-      "detail": "pipeline_status age 4.06h exceeds 4h"
+      "detail": "pipeline_status age 4.17h exceeds 4h"
     }
   ],
   "policy": "Proactive operational guard. Visibility is never reduced to zero just because an evidence gate is unmet.",
