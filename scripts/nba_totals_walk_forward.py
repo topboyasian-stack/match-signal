@@ -220,9 +220,9 @@ def _roi_grade_record(row):
     return str(row.get("pick") or "").lower() in {"over", "under"}
 
 
-def verified_market_records(rows):
-    """Return one independently settled, provenance-verified row per fixture."""
-    eligible = [row for row in rows if _roi_grade_record(row)]
+def roi_grade_market_candidates(rows):
+    """Return one provenance-eligible row per fixture before archive linkage checks."""
+    eligible = [row for row in (rows or []) if _roi_grade_record(row)]
     eligible.sort(key=lambda row: (
         str(row.get("published_at") or ""),
         str(row.get("start_time") or ""),
@@ -237,6 +237,88 @@ def verified_market_records(rows):
         seen_events.add(event_id)
         unique.append(row)
     return unique
+
+
+def _snapshot_matches_roi_record(row, snapshot_by_id, duplicate_snapshot_ids):
+    """Require the settled ledger row to match its exact immutable publication snapshot."""
+    snapshot_id = str(row.get("publication_snapshot_id") or "").strip()
+    if not snapshot_id or snapshot_id in duplicate_snapshot_ids:
+        return False
+    snapshot = snapshot_by_id.get(snapshot_id)
+    if not isinstance(snapshot, dict):
+        return False
+
+    market = ((snapshot.get("markets") or {}).get("total_ou") or {})
+    if not market:
+        return False
+
+    if not (
+        str(snapshot.get("publication_snapshot_id") or "").strip() == snapshot_id
+        and str(snapshot.get("event_id") or "").strip() == str(row.get("event_id") or "").strip()
+        and snapshot.get("totals_model_version") == row.get("totals_model_version")
+        and row.get("publication_snapshot_verified") is True
+        and snapshot.get("publication_snapshot_verified") is True
+        and row.get("publication_snapshot_kind") == "immutable_sportybet_market_225_revision"
+        and snapshot.get("publication_snapshot_kind") == "immutable_sportybet_market_225_revision"
+        and str(market.get("market_id") or "") == "225"
+        and str(row.get("market_id") or "") == "225"
+        and str(market.get("source") or "").strip().lower() == "sportybet nigeria"
+        and str(row.get("market_source") or "").strip().lower() == "sportybet nigeria"
+        and str(market.get("sportybet_event_id") or "").strip()
+            == str(row.get("sportybet_event_id") or "").strip()
+        and bool(str(row.get("sportybet_event_id") or "").strip())
+        and market.get("quote_capture_basis") == "SportyBet API response observed_at"
+        and row.get("quote_capture_basis") == "SportyBet API response observed_at"
+        and str(market.get("pick") or "").strip().lower()
+            == str(row.get("pick") or "").strip().lower()
+    ):
+        return False
+
+    for row_value, snapshot_value in (
+        (row.get("published_at"), snapshot.get("published_at")),
+        (row.get("start_time"), snapshot.get("start_time")),
+        (row.get("quote_timestamp"), market.get("quote_timestamp")),
+    ):
+        row_time = parse_time(row_value)
+        snapshot_time = parse_time(snapshot_value)
+        if row_time is None or snapshot_time is None or row_time != snapshot_time:
+            return False
+
+    for row_value, snapshot_value in (
+        (row.get("expected_total"), snapshot.get("expected_total")),
+        (row.get("expected_total"), market.get("expected_total")),
+        (row.get("line"), market.get("line")),
+        (row.get("over_odds"), market.get("over_odds")),
+        (row.get("under_odds"), market.get("under_odds")),
+    ):
+        left = finite_number(row_value)
+        right = finite_number(snapshot_value)
+        if left is None or right is None or not math.isclose(left, right, rel_tol=0.0, abs_tol=1e-9):
+            return False
+
+    return True
+
+
+def verified_market_records(rows, snapshots):
+    """Return only independently settled rows that match one unique immutable snapshot."""
+    candidates = roi_grade_market_candidates(rows)
+    snapshot_by_id = {}
+    snapshot_id_counts = {}
+    for snapshot in (snapshots or []):
+        if not isinstance(snapshot, dict):
+            continue
+        snapshot_id = str(snapshot.get("publication_snapshot_id") or "").strip()
+        if not snapshot_id:
+            continue
+        snapshot_id_counts[snapshot_id] = snapshot_id_counts.get(snapshot_id, 0) + 1
+        snapshot_by_id.setdefault(snapshot_id, snapshot)
+    duplicate_snapshot_ids = {
+        snapshot_id for snapshot_id, count in snapshot_id_counts.items() if count > 1
+    }
+    return [
+        row for row in candidates
+        if _snapshot_matches_roi_record(row, snapshot_by_id, duplicate_snapshot_ids)
+    ]
 
 
 def split_at_fixed_cutoff(rows, timestamp_field):
@@ -528,7 +610,16 @@ def evaluate(history, ledger, snapshots=None, predictions=None, as_of=None):
     )
 
     publication_capture = publication_capture_metrics(snapshots, predictions, as_of=as_of)
-    market_rows = verified_market_records(ledger)
+    market_candidates = roi_grade_market_candidates(ledger)
+    market_rows = verified_market_records(ledger, snapshots or [])
+    candidate_event_ids = {str(row.get("event_id") or "").strip() for row in market_candidates}
+    linked_event_ids = {str(row.get("event_id") or "").strip() for row in market_rows}
+    market_snapshot_linkage = {
+        "candidate_unique_roi_grade_fixtures": len(candidate_event_ids),
+        "exact_snapshot_linked_unique_fixtures": len(linked_event_ids),
+        "missing_or_mismatched_snapshot_event_ids": sorted(candidate_event_ids - linked_event_ids),
+        "exact_immutable_snapshot_linkage_required_for_roi": True,
+    }
     market_development, market_holdout_rows = split_at_fixed_cutoff(market_rows, "published_at")
     market_holdout = market_metrics(market_holdout_rows)
     market_development_metrics = market_metrics(market_development)
@@ -593,12 +684,13 @@ def evaluate(history, ledger, snapshots=None, predictions=None, as_of=None):
         "market_development": market_development_metrics,
         "market_holdout_publications": len(market_holdout_rows),
         "market_overall": market_overall,
+        "market_snapshot_linkage": market_snapshot_linkage,
         "market_holdout": market_holdout,
         "market_record_audit": market_record_audit(market_rows),
         "release_decision": "QUALIFIED" if forecast_ok and market_ok else "RESEARCH_ONLY",
         "release_reason": (
             "The fixed-cutoff prospective forecast holdout beat the rolling baseline and the untouched, model-version-specific SportyBet market-225 holdout passed the pre-registered ROI and bootstrap confidence checks."
             if forecast_ok and market_ok else
-            "Not qualified: require at least 100 forecast games after the frozen cutoff with lower MAE than baseline and absolute bias <=3 points, plus at least 100 unique settled, immutable, fresh SportyBet market-225 bets published after that same cutoff with positive ROI, a positive bootstrap 95% lower bound, and ROI above the market-favourite baseline."
+            "Not qualified: require at least 100 forecast games after the frozen cutoff with lower MAE than baseline and absolute bias <=3 points, plus exact immutable snapshot linkage for every ROI-counted selection and at least 100 unique settled, fresh SportyBet market-225 bets published after that same cutoff with positive ROI, a positive bootstrap 95% lower bound, and ROI above the market-favourite baseline."
         ),
     }
