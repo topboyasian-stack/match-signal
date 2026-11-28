@@ -1,8 +1,8 @@
 {
   "status": "GENERATED",
-  "generated_at": "2026-11-28T03:45:25.042719+00:00",
+  "generated_at": "2026-11-28T03:51:23.514647+00:00",
   "horizon_days": 7,
-  "event_count": 2424,
+  "event_count": 2313,
   "live_count": 0,
   "pending_settlement_count": 0,
   "publication_filters": {
@@ -15,12 +15,12 @@
   },
   "participant_history_freshness": {
     "fresh": true,
-    "max_age_minutes": 3.1,
+    "max_age_minutes": 9.1,
     "max_age_minutes_allowed": 30,
     "input_age_minutes": {
-      "participant_lifecycle": 3.1,
-      "collector_status": 3.1,
-      "model_evaluation": 0.9
+      "participant_lifecycle": 9.1,
+      "collector_status": 9.0,
+      "model_evaluation": 6.9
     },
     "participant_lifecycle_generated_at": "2026-11-28T03:42:20.274459+00:00",
     "collector_status_updated_at": "2026-11-28T03:42:20.974413+00:00",
@@ -29,22 +29,10 @@
   },
   "high_line_under_evidence": [
     {
-      "product": "efootball_gt",
-      "line": 6.5,
-      "side": "under",
-      "event_rows": 46,
-      "walkforward_n": 127,
-      "walkforward_hit_rate": 0.5433070866141733,
-      "walkforward_brier": 0.24055712994780645,
-      "walkforward_model_variant": "poisson",
-      "qualification_status": "DIRECTIONAL_LINE_VALIDATION_GATE_PENDING",
-      "betting_qualified": false
-    },
-    {
       "product": "vfootball",
       "line": 6.5,
       "side": "under",
-      "event_rows": 183,
+      "event_rows": 173,
       "walkforward_n": 290,
       "walkforward_hit_rate": 0.9827586206896551,
       "walkforward_brier": 0.01721489396422496,
@@ -56,7 +44,7 @@
       "product": "vfootball",
       "line": 7.5,
       "side": "under",
-      "event_rows": 183,
+      "event_rows": 173,
       "walkforward_n": 39,
       "walkforward_hit_rate": 1.0,
       "walkforward_brier": 0.0005813722885816634,
@@ -68,7 +56,7 @@
       "product": "vfootball",
       "line": 8.5,
       "side": "under",
-      "event_rows": 183,
+      "event_rows": 173,
       "walkforward_n": 0,
       "walkforward_hit_rate": null,
       "walkforward_brier": null,
@@ -80,12 +68,24 @@
       "product": "vfootball",
       "line": 9.5,
       "side": "under",
-      "event_rows": 183,
+      "event_rows": 173,
       "walkforward_n": 0,
       "walkforward_hit_rate": null,
       "walkforward_brier": null,
       "walkforward_model_variant": null,
       "qualification_status": "HIGH_LINE_UNDER_EVIDENCE_GATE_PENDING",
+      "betting_qualified": false
+    },
+    {
+      "product": "efootball_gt",
+      "line": 6.5,
+      "side": "under",
+      "event_rows": 45,
+      "walkforward_n": 127,
+      "walkforward_hit_rate": 0.5433070866141733,
+      "walkforward_brier": 0.24055712994780645,
+      "walkforward_model_variant": "poisson",
+      "qualification_status": "DIRECTIONAL_LINE_VALIDATION_GATE_PENDING",
       "betting_qualified": false
     },
     {
@@ -151,22 +151,22 @@
   ],
   "prospective_poisson_shadow_coverage": {
     "efootball_gt": {
-      "efootball_rows": 585,
-      "unique_events": 279,
-      "rows_with_valid_shadow": 95,
-      "unique_events_with_valid_shadow": 31,
+      "efootball_rows": 570,
+      "unique_events": 274,
+      "rows_with_valid_shadow": 88,
+      "unique_events_with_valid_shadow": 29,
       "rejection_reason_counts": {
-        "eligible_leave_one_line_out_fit": 95,
-        "historical_product_fallback_rejected": 490
+        "eligible_leave_one_line_out_fit": 88,
+        "historical_product_fallback_rejected": 482
       },
       "lambda_fit_source_counts_by_side": {
         "over": {
-          "current_market_ladder_leave_one_line_out": 95,
-          "historical_product_lambda_fallback": 490
+          "current_market_ladder_leave_one_line_out": 88,
+          "historical_product_lambda_fallback": 482
         },
         "under": {
-          "current_market_ladder_leave_one_line_out": 95,
-          "historical_product_lambda_fallback": 490
+          "current_market_ladder_leave_one_line_out": 88,
+          "historical_product_lambda_fallback": 482
         }
       },
       "mode": "PAPER_SHADOW_ONLY",
