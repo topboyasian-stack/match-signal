@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-28T14:40:46.438727+00:00",
+  "generated_at": "2026-11-28T14:50:08.300806+00:00",
   "status": "DEGRADED",
   "critical_issues": 0,
   "warning_issues": 3,
@@ -8,19 +8,19 @@
     {
       "engine": "core_prediction_pipeline",
       "status": "PASS",
-      "age_hours": 2.33,
+      "age_hours": 2.48,
       "threshold_hours": 4
     },
     {
       "engine": "odds_builder",
       "status": "PASS",
-      "age_hours": 0.18,
+      "age_hours": 0.13,
       "threshold_hours": 8
     },
     {
       "engine": "expansion",
       "status": "PASS",
-      "age_hours": 0.54,
+      "age_hours": 0.7,
       "threshold_hours": 4
     },
     {
@@ -38,21 +38,21 @@
     {
       "engine": "virtual_participant_history",
       "status": "STALE",
-      "max_input_age_minutes": 31.9,
-      "virtual_lab_status_age_minutes": 34.1,
+      "max_input_age_minutes": 40.8,
+      "virtual_lab_status_age_minutes": 43.5,
       "threshold_minutes": 30.0,
       "stale_inputs": []
     },
     {
       "engine": "tennis_forward_discovery",
       "status": "PASS",
-      "age_hours": 6.35,
+      "age_hours": 6.5,
       "threshold_hours": 8
     },
     {
       "engine": "virtual_live_feed",
       "status": "PASS",
-      "age_hours": 0.32,
+      "age_hours": 0.47,
       "threshold_hours": 0.5,
       "heartbeat_source": "virtual_lab_live.json",
       "events_count": 619
@@ -105,7 +105,7 @@
     {
       "code": "VIRTUAL_PARTICIPANT_HISTORY_STALE",
       "severity": "warning",
-      "detail": "input older than 30 minutes: participant_lifecycle, collector_status; oldest participant/settlement/model input is 31.9 minutes old; virtual_lab_status.json is 34.1 minutes old; current eFootball/virtual predictions must remain withheld until the source collector publishes fresh data"
+      "detail": "input older than 30 minutes: participant_lifecycle, collector_status, model_evaluation; oldest participant/settlement/model input is 40.8 minutes old; virtual_lab_status.json is 43.5 minutes old; current eFootball/virtual predictions must remain withheld until the source collector publishes fresh data"
     },
     {
       "code": "NBA_LIVE_OBSERVATION_STALE",
@@ -130,7 +130,7 @@
     "stale_live_flags_hidden": 0,
     "expired_settled_rows_hidden": 0,
     "virtual_market_rows_held_for_kickoff_window": 0,
-    "virtual_rows_held_for_stale_participant_history": 4713,
+    "virtual_rows_held_for_stale_participant_history": 4786,
     "virtual_rows_held_for_recent_product_drawdown": 0
   }
 }
