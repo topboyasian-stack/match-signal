@@ -173,6 +173,19 @@ def run():
     assert "gh workflow run nba-ticket-guard-tests.yml --ref main" in workflow, (
         "The report-to-gate handoff must run against main after the report has been published."
     )
+    assert "Dispatch Cloudflare Pages after fresh NBA report publication" in workflow, (
+        "Verified report publication must explicitly dispatch Pages because GITHUB_TOKEN pushes do not trigger push workflows."
+    )
+    assert "gh workflow run cloudflare-pages.yml --ref main" in workflow, (
+        "The report publisher must explicitly deploy the refreshed static reports to production."
+    )
+    assert workflow.index("Publish OOS and probability reports without stale source fingerprints") < workflow.index("Dispatch Cloudflare Pages after fresh NBA report publication"), (
+        "Cloudflare deployment must be dispatched only after both report files pass source-fingerprint verification and publication."
+    )
+    pages_workflow = (Path(__file__).resolve().parents[1] / ".github/workflows/cloudflare-pages.yml").read_text(encoding="utf-8")
+    assert "  workflow_dispatch:" in pages_workflow, (
+        "The direct static report deployment handoff requires an explicit Pages workflow_dispatch entry point."
+    )
     guard_workflow = (Path(__file__).resolve().parents[1] / ".github/workflows/nba-ticket-guard-tests.yml").read_text(encoding="utf-8")
     assert "workflow_dispatch:" in guard_workflow, (
         "The NBA ticket guard must support the explicit report-completion dispatch."

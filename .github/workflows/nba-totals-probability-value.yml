@@ -306,3 +306,13 @@ jobs:
           set -euo pipefail
           gh workflow run nba-ticket-guard-tests.yml --ref main
           echo "Dispatched fail-closed Basketball gate tests against the latest main reports."
+      - name: Dispatch Cloudflare Pages after fresh NBA report publication
+        if: steps.refresh_gate.outputs.run == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Report commits use GITHUB_TOKEN, whose push event does not trigger other workflows.
+          # Explicitly dispatch Pages only after both reports were fingerprint-verified and pushed.
+          gh workflow run cloudflare-pages.yml --ref main
+          echo "Dispatched Cloudflare Pages after fingerprint-verified NBA report publication; the Basketball gate remains research-only."
