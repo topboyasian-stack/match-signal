@@ -1,11 +1,11 @@
 {
-  "generated_at_utc": "2026-11-28T16:54:20+00:00",
+  "generated_at_utc": "2026-11-28T21:02:18+00:00",
   "mode": "PAPER_RESEARCH_ONLY",
   "model_version": "5.1-fixture-ready-prequential-ensemble",
   "validation_report_status": "EVALUATED",
-  "validation_total_eligible": 563,
-  "validation_development_n": 394,
-  "validation_holdout_n": 169,
+  "validation_total_eligible": 567,
+  "validation_development_n": 396,
+  "validation_holdout_n": 171,
   "global_blend_promotion_allowed": true,
   "global_blend_scope_gates": {
     "Bundesliga": {
@@ -15,7 +15,7 @@
       "competition_development_minimum": 30,
       "competition_development_sample_required": false,
       "competition_development_sample_informational_passed": true,
-      "holdout_n": 41,
+      "holdout_n": 42,
       "minimum_holdout": 20,
       "holdout_sample_passed": true,
       "minimum_brier_improvement": 0.005,
@@ -28,17 +28,17 @@
         0.0,
         0.4
       ],
-      "global_holdout_n": 169,
+      "global_holdout_n": 171,
       "global_model_passed": true
     },
     "Champions League": {
       "passed": true,
-      "development_n": 29,
-      "competition_development_n": 29,
+      "development_n": 31,
+      "competition_development_n": 31,
       "competition_development_minimum": 30,
       "competition_development_sample_required": false,
-      "competition_development_sample_informational_passed": false,
-      "holdout_n": 49,
+      "competition_development_sample_informational_passed": true,
+      "holdout_n": 47,
       "minimum_holdout": 20,
       "holdout_sample_passed": true,
       "minimum_brier_improvement": 0.005,
@@ -51,7 +51,7 @@
         0.0,
         0.4
       ],
-      "global_holdout_n": 169,
+      "global_holdout_n": 171,
       "global_model_passed": true
     },
     "La Liga": {
@@ -61,7 +61,7 @@
       "competition_development_minimum": 30,
       "competition_development_sample_required": false,
       "competition_development_sample_informational_passed": true,
-      "holdout_n": 42,
+      "holdout_n": 44,
       "minimum_holdout": 20,
       "holdout_sample_passed": true,
       "minimum_brier_improvement": 0.005,
@@ -74,7 +74,7 @@
         0.0,
         0.4
       ],
-      "global_holdout_n": 169,
+      "global_holdout_n": 171,
       "global_model_passed": true
     },
     "Ligue 1": {
@@ -84,7 +84,7 @@
       "competition_development_minimum": 30,
       "competition_development_sample_required": false,
       "competition_development_sample_informational_passed": true,
-      "holdout_n": 37,
+      "holdout_n": 38,
       "minimum_holdout": 20,
       "holdout_sample_passed": true,
       "minimum_brier_improvement": 0.005,
@@ -97,11 +97,40 @@
         0.0,
         0.4
       ],
-      "global_holdout_n": 169,
+      "global_holdout_n": 171,
       "global_model_passed": true
     }
   },
   "validated_competition_scopes": {
+    "Champions League": {
+      "selected_model": "elo",
+      "weights": null,
+      "status": "RESEARCH_SCOPE_VALIDATED",
+      "development_n": 31,
+      "holdout_n": 47,
+      "development_metrics": {
+        "n": 31,
+        "accuracy": 0.6452,
+        "brier": 0.55001,
+        "log_loss": 0.93632,
+        "rps": 0.41409
+      },
+      "holdout_metrics": {
+        "n": 47,
+        "accuracy": 0.5957,
+        "brier": 0.54714,
+        "log_loss": 0.92082,
+        "rps": 0.43287
+      },
+      "published_holdout_metrics": {
+        "n": 47,
+        "accuracy": 0.5106,
+        "brier": 0.57831,
+        "log_loss": 0.9769,
+        "rps": 0.44845
+      },
+      "evidence": "development-selected model passed untouched chronological holdout"
+    },
     "Bundesliga": {
       "status": "RESEARCH_SCOPE_VALIDATED",
       "selected_model": "fitted_blend",
@@ -111,68 +140,31 @@
         0.4
       ],
       "development_n": 36,
-      "holdout_n": 41,
+      "holdout_n": 42,
       "development_metrics": {
         "weights": [
           0.6,
           0.0,
           0.4
         ],
-        "development_n": 394,
-        "development_brier": 0.60465,
+        "development_n": 396,
+        "development_brier": 0.60418,
         "candidate_count": 66,
         "objective": "minimum multiclass Brier on the chronological development window"
       },
       "holdout_metrics": {
-        "n": 41,
-        "accuracy": 0.5122,
-        "brier": 0.59825,
-        "log_loss": 1.00321,
-        "rps": 0.41595
+        "n": 42,
+        "accuracy": 0.5,
+        "brier": 0.60573,
+        "log_loss": 1.01407,
+        "rps": 0.41373
       },
       "published_holdout_metrics": {
-        "n": 41,
-        "accuracy": 0.4878,
-        "brier": 0.62156,
-        "log_loss": 1.04678,
-        "rps": 0.43848
-      },
-      "evidence": "global development-fitted blend passed global holdout and this competition's predeclared holdout guard"
-    },
-    "Champions League": {
-      "status": "RESEARCH_SCOPE_VALIDATED",
-      "selected_model": "fitted_blend",
-      "weights": [
-        0.6,
-        0.0,
-        0.4
-      ],
-      "development_n": 29,
-      "holdout_n": 49,
-      "development_metrics": {
-        "weights": [
-          0.6,
-          0.0,
-          0.4
-        ],
-        "development_n": 394,
-        "development_brier": 0.60465,
-        "candidate_count": 66,
-        "objective": "minimum multiclass Brier on the chronological development window"
-      },
-      "holdout_metrics": {
-        "n": 49,
-        "accuracy": 0.5714,
-        "brier": 0.5548,
-        "log_loss": 0.93869,
-        "rps": 0.4357
-      },
-      "published_holdout_metrics": {
-        "n": 49,
-        "accuracy": 0.5306,
-        "brier": 0.57966,
-        "log_loss": 0.97854,
-        "rps": 0.45091
+        "n": 42,
+        "accuracy": 0.4762,
+        "brier": 0.62768,
+        "log_loss": 1.05548,
+        "rps": 0.43534
       },
       "evidence": "global development-fitted blend passed global holdout and this competition's predeclared holdout guard"
     },
@@ -185,31 +177,31 @@
         0.4
       ],
       "development_n": 43,
-      "holdout_n": 42,
+      "holdout_n": 44,
       "development_metrics": {
         "weights": [
           0.6,
           0.0,
           0.4
         ],
-        "development_n": 394,
-        "development_brier": 0.60465,
+        "development_n": 396,
+        "development_brier": 0.60418,
         "candidate_count": 66,
         "objective": "minimum multiclass Brier on the chronological development window"
       },
       "holdout_metrics": {
-        "n": 42,
-        "accuracy": 0.4762,
-        "brier": 0.60424,
-        "log_loss": 1.00537,
-        "rps": 0.45291
+        "n": 44,
+        "accuracy": 0.4545,
+        "brier": 0.60687,
+        "log_loss": 1.00852,
+        "rps": 0.45958
       },
       "published_holdout_metrics": {
-        "n": 42,
-        "accuracy": 0.4524,
-        "brier": 0.63153,
-        "log_loss": 1.04316,
-        "rps": 0.47634
+        "n": 44,
+        "accuracy": 0.4318,
+        "brier": 0.63906,
+        "log_loss": 1.05361,
+        "rps": 0.48773
       },
       "evidence": "global development-fitted blend passed global holdout and this competition's predeclared holdout guard"
     },
@@ -222,47 +214,47 @@
         0.4
       ],
       "development_n": 36,
-      "holdout_n": 37,
+      "holdout_n": 38,
       "development_metrics": {
         "weights": [
           0.6,
           0.0,
           0.4
         ],
-        "development_n": 394,
-        "development_brier": 0.60465,
+        "development_n": 396,
+        "development_brier": 0.60418,
         "candidate_count": 66,
         "objective": "minimum multiclass Brier on the chronological development window"
       },
       "holdout_metrics": {
-        "n": 37,
-        "accuracy": 0.4595,
-        "brier": 0.6443,
-        "log_loss": 1.06681,
-        "rps": 0.46866
+        "n": 38,
+        "accuracy": 0.4474,
+        "brier": 0.64372,
+        "log_loss": 1.06541,
+        "rps": 0.47123
       },
       "published_holdout_metrics": {
-        "n": 37,
-        "accuracy": 0.4054,
-        "brier": 0.67236,
-        "log_loss": 1.11825,
-        "rps": 0.48921
+        "n": 38,
+        "accuracy": 0.3947,
+        "brier": 0.67599,
+        "log_loss": 1.12254,
+        "rps": 0.4961
       },
       "evidence": "global development-fitted blend passed global holdout and this competition's predeclared holdout guard"
     }
   },
   "validated_scope_prediction_counts": {
-    "La Liga": 31,
-    "Ligue 1": 26,
-    "Bundesliga": 28,
+    "Ligue 1": 25,
+    "La Liga": 29,
+    "Bundesliga": 27,
     "Champions League": 16
   },
   "fixture_model_readiness_counts": {
-    "VALIDATED_MODEL_READY": 101,
+    "VALIDATED_MODEL_READY": 97,
     "PUBLISHED_BASELINE_ONLY": 5
   },
-  "validated_model_prediction_updates": 101,
-  "football_predictions_processed": 103,
+  "validated_model_prediction_updates": 97,
+  "football_predictions_processed": 99,
   "warnings": 3,
   "live_money_approved": false,
   "ticket_release_approved": false,
