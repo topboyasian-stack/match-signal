@@ -22,6 +22,7 @@ from nba_totals_walk_forward import (
     PREDICTIONS,
     build_forecasts,
     clean_history,
+    roi_grade_market_candidates,
     verified_market_records,
 )
 
@@ -1032,8 +1033,16 @@ def run_experiment(history, ledger, predictions, now=None, snapshots=None, proba
         and fitted["calibration_n"] >= MIN_CALIBRATION_RESIDUALS
     )
 
-    settled = verified_market_records(ledger)
-    v5_settled = [row for row in settled if row.get("totals_model_version") == "nba-total-v5.1-pace-efficiency-calibrated"]
+    settled_candidates = roi_grade_market_candidates(ledger)
+    settled = verified_market_records(ledger, snapshots or [])
+    v5_candidate_settled = [
+        row for row in settled_candidates
+        if row.get("totals_model_version") == "nba-total-v5.1-pace-efficiency-calibrated"
+    ]
+    v5_settled = [
+        row for row in settled
+        if row.get("totals_model_version") == "nba-total-v5.1-pace-efficiency-calibrated"
+    ]
     clv_audit = snapshot_clv_audit(v5_settled, snapshots or [])
     settled_audit = []
     for row in v5_settled:
@@ -1098,7 +1107,7 @@ def run_experiment(history, ledger, predictions, now=None, snapshots=None, proba
         })
 
     snapshot_coverage, snapshot_linked_event_ids = prospective_snapshot_coverage(
-        v5_settled, snapshots or []
+        v5_candidate_settled, snapshots or []
     )
     prospective_probability_audit, prospective_probability_coverage = prospective_probability_fixture_audit(
         probability_settlements or [], snapshots or [], residuals
