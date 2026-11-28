@@ -8,9 +8,9 @@ on:
   # -> rebuild/publish Builder -> deploy and verify Pages. Do not deploy on the
   # initial board completion because its Builder artifact may still be stale.
   # Fixed-cutoff NBA OOS/probability report JSONs are read-only static artifacts.
-  # Their publication can deploy directly; existing board/Builder freshness checks
-  # still fail closed if those production inputs are stale. Builder-owned changes
-  # and shared booking remain ordered through Builder Production Promotion.
+  # A direct push can deploy them, but GITHUB_TOKEN report commits do not trigger push workflows;
+  # those commits hand off through Builder Production Promotion. Builder-owned changes
+  # and shared booking always remain ordered through board -> Builder -> board -> Builder -> Pages.
   # This workflow file itself is intentionally excluded from direct promotion; changes to it go through Builder Production Promotion.
   push:
     branches: [main]
@@ -99,6 +99,15 @@ on:
       - '.github/workflows/cloudflare-pages.yml'
       - 'wrangler.toml'
   workflow_dispatch:
+    inputs:
+      source:
+        description: "Deployment source; only the ordered Builder Production Promotion may dispatch production Pages."
+        required: false
+        type: choice
+        options:
+          - none
+          - ordered-promotion
+        default: none
 
 permissions:
   contents: write
@@ -136,7 +145,7 @@ jobs:
         run: python scripts/validate_virtual_lab_v1.py
 
   deploy:
-    if: ${{ github.event_name != 'pull_request' && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success') && !(github.event_name == 'push' && contains(toJSON(github.event.commits), '.github/workflows/cloudflare-pages.yml')) }}
+    if: ${{ github.event_name != 'pull_request' && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success') && !(github.event_name == 'push' && contains(toJSON(github.event.commits), '.github/workflows/cloudflare-pages.yml')) && (github.event_name != 'workflow_dispatch' || inputs.source == 'ordered-promotion') }}
     concurrency:
       group: cloudflare-pages-v3
       cancel-in-progress: false

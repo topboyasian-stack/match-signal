@@ -423,7 +423,7 @@ jobs:
           dispatch_validated_pages() {
             local deploy_dispatch_url deploy_run_id candidate_sha merge_base
             for dispatch_attempt in $(seq 1 4); do
-              deploy_dispatch_url="$(gh workflow run cloudflare-pages.yml --ref main)"
+              deploy_dispatch_url="$(gh workflow run cloudflare-pages.yml --ref main -f source=ordered-promotion)"
               deploy_run_id="${deploy_dispatch_url##*/}"
               if ! [[ "$deploy_run_id" =~ ^[0-9]+$ ]]; then
                 echo "Could not parse Cloudflare Pages run ID from: $deploy_dispatch_url" >&2

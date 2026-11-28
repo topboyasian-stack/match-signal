@@ -306,13 +306,18 @@ jobs:
           set -euo pipefail
           gh workflow run nba-ticket-guard-tests.yml --ref main
           echo "Dispatched fail-closed Basketball gate tests against the latest main reports."
-      - name: Dispatch Cloudflare Pages after fresh NBA report publication
+      - name: Dispatch ordered Builder Production Promotion after fresh NBA report publication
         if: steps.refresh_gate.outputs.run == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           # Report commits use GITHUB_TOKEN, whose push event does not trigger other workflows.
-          # Explicitly dispatch Pages only after both reports were fingerprint-verified and pushed.
-          gh workflow run cloudflare-pages.yml --ref main
-          echo "Dispatched Cloudflare Pages after fingerprint-verified NBA report publication; the Basketball gate remains research-only."
+          # Preserve the required board -> Builder -> board -> Builder -> Pages ordering.
+          active_promotion_runs="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/builder-production-promotion.yml/runs?branch=main&per_page=20" --jq '[.workflow_runs[] | select(.status == "queued" or .status == "in_progress")] | length')"
+          if [ "$active_promotion_runs" -gt 0 ]; then
+            echo "An ordered Builder Production Promotion is already queued or running; it will re-read latest main and handle deployment."
+          else
+            gh workflow run builder-production-promotion.yml --ref main
+            echo "Dispatched ordered Builder Production Promotion after fingerprint-verified NBA report publication; the Basketball gate remains research-only."
+          fi

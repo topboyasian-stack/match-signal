@@ -130,7 +130,7 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         self.assertIn('board_run_id="$(dispatch_validated_board_run)"', PROMOTION_WORKFLOW)
         self.assertIn('board_dispatch_url="$(gh workflow run unified-upcoming.yml --ref main -f promotion_child=true)"', PROMOTION_WORKFLOW)
         self.assertIn('board_run_id="${board_dispatch_url##*/}"', PROMOTION_WORKFLOW)
-        self.assertIn('deploy_dispatch_url="$(gh workflow run cloudflare-pages.yml --ref main)"', PROMOTION_WORKFLOW)
+        self.assertIn('deploy_dispatch_url="$(gh workflow run cloudflare-pages.yml --ref main -f source=ordered-promotion)"', PROMOTION_WORKFLOW)
         self.assertIn('deploy_run_id="${deploy_dispatch_url##*/}"', PROMOTION_WORKFLOW)
         self.assertIn('board_run_id="$(dispatch_validated_post_build_board)"', PROMOTION_WORKFLOW)
         self.assertIn('deploy_run_id="$(dispatch_validated_pages)"', PROMOTION_WORKFLOW)
@@ -252,6 +252,12 @@ class FreshnessDeployOrderingTests(unittest.TestCase):
         self.assertNotIn("  workflow_run:", events,
                          "production deployment must be triggered by scoped static pushes or the ordered Builder Production Promotion dispatch, not unrelated completed workflows")
         self.assertIn("  workflow_dispatch:", events)
+        self.assertIn("source:", events)
+        self.assertIn("default: none", events)
+        self.assertIn("inputs.source == 'ordered-promotion'", PAGES_WORKFLOW,
+                      "a direct Pages workflow_dispatch must require the ordered-promotion source token")
+        self.assertIn("source=ordered-promotion", PROMOTION_WORKFLOW,
+                      "only the ordered Builder Production Promotion may authorize a Pages workflow_dispatch")
 
         # Direct promotion is limited to UI/static assets and scoped APIs that do not depend on fresh board/Builder data.
         # The shared ticket handler and its contract-test workflow must not bypass ordered promotion or trigger a Pages deploy by themselves.

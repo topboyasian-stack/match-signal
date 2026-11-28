@@ -173,14 +173,24 @@ def run():
     assert "gh workflow run nba-ticket-guard-tests.yml --ref main" in workflow, (
         "The report-to-gate handoff must run against main after the report has been published."
     )
-    assert "Dispatch Cloudflare Pages after fresh NBA report publication" in workflow, (
-        "Verified report publication must explicitly dispatch Pages because GITHUB_TOKEN pushes do not trigger push workflows."
+    assert "Dispatch ordered Builder Production Promotion after fresh NBA report publication" in workflow, (
+        "Verified report publication must hand off through the required board/Builder ordering because GITHUB_TOKEN pushes do not trigger push workflows."
     )
-    assert "gh workflow run cloudflare-pages.yml --ref main" in workflow, (
-        "The report publisher must explicitly deploy the refreshed static reports to production."
+    assert "gh workflow run builder-production-promotion.yml --ref main" in workflow, (
+        "The report publisher must request the ordered Builder Production Promotion, not bypass it with a direct Pages deployment."
     )
-    assert workflow.index("Publish OOS and probability reports without stale source fingerprints") < workflow.index("Dispatch Cloudflare Pages after fresh NBA report publication"), (
-        "Cloudflare deployment must be dispatched only after both report files pass source-fingerprint verification and publication."
+    assert "active_promotion_runs" in workflow and "An ordered Builder Production Promotion is already queued or running" in workflow, (
+        "A report refresh must reuse an active ordered promotion instead of starting a competing deployment."
+    )
+    assert "gh workflow run cloudflare-pages.yml" not in workflow, (
+        "Only Builder Production Promotion may dispatch Cloudflare Pages directly."
+    )
+    assert workflow.index("Publish OOS and probability reports without stale source fingerprints") < workflow.index("Dispatch ordered Builder Production Promotion after fresh NBA report publication"), (
+        "Promotion must be dispatched only after both report files pass source-fingerprint verification and publication."
+    )
+    promotion_workflow = (Path(__file__).resolve().parents[1] / ".github/workflows/builder-production-promotion.yml").read_text(encoding="utf-8")
+    assert "workflow_dispatch:" in promotion_workflow, (
+        "The ordered Builder Production Promotion must support the explicit report-completion handoff."
     )
     pages_workflow = (Path(__file__).resolve().parents[1] / ".github/workflows/cloudflare-pages.yml").read_text(encoding="utf-8")
     assert "  workflow_dispatch:" in pages_workflow, (
