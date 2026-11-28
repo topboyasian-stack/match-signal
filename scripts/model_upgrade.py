@@ -66,6 +66,7 @@ def valid_market(row):
                     "draw": probs[1],
                     "p2": probs[2],
                     "odds": sporty_odds,
+                    "odds_format": "decimal",
                     "source": "SportyBet NG de-vig current market"
                 }
         except (TypeError, ValueError, ZeroDivisionError):
@@ -81,7 +82,13 @@ def valid_market(row):
             return None
         if any(o is None for o in odds):
             return None
-        return {"p1": values[0], "draw": values[1], "p2": values[2], "odds": odds, "source": row.get("market_source")}
+        source = str(row.get("market_source") or "")
+        # enrich_market_snapshot.py stores raw ESPN American moneyline prices.
+        odds_format = "american" if source == "ESPN core bookmaker odds" else row.get("market_odds_format", "american")
+        return {
+            "p1": values[0], "draw": values[1], "p2": values[2],
+            "odds": odds, "odds_format": odds_format, "source": source,
+        }
     except (TypeError, ValueError, KeyError):
         return None
 
@@ -142,7 +149,7 @@ def _record_ucl_shadow_fields(row, independent, calibrated, market, calibration)
     if market:
         odds = [float(value) for value in market["odds"]]
         index = keys.index(pick)
-        edge, expected_value = edge_and_ev(shadow_calibrated[pick], odds[index])
+        edge, expected_value = edge_and_ev(shadow_calibrated[pick], odds[index], odds_format=market.get('odds_format', 'american'))
         row["independent_shadow_market"] = {
             "source": market.get("source"),
             "probabilities": {key: round(float(market[key]), 6) for key in keys},
@@ -567,14 +574,14 @@ def main():
                 row["market_source"] = market.get("source") or row.get("market_source") or "stored contemporaneous market"
                 pick_key = row["pick"]
                 pick_idx = ("p1", "draw", "p2").index(pick_key)
-                edge, ev = edge_and_ev(final_vector[pick_idx], market["odds"][pick_idx])
+                edge, ev = edge_and_ev(final_vector[pick_idx], market["odds"][pick_idx], odds_format=market.get("odds_format", "american"))
                 row["edge"] = edge
                 row["value"] = {
                     "expected_value": ev,
                     "odds": market["odds"][pick_idx],
                     "market_implied": market[pick_key],
                 }
-                dec = decision(final_vector[pick_idx], market["odds"][pick_idx], sample_ok=False)
+                dec = decision(final_vector[pick_idx], market["odds"][pick_idx], odds_format=market.get("odds_format", "american"), sample_ok=False)
                 row["decision"] = dec["decision"]
                 row["decision_reason"] = dec["reason"]
                 if edge is not None and edge >= 0.035 and ev is not None and ev >= 0.05:

@@ -91,6 +91,8 @@ jobs:
         run: PYTHONPATH=scripts python scripts/test_ucl_shadow_contract.py
       - name: Test alternate domestic-history fallback and competition isolation
         run: PYTHONPATH=scripts:. python scripts/test_ucl_history_coverage.py
+      - name: Test explicit American and decimal odds value math
+        run: python scripts/test_value_decision.py
       - name: Test competition-scoped football ensemble and fail-closed model updates
         run: |
           python -m py_compile scripts/football_prequential_ensemble.py scripts/model_upgrade.py scripts/test_football_prequential_ensemble.py scripts/test_model_upgrade_football_ensemble.py
