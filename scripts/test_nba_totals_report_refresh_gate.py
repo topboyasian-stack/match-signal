@@ -7,6 +7,7 @@ import tempfile
 
 from nba_totals_report_refresh_gate import (
     SOURCE_DATA_FILES,
+    SOURCE_CODE_FILES,
     latest_snapshot_evidence_time,
     report_source_fingerprint_matches,
     should_refresh_report,
@@ -55,7 +56,7 @@ def run():
     # Fingerprints, not generated_at alone, must detect that race.
     with tempfile.TemporaryDirectory() as temp_dir:
         root = Path(temp_dir)
-        for relative in SOURCE_DATA_FILES:
+        for relative in SOURCE_DATA_FILES + SOURCE_CODE_FILES:
             path = root / relative
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text("version-one", encoding="utf-8")
@@ -73,9 +74,18 @@ def run():
         assert not report_source_fingerprint_matches(
             {"source_data_fingerprint": first_fingerprint}, second_fingerprint
         )
+        # A data-identical report from an older evaluator must still be rejected.
+        changed_code = root / "scripts/nba_totals_walk_forward.py"
+        changed_code.write_text("evaluator-version-two", encoding="utf-8")
+        third_fingerprint = source_data_fingerprint(root)
+        assert third_fingerprint != second_fingerprint
+        assert not report_source_fingerprint_matches(
+            {"source_data_fingerprint": second_fingerprint}, third_fingerprint
+        ), "Evaluator-code changes must invalidate previously generated reports."
+
         report_path = root / "data/nba_totals_probability_value_experiment.json"
         report_path.write_text(
-            json.dumps({"source_data_fingerprint": second_fingerprint}),
+            json.dumps({"source_data_fingerprint": third_fingerprint}),
             encoding="utf-8",
         )
         verifier_ok, verifier_mismatches = verify_nba_totals_report_fingerprint(root)
