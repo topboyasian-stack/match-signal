@@ -6,6 +6,9 @@ on:
       - 'scripts/expansion_pipeline.py'
       - 'scripts/test_expansion_sources.py'
       - 'scripts/nba_totals_walk_forward.py'
+      - 'scripts/nba_totals_report_refresh_gate.py'
+      - 'scripts/test_nba_totals_report_refresh_gate.py'
+      - 'scripts/verify_nba_totals_report_fingerprint.py'
       - 'scripts/test_nba_totals_walk_forward.py'
       - 'scripts/live_expansion_pipeline.py'
       - 'scripts/settle_nba_totals.py'
@@ -38,6 +41,9 @@ on:
       - 'scripts/expansion_pipeline.py'
       - 'scripts/test_expansion_sources.py'
       - 'scripts/nba_totals_walk_forward.py'
+      - 'scripts/nba_totals_report_refresh_gate.py'
+      - 'scripts/test_nba_totals_report_refresh_gate.py'
+      - 'scripts/verify_nba_totals_report_fingerprint.py'
       - 'scripts/test_nba_totals_walk_forward.py'
       - 'scripts/live_expansion_pipeline.py'
       - 'scripts/settle_nba_totals.py'
@@ -88,6 +94,8 @@ jobs:
         run: node scripts/test_odds_builder_ui_freshness.mjs
       - name: Run shared ticket-drawer contract
         run: python scripts/test_ticket_drawer_contract.py
+      - name: Run NBA report source-fingerprint regression
+        run: PYTHONPATH=scripts python scripts/test_nba_totals_report_refresh_gate.py
       - name: Run NBA source and season-isolation tests
         run: |
           python scripts/test_expansion_sources.py
