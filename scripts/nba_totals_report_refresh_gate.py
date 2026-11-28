@@ -35,12 +35,23 @@ SOURCE_DATA_FILES = (
     "data/nba_totals_oos_value_test.json",
 )
 
+# Bind each published report to the code that produced it, not only the data
+# files. This prevents a run that started on an older checkout from publishing
+# its candidate after main advances to different scoring or eligibility logic.
+SOURCE_CODE_FILES = (
+    "scripts/expansion_pipeline.py",
+    "scripts/nba_totals_walk_forward.py",
+    "scripts/refresh_nba_totals_oos_report.py",
+    "scripts/nba_totals_probability_value_experiment.py",
+    "scripts/nba_totals_report_refresh_gate.py",
+)
+
 
 def source_data_fingerprint(root="."):
-    """Hash the immutable inputs used by the report and its release-gate evidence."""
+    """Hash report data inputs and the evaluator code that produced them."""
     root_path = Path(root)
     result = {}
-    for relative in SOURCE_DATA_FILES:
+    for relative in SOURCE_DATA_FILES + SOURCE_CODE_FILES:
         path = root_path / relative
         if not path.is_file():
             result[relative] = None
